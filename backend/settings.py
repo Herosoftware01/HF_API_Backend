@@ -46,8 +46,8 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt.token_blacklist', 
     'rest_framework',
     'corsheaders',
-
     'herofashion',
+    'qcapp',
 ]
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'

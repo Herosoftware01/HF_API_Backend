@@ -23,6 +23,7 @@ from django.conf import settings
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', include('herofashion.urls')),
+    path('qcapp/', include('qcapp.urls'))
 
 ] 
 
