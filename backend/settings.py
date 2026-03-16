@@ -48,7 +48,9 @@ INSTALLED_APPS = [
     'corsheaders',
     'herofashion',
     'qcapp',
+    'syncfushion',
 ]
+
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
