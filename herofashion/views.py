@@ -169,7 +169,11 @@ class SidebarView(APIView):
             menu["submenus"] = sorted(menu["submenus"], key=lambda x: x["id"])
 
         return Response({
-            "menus": list(menu_dict.values())
+            "menus": list(menu_dict.values()),
+            "user": {
+                "id": request.user.id,
+                "username": request.user.username
+            }
         })
 
 
