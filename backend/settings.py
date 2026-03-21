@@ -137,6 +137,18 @@ DATABASES = {
             'trusted_connection': "yes"
         }
     },
+    'main': {
+        'ENGINE': 'mssql',
+        'NAME': 'Garmentrk',
+        'USER': 'sa',
+        'PASSWORD': 'Fashion@01',
+        'HOST': '10.1.21.11',
+        'PORT': '1433',
+        'OPTIONS': {
+            'driver': 'ODBC Driver 17 for SQL Server',
+            'trusted_connection': "yes"
+        }
+    },
 }
 
 # Password validation
@@ -178,5 +190,12 @@ STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 #     os.path.join(BASE_DIR, 'static'),
 # ]
 
+
+
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
+STAFF_IMAGES_URL = '/staff_images/'
+STAFF_IMAGES_ROOT = r'\\10.1.21.11\D\Staff_Employee_Images'
+
+

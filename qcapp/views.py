@@ -1,17 +1,19 @@
 from django.shortcuts import render
-from django.db import connection
 from django.db import connections
 from rest_framework.decorators import api_view
-
-
-
+import pandas as pd
+from django.http import HttpResponse
+from django.core.exceptions import ValidationError
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, permissions
-from .models import QcAdminMistake,Line,qc_piece_final
-from .serializers import QcAdminMistakeSerializer,LineSerializer
+from .models import QcAdminMistake,Unit,Line,qc_piece_final, MachineAllocation, machine_details, emp_allocate, Empwisesal, VueProcessSequence
+from .serializers import QcAdminMistakeSerializer,UnitSerializer,MachineSerializer,LineSerializer, MachineAllocationSerializer, VueProcessSequenceSerializer
 from rest_framework.parsers import MultiPartParser, FormParser
 from collections import defaultdict
+
+from datetime import date
+from django.utils.timezone import now
 
 
 
@@ -286,11 +288,10 @@ def get_last_bundle(request):
     print("line",line)
     print("bundle_id",bundle_id)
     print("piece",piece)
-
-    # ✅ count checked pieces
+    #  count checked pieces
     # checked_count = qc_piece_data.objects.filter(bundle_id=bundle_id).count()
 
-    # ✅ check if completed
+    #  check if completed
     is_completed = qc_piece_final.objects.filter(bundle_id=bundle_id).exists()
 
     return Response({
@@ -307,43 +308,6 @@ def get_last_bundle(request):
     })
 
 
-# @api_view(["GET"])
-# def get_last_bundle(request):
-#     from .models import qc_piece_data, qc_piece_final
-
-#     unit = request.GET.get("unit")
-#     line = request.GET.get("line")
-
-#     if not unit or not line:
-#         return Response({"error": "unit and line required"}, status=400)
-
-#     #  filter by unit + line
-#     last = qc_piece_data.objects.filter(unit=unit, line=line).order_by("-id").first()
-
-#     if not last:
-#         return Response({"error": "No bundle found"}, status=404)
-
-#     bundle_id = last.bundle_id
-
-#     # check completion
-#     is_completed = qc_piece_final.objects.filter(
-#         bundle_id=bundle_id,
-#         unit=unit,
-#         line=line
-#     ).exists()
-
-#     return Response({
-#         "bundle_id": bundle_id,
-#         "bundle_no": last.bundle_no,
-#         "jobno": last.jobno,
-#         "product": last.product,
-#         "color": last.color,
-#         "size": last.size,
-#         "total_pieces": last.total_pieces,
-#         "piece_no":last.piece_no,
-#         "checked_pieces": last.piece_no,
-#         "is_completed": is_completed
-#     })
 
 @api_view(["GET"])
 def check_bundle_entry_status(request):
@@ -364,4 +328,237 @@ def check_bundle_entry_status(request):
 
     else:
         return Response({"status": "new"})  # normal flow
+    
 
+
+def import_machine_details_from_excel(request):
+    file_path = 'C:/Users/Murthy/Desktop/Full App/HF_API/machine.xlsx'
+
+    try:
+        # Read Excel, header is at row 4 (index 3)
+        df = pd.read_excel(file_path, header=3)
+
+        # Clean column names
+        df.columns = df.columns.str.strip()
+
+        required_columns = ['Identity', 'Item', 'Description']
+
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            return HttpResponse(f"Error: Missing columns {missing_cols}")
+
+        # Drop rows with empty required fields
+        df = df.dropna(subset=required_columns)
+
+        count = 0
+        skipped = 0
+
+        for _, row in df.iterrows():
+            try:
+                machine_details.objects.create(
+                    Identity=str(row['Identity']).strip(),
+                    Item=str(row['Item']).strip(),
+                    Description=str(row['Description']).strip()
+                )
+                count += 1
+            except Exception as e:
+                # Likely a unique constraint or DB error
+                skipped += 1
+                continue
+
+        return HttpResponse(f"Success: {count} records imported, {skipped} skipped due to DB constraints")
+
+    except Exception as e:
+        return HttpResponse(f"Error: {str(e)}")
+
+
+# ------------------ Machines ------------------
+# class MachineListAPIView(APIView):
+#     permission_classes = [permissions.IsAuthenticated]
+
+#     def get(self, request):
+#         machines = machine_details.objects.all()
+#         serializer = MachineSerializer(machines, many=True)
+#         return Response(serializer.data)
+
+class MachineListAPIView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        # Get IDs of already allocated machines
+        allocated_ids = MachineAllocation.objects.values_list('machine_id', flat=True)
+        
+        # Exclude allocated machines from the queryset
+        unallocated_machines = machine_details.objects.exclude(id__in=allocated_ids)
+        
+        serializer = MachineSerializer(unallocated_machines, many=True)
+        return Response(serializer.data)
+
+# ------------------ Units ------------------
+class UnitListAPIView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        units = Unit.objects.all()
+        serializer = UnitSerializer(units, many=True)
+        return Response(serializer.data)
+
+# ------------------ Lines ------------------
+class LineListAPIView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        unit_id = request.GET.get("unit")
+        if unit_id:
+            lines = Line.objects.filter(unit_id=unit_id)
+        else:
+            lines = Line.objects.all()
+        serializer = LineSerializer(lines, many=True)
+        return Response(serializer.data)
+
+# ------------------ Machine Allocation ------------------
+class MachineAllocationAPIView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        unit_id = request.GET.get("unit")
+        line_id = request.GET.get("line")
+
+        allocations = MachineAllocation.objects.all()
+        if unit_id:
+            allocations = allocations.filter(unit=unit_id)
+        if line_id:
+            allocations = allocations.filter(line=line_id)
+
+        serializer = MachineAllocationSerializer(allocations, many=True)
+        return Response(serializer.data)
+
+    def post(self, request):
+        machines = request.data.get("machine_id")  # use `machine_id` consistently
+        unit_id = request.data.get("unit")
+        line_id = request.data.get("line")
+
+        if not machines or not unit_id or not line_id:
+            return Response({"error": "machine_id, unit and line are required"}, status=400)
+
+        if not isinstance(machines, list):
+            machines = [machines]
+
+        created_allocations = []
+
+        for m_id in machines:
+            serializer = MachineAllocationSerializer(data={
+                "machine_id": m_id,
+                "unit": unit_id,
+                "line": line_id
+            })
+            if serializer.is_valid():
+                allocation = serializer.save()
+                created_allocations.append(MachineAllocationSerializer(allocation).data)
+            else:
+                return Response(serializer.errors, status=400)
+
+        return Response(created_allocations, status=201)
+
+class MachineAllocationDetailAPIView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_object(self, pk):
+        try:
+            return MachineAllocation.objects.get(pk=pk)
+        except MachineAllocation.DoesNotExist:
+            return None
+
+    def delete(self, request, pk):
+        allocation = self.get_object(pk)
+        if not allocation:
+            return Response({"error": "Not found"}, status=404)
+        allocation.delete()
+        return Response({"message": "Deleted successfully"}, status=204)
+
+
+# class EmployeeAPIView(APIView):
+#     def get(self, request):
+#         employees = Empwisesal.objects.using('main').filter(status='working').values()
+
+#         data = [
+#             {
+#                 "code": emp.code,
+#                 "name": emp.name
+#             }
+#             for emp in employees
+#         ]
+
+#         return Response(data)
+
+
+class EmployeeAPIView(APIView):
+    def get(self, request):
+        
+        employees = Empwisesal.objects.using('main').filter(status='working').values('code', 'name', 'photo')
+
+        data = [
+            {
+                "code": emp['code'],
+                "name": emp['name'],
+            }
+            for emp in employees
+        ]
+      
+        return Response(data)
+
+
+
+class EmpAllocateAPIView(APIView):
+    def post(self, request):
+        emp_code = request.data.get("emp_code")
+        machine_id = request.data.get("machine_id")
+        unit = request.data.get("unit")
+        line = request.data.get("line")
+        status = request.data.get("status", 1)  # default online
+
+        if not emp_code or not machine_id or not unit or not line:
+            return Response(
+                {"error": "emp_code, machine_id, unit and line are required"},
+                status=400
+            )
+
+        today = now().date()
+
+        # Check if employee already allocated today
+        allocation = emp_allocate.objects.filter(
+            emp_code=emp_code,
+            machine_id=machine_id,
+            unit=unit,
+            line=line,
+            date=today  # use correct field
+        ).first()
+
+        if allocation:
+            allocation.status = status
+            allocation.save()
+            return Response({"message": "Status updated"})
+        else:
+            emp_allocate.objects.create(
+                emp_code=emp_code,
+                machine_id=machine_id,
+                unit=unit,
+                line=line,
+                status=status,
+                date=today
+            )
+            return Response({"message": "Employee allocated"})
+
+
+
+@api_view(['GET'])
+def get_process_sequence(request):
+    jobno = request.query_params.get('jobno')
+    topbottom_des = request.query_params.get('topbottom_des')
+
+    if not jobno or not topbottom_des:
+        return Response({"error": "jobno and topbottom_des are required"}, status=400)
+
+    queryset = VueProcessSequence.objects.using('demo').filter(jobno=jobno, topbottom_des=topbottom_des).order_by('sl')
+    serializer = VueProcessSequenceSerializer(queryset, many=True)
+    return Response(serializer.data)
