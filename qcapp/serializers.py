@@ -8,7 +8,6 @@ class QcAdminMistakeSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
-
 class LineSerializer(serializers.ModelSerializer):
     class Meta:
         model = Line

@@ -121,6 +121,19 @@ DATABASES = {
             'trusted_connection': "yes"
         }
     },
+
+    'demo': {
+        'ENGINE': 'mssql',
+        'NAME': 'Tally2sql',
+        'USER': 'sa',
+        'PASSWORD': 'Fashion@01',
+        'HOST': '10.1.21.11',
+        'PORT': '1433',
+        'OPTIONS': {
+            'driver': 'ODBC Driver 17 for SQL Server',
+            'trusted_connection': "yes"
+        }
+    },
 }
 
 
