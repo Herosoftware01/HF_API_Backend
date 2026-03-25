@@ -45,31 +45,38 @@ class UserListView(APIView):
 
         return Response(user_data)
 
+
 # class SidebarView(APIView):
 #     permission_classes = [IsAuthenticated]
 
 #     def get(self, request):
-#         user = request.user
-#         role = user.role
+
+#         role_id = request.GET.get("role_id")
+
+#         # ✅ If role_id is passed → use that role
+#         if role_id:
+#             try:
+#                 role = Role.objects.get(id=role_id)
+#             except Role.DoesNotExist:
+#                 return Response({"menus": []})
+#         else:
+#             # ✅ Otherwise use logged-in user role
+#             role = request.user.role
 
 #         if not role:
-#             return Response({
-#                 "user": {"id": user.id, "username": user.username},
-#                 "menus": []
-#             })
+#             return Response({"menus": []})
 
-#         # Step 1: Allowed menus
+#         # 🔹 Step 1: Allowed Menus
 #         allowed_menus = RoleMenuPermission.objects.filter(
-#             role=role, can_view=True
-#         ).select_related('menu').order_by('menu__order')
+#             role=role,
+#             can_view=True
+#         ).select_related("menu").order_by("menu__order")
 
 #         if not allowed_menus.exists():
-#             return Response({
-#                 "user": {"id": user.id, "username": user.username},
-#                 "menus": []
-#             })
+#             return Response({"menus": []})
 
 #         menu_dict = {}
+
 #         for rm in allowed_menus:
 #             menu = rm.menu
 #             menu_dict[menu.id] = {
@@ -79,28 +86,36 @@ class UserListView(APIView):
 #                 "submenus": []
 #             }
 
-#         # Step 2: Allowed submenus
+#         # 🔹 Step 2: Allowed Submenus
 #         sub_permissions = RoleSubMenuPermission.objects.filter(
 #             role=role,
 #             can_view=True,
 #             submenu__menu__in=[rm.menu for rm in allowed_menus]
-#         ).select_related('submenu__menu').order_by('submenu__menu__order', 'submenu__id')
+#         ).select_related("submenu__menu").order_by(
+#             "submenu__menu__order",
+#             "submenu__id"
+#         )
 
 #         for perm in sub_permissions:
 #             menu_id = perm.submenu.menu.id
-#             menu_dict[menu_id]["submenus"].append({
-#                 "id": perm.submenu.id,
-#                 "name": perm.submenu.name,
-#                 "path": perm.submenu.path
-#             })
 
-#         # Step 3: Sort submenus
+#             if menu_id in menu_dict:
+#                 menu_dict[menu_id]["submenus"].append({
+#                     "id": perm.submenu.id,
+#                     "name": perm.submenu.name,
+#                     "path": perm.submenu.path
+#                 })
+
+#         # 🔹 Sort Submenus
 #         for menu in menu_dict.values():
 #             menu["submenus"] = sorted(menu["submenus"], key=lambda x: x["id"])
 
 #         return Response({
-#             "user": {"id": user.id, "username": user.username},
-#             "menus": list(menu_dict.values())
+#             "menus": list(menu_dict.values()),
+#             "user": {
+#                 "id": request.user.id,
+#                 "username": request.user.username
+#             }
 #         })
 
 
@@ -108,23 +123,12 @@ class SidebarView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-
-        role_id = request.GET.get("role_id")
-
-        # ✅ If role_id is passed → use that role
-        if role_id:
-            try:
-                role = Role.objects.get(id=role_id)
-            except Role.DoesNotExist:
-                return Response({"menus": []})
-        else:
-            # ✅ Otherwise use logged-in user role
-            role = request.user.role
+        role = request.user.role
 
         if not role:
             return Response({"menus": []})
 
-        # 🔹 Step 1: Allowed Menus
+        # ✅ STEP 1: MENUS
         allowed_menus = RoleMenuPermission.objects.filter(
             role=role,
             can_view=True
@@ -144,29 +148,58 @@ class SidebarView(APIView):
                 "submenus": []
             }
 
-        # 🔹 Step 2: Allowed Submenus
-        sub_permissions = RoleSubMenuPermission.objects.filter(
+        # ✅ STEP 2: SUBMENU PERMISSIONS
+        allowed_submenus = RoleSubMenuPermission.objects.filter(
             role=role,
-            can_view=True,
-            submenu__menu__in=[rm.menu for rm in allowed_menus]
-        ).select_related("submenu__menu").order_by(
-            "submenu__menu__order",
-            "submenu__id"
-        )
+            can_view=True
+        ).select_related("submenu__parent", "submenu__menu")
 
-        for perm in sub_permissions:
-            menu_id = perm.submenu.menu.id
+        # ✅ STEP 3: INCLUDE PARENTS
+        def get_all_with_parents(perms):
+            result = {}
 
-            if menu_id in menu_dict:
-                menu_dict[menu_id]["submenus"].append({
-                    "id": perm.submenu.id,
-                    "name": perm.submenu.name,
-                    "path": perm.submenu.path
-                })
+            for perm in perms:
+                s = perm.submenu
+                result[s.id] = s
 
-        # 🔹 Sort Submenus
+                parent = s.parent
+                while parent:
+                    result[parent.id] = parent
+                    parent = parent.parent
+
+            return list(result.values())
+
+        submenu_objects = get_all_with_parents(allowed_submenus)
+
+        # ✅ STEP 4: BUILD TREE
+        def build_tree(submenus):
+            tree = []
+            mapping = {}
+
+            for s in submenus:
+                mapping[s.id] = {
+                    "id": s.id,
+                    "name": s.name,
+                    "path": s.path,
+                    "children": [],
+                    "menu_id": s.menu.id
+                }
+
+            for s in submenus:
+                if s.parent_id and s.parent_id in mapping:
+                    mapping[s.parent_id]["children"].append(mapping[s.id])
+                else:
+                    tree.append(mapping[s.id])
+
+            return tree
+
+        submenu_tree = build_tree(submenu_objects)
+
+        # ✅ STEP 5: ATTACH TO MENU
         for menu in menu_dict.values():
-            menu["submenus"] = sorted(menu["submenus"], key=lambda x: x["id"])
+            menu["submenus"] = [
+                s for s in submenu_tree if s["menu_id"] == menu["id"]
+            ]
 
         return Response({
             "menus": list(menu_dict.values()),
@@ -225,8 +258,13 @@ class ToggleUserStatusAPI(APIView):
 
 
 # views.py
+# class MenuListCreateAPI(generics.ListCreateAPIView):
+#     queryset = Menu.objects.all().order_by('order')
+#     serializer_class = MenuSerializer
+#     permission_classes = [permissions.IsAuthenticated]
+
 class MenuListCreateAPI(generics.ListCreateAPIView):
-    queryset = Menu.objects.all().order_by('order')
+    queryset = Menu.objects.prefetch_related('submenus__children').all().order_by('order')
     serializer_class = MenuSerializer
     permission_classes = [permissions.IsAuthenticated]
 
