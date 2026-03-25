@@ -22,10 +22,28 @@ class Menu(models.Model):
         return self.name
 
 
+# class SubMenu(models.Model):
+#     menu = models.ForeignKey(Menu, related_name="submenus", on_delete=models.CASCADE)
+#     name = models.CharField(max_length=100)
+#     path = models.CharField(max_length=200)
+
+#     def __str__(self):
+#         return self.name
+    
 class SubMenu(models.Model):
     menu = models.ForeignKey(Menu, related_name="submenus", on_delete=models.CASCADE)
+
+    # ✅ SELF REFERENCE (IMPORTANT)
+    parent = models.ForeignKey(
+        "self",
+        related_name="children",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True
+    )
+
     name = models.CharField(max_length=100)
-    path = models.CharField(max_length=200)
+    path = models.CharField(max_length=200, blank=True, null=True)
 
     def __str__(self):
         return self.name
