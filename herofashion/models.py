@@ -9,10 +9,6 @@ class Role(models.Model):
         return self.name
 
 
-class User(AbstractUser):
-    role = models.ForeignKey(Role, on_delete=models.SET_NULL, null=True)
-
-
 class Menu(models.Model):
     name = models.CharField(max_length=100)
     icon = models.ImageField(upload_to="menu_icons/", blank=True, null=True)
@@ -21,19 +17,10 @@ class Menu(models.Model):
     def __str__(self):
         return self.name
 
-
-# class SubMenu(models.Model):
-#     menu = models.ForeignKey(Menu, related_name="submenus", on_delete=models.CASCADE)
-#     name = models.CharField(max_length=100)
-#     path = models.CharField(max_length=200)
-
-#     def __str__(self):
-#         return self.name
-    
+   
 class SubMenu(models.Model):
     menu = models.ForeignKey(Menu, related_name="submenus", on_delete=models.CASCADE)
 
-    # ✅ SELF REFERENCE (IMPORTANT)
     parent = models.ForeignKey(
         "self",
         related_name="children",
@@ -44,9 +31,24 @@ class SubMenu(models.Model):
 
     name = models.CharField(max_length=100)
     path = models.CharField(max_length=200, blank=True, null=True)
+    order = models.IntegerField(default=0)
 
     def __str__(self):
         return self.name
+
+    class Meta:
+        ordering = ['order']
+
+
+class User(AbstractUser):
+    role = models.ForeignKey(Role, on_delete=models.SET_NULL, null=True)
+    default_submenu = models.ForeignKey(
+        SubMenu,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        help_text="Select default submenu to open after login"
+    )
 
 
 class RoleMenuPermission(models.Model):

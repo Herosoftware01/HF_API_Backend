@@ -67,7 +67,7 @@ class machine_details(models.Model):
     Identity = models.CharField(max_length=100)
     Item = models.CharField(max_length=100)
     Description = models.CharField(max_length=100)
-    mcgrp = models.CharField(db_column='MCGRP', max_length=50,blank=True, null=True)
+    mcgrp = models.CharField(max_length=50,blank=True, null=True)
 
 
 class MachineAllocation(models.Model):
