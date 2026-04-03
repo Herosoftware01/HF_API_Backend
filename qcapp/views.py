@@ -7,7 +7,7 @@ from django.core.exceptions import ValidationError
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, permissions
-from .models import QcAdminMistake,Unit,Line,qc_piece_final, MachineAllocation, machine_details, emp_allocate, Empwisesal, VueProcessSequence
+from .models import QcAdminMistake,Unit,Line,roving_qc_mistake,qc_piece_final, MachineAllocation, machine_details, emp_allocate, Empwisesal, VueProcessSequence
 from .serializers import QcAdminMistakeSerializer,UnitSerializer,MachineTrasnsferSerializer,MachineSerializer,LineSerializer, MachineAllocationSerializer, VueProcessSequenceSerializer
 from rest_framework.parsers import MultiPartParser, FormParser
 from collections import defaultdict
@@ -217,30 +217,125 @@ class LineAPIView(APIView):
         
 
 
+# @api_view(['GET'])
+# def get_bundle_data(request):
+#     bundle_id = request.GET.get('bundle_id')
+
+#     if not bundle_id:
+#         return Response({"error": "bundle_id is required"}, status=400)
+
+#     with connections['demo'].cursor() as cursor:
+#         cursor.execute(
+#             "EXEC dbo.GetOrderBundleList_ByBundID @BundID=%s",
+#             [bundle_id]
+#         )
+
+#         columns = [col[0] for col in cursor.description]
+#         results = [
+#             dict(zip(columns, row))
+#             for row in cursor.fetchall()
+#         ]
+
+#     return Response(results)
+
+
+
 @api_view(['GET'])
 def get_bundle_data(request):
-    bundle_id = request.GET.get('bundle_id')
+    try:
+        bundle_id = request.GET.get('bundle_id')
 
-    if not bundle_id:
-        return Response({"error": "bundle_id is required"}, status=400)
+        if not bundle_id:
+            return Response({"error": "bundle_id is required"}, status=400)
 
-    with connections['demo'].cursor() as cursor:
-        cursor.execute(
-            "EXEC dbo.GetOrderBundleList_ByBundID @BundID=%s",
-            [bundle_id]
-        )
+        with connections['demo'].cursor() as cursor:
+            cursor.execute(
+                "EXEC dbo.GetOrderBundleList_ByBundID @BundID=%s",
+                [bundle_id]
+            )
 
-        columns = [col[0] for col in cursor.description]
-        results = [
-            dict(zip(columns, row))
-            for row in cursor.fetchall()
+            if cursor.description is None:
+                return Response({"message": "Bundle Not Found"}, status=404)
+
+            columns = [col[0] for col in cursor.description]
+            results = [
+                dict(zip(columns, row))
+                for row in cursor.fetchall()
+            ]
+
+        if not results:
+            return Response({"message": "Bundle Not Found"}, status=404)
+
+     
+        bundle_ids_from_api = [
+            str(item.get('bundid')) for item in results if item.get('bundid') is not None
         ]
 
-    return Response(results)
-        
+        checked_bundle_ids = set(
+            qc_piece_final.objects.filter(
+                bundle_id__in=bundle_ids_from_api
+            ).values_list('bundle_id', flat=True)
+        )
 
+        for item in results:
+            bund_id = str(item.get('bundid'))
+
+            if bund_id in checked_bundle_ids:
+                return Response({
+                    "message": "This bundle is already checked"
+                }, status=200)
+
+        return Response(results)
+
+    except Exception as e:
+        return Response(
+            {"error": "Something went wrong", "details": str(e)},
+            status=500
+        )
 
 from .models import qc_piece_data
+
+# @api_view(['POST'])
+# def save_piece(request):
+#     data = request.data
+#     bundle_no = data.get("bundle_no")
+#     bundle_id = data.get("bundle_id")
+#     jobno = data.get("jobno")
+#     product = data.get("product")
+#     color = data.get("color")
+#     size = data.get("size")
+#     unit = data.get("unit")
+#     line = data.get("line")
+#     qc_type = data.get("qc_type")
+#     total_pieces = data.get("total_pieces")
+#     piece_no = data.get("piece_no")
+#     total_mistake = data.get("total_mistake")
+#     mistake_percentage = data.get("mistake_percentage")
+#     defects = data.get("defects", [])
+
+#     for defect in defects:
+#         qc_piece_data.objects.create(
+#             bundle_no=bundle_no,
+#             bundle_id=bundle_id,
+#             jobno=jobno,
+#             product=product,
+#             color=color,
+#             size=size,
+#             unit=unit,
+#             line=line,
+#             qc_type=qc_type,
+#             total_pieces=total_pieces,
+#             piece_no=piece_no,
+#             total_mistake=total_mistake,
+#             mistake_percentage=mistake_percentage,
+#             category=defect.get("category", ""),
+#             mistake_name=defect.get("mistake_name", ""),
+#             mistake_count=defect.get("mistake_count", 0)
+#         )
+
+#     return Response({"status": "success"})
+
+
 
 @api_view(['POST'])
 def save_piece(request):
@@ -259,9 +354,17 @@ def save_piece(request):
     total_mistake = data.get("total_mistake")
     mistake_percentage = data.get("mistake_percentage")
     defects = data.get("defects", [])
+    emp_id = data.get("operator")
+    machine_id = data.get("machineId", "")
+    process = data.get("process", "")
+    shade_variation = data.get("shade_variation", False)
+    number_sticker = data.get("number_sticker", False)
+    remarks = data.get("remarks", "")
 
+    # Save defects to qc_piece_data
+    saved_pieces = []
     for defect in defects:
-        qc_piece_data.objects.create(
+        qc_piece = qc_piece_data.objects.create(
             bundle_no=bundle_no,
             bundle_id=bundle_id,
             jobno=jobno,
@@ -279,9 +382,22 @@ def save_piece(request):
             mistake_name=defect.get("mistake_name", ""),
             mistake_count=defect.get("mistake_count", 0)
         )
+        saved_pieces.append(qc_piece)
+
+    # If qc_type is 'rowing_qc', save extra info in roving_qc_mistake
+    if qc_type == "rowing_qc":
+        for qc_piece in saved_pieces:
+            roving_qc_mistake.objects.create(
+                qc_piece=qc_piece,
+                machine_id=machine_id,
+                operation=process,
+                emb_id=emp_id,  # add if you have embroidery ID
+                shade_var=shade_variation,
+                num_sticker=number_sticker,
+                remark=remarks
+            )
 
     return Response({"status": "success"})
-
 
 
 
@@ -360,9 +476,15 @@ def get_last_bundle(request):
         return Response({"error": "No bundle found"}, status=404)
 
     bundle_id = last.bundle_id
+    
     line = last.line
     unit= last.unit
     piece= last.piece_no
+
+    print("bundle_id", bundle_id)
+    print("line", line)
+    print("unit", unit)
+    print("qc_type", qc_type)
 
 
     is_completed = qc_piece_final.objects.filter(bundle_id=bundle_id).exists()

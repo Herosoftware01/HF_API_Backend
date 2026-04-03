@@ -63,6 +63,27 @@ class qc_piece_final(models.Model):
     qc_type = models.CharField(max_length=50)
 
 
+
+class roving_qc_mistake(models.Model):
+    qc_piece = models.ForeignKey(
+        qc_piece_data,
+        on_delete=models.CASCADE,
+        related_name='roving_mistakes'
+    )
+    machine_id = models.CharField(max_length=20)
+    operation = models.CharField(max_length=100)
+    emb_id = models.CharField(max_length=20)
+
+    shade_var = models.BooleanField(default=False)
+    num_sticker = models.BooleanField(default=False)
+
+    remark = models.CharField(max_length=200, blank=True, null=True)
+    date = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.qc_piece.bundle_no} - {self.machine_id} - {self.operation}"
+
+
 class machine_details(models.Model):
     Identity = models.CharField(max_length=100)
     Item = models.CharField(max_length=100)
