@@ -141,6 +141,7 @@ class SidebarView(APIView):
             "user": {
                 "id": request.user.id,
                 "username": request.user.username,
+                "user_id": request.user.id,
                 "default_path": request.user.default_submenu.path if request.user.default_submenu else "/dashboard"
             }
         })

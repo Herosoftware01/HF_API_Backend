@@ -340,6 +340,11 @@ from .models import qc_piece_data
 @api_view(['POST'])
 def save_piece(request):
     data = request.data
+    user_id = data.get("userId")
+
+    if not user_id:
+        return Response({"status": "error", "message": "user_id is required"}, status=400)
+    
     bundle_no = data.get("bundle_no")
     bundle_id = data.get("bundle_id")
     jobno = data.get("jobno")
@@ -360,6 +365,7 @@ def save_piece(request):
     shade_variation = data.get("shade_variation", False)
     number_sticker = data.get("number_sticker", False)
     remarks = data.get("remarks", "")
+    
 
     # Save defects to qc_piece_data
     saved_pieces = []
@@ -380,7 +386,8 @@ def save_piece(request):
             mistake_percentage=mistake_percentage,
             category=defect.get("category", ""),
             mistake_name=defect.get("mistake_name", ""),
-            mistake_count=defect.get("mistake_count", 0)
+            mistake_count=defect.get("mistake_count", 0),
+            user_id=user_id
         )
         saved_pieces.append(qc_piece)
 
@@ -412,6 +419,7 @@ def save_final_piece(request):
         size = request.data.get("size")
         unit = request.data.get("unit")
         line = request.data.get("line")
+        user_id = request.data.get("userId", None)
         qc_type = request.data.get("qc_type")
         total_pieces = int(request.data.get("total_pieces", 0))
         checked_piece = int(request.data.get("checked_piece", 0))
@@ -446,6 +454,7 @@ def save_final_piece(request):
             total_pieces=total_pieces,
             checked_piece=checked_piece,
             force_save=force_save,
+            user_id=user_id
         )
 
         return Response(

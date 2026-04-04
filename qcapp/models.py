@@ -1,6 +1,6 @@
 from django.db import models
-from django.db import models
 from django.core.exceptions import ValidationError
+import datetime
 
 
 class QcAdminMistake(models.Model):
@@ -47,6 +47,8 @@ class qc_piece_data(models.Model):
     total_mistake = models.IntegerField()
     mistake_percentage = models.CharField(max_length=20)
     qc_type = models.CharField(max_length=50)
+    user_id = models.IntegerField()
+    date = models.DateTimeField(default=datetime.datetime.now)
 
 class qc_piece_final(models.Model):
     bundle_no = models.CharField(max_length=20)
@@ -61,6 +63,8 @@ class qc_piece_final(models.Model):
     checked_piece = models.IntegerField()
     force_save = models.BooleanField(default=False)
     qc_type = models.CharField(max_length=50)
+    user_id = models.IntegerField()
+    date = models.DateTimeField(default=datetime.datetime.now)
 
 
 
