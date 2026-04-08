@@ -17,86 +17,6 @@ from django.utils.timezone import now
 from django.conf import settings
 
 
-
-# class QcAdminMistakeAPIView(APIView):
-#     permission_classes = [permissions.IsAuthenticated]
-
-#     # GET (List)
-#     def get(self, request):
-#         mistakes = QcAdminMistake.objects.all()
-#         serializer = QcAdminMistakeSerializer(mistakes, many=True)
-#         return Response(serializer.data)
-
-#     # POST (Create)
-#     def post(self, request):
-#         serializer = QcAdminMistakeSerializer(data=request.data)
-#         if serializer.is_valid():
-#             serializer.save()
-#             return Response(serializer.data, status=status.HTTP_201_CREATED)
-#         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
-# class QcAdminMistakeDetailAPIView(APIView):
-#     permission_classes = [permissions.IsAuthenticated]
-#     parser_classes = (MultiPartParser, FormParser)
-
-#     def get_object(self, pk):
-#         try:
-#             return QcAdminMistake.objects.get(pk=pk)
-#         except QcAdminMistake.DoesNotExist:
-#             return None
-
-#     # GET single
-#     def get(self, request, pk):
-#         mistake = self.get_object(pk)
-#         if not mistake:
-#             return Response({"error": "Not found"}, status=404)
-
-#         serializer = QcAdminMistakeSerializer(mistake)
-#         return Response(serializer.data)
-
-#     # PUT update
-#     def put(self, request, pk):
-#         mistake = self.get_object(pk)
-#         if not mistake:
-#             return Response({"error": "Not found"}, status=404)
-
-#         serializer = QcAdminMistakeSerializer(mistake, data=request.data)
-#         if serializer.is_valid():
-#             serializer.save()
-#             return Response(serializer.data)
-
-#         return Response(serializer.errors, status=400)
-
-#     # PATCH (partial update)
-#     def patch(self, request, pk):
-#         mistake = self.get_object(pk)
-#         if not mistake:
-#             return Response({"error": "Not found"}, status=404)
-
-#         serializer = QcAdminMistakeSerializer(
-#             mistake,
-#             data=request.data,
-#             partial=True
-#         )
-
-#         if serializer.is_valid():
-#             serializer.save()
-#             return Response(serializer.data)
-
-#         return Response(serializer.errors, status=400)
-
-#     # DELETE
-#     def delete(self, request, pk):
-#         mistake = self.get_object(pk)
-#         if not mistake:
-#             return Response({"error": "Not found"}, status=404)
-
-#         mistake.delete()
-#         return Response({"message": "Deleted successfully"}, status=204)
-    
-
-
-
 class QcAdminMistakeAPIView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
@@ -217,28 +137,6 @@ class LineAPIView(APIView):
         
 
 
-# @api_view(['GET'])
-# def get_bundle_data(request):
-#     bundle_id = request.GET.get('bundle_id')
-
-#     if not bundle_id:
-#         return Response({"error": "bundle_id is required"}, status=400)
-
-#     with connections['demo'].cursor() as cursor:
-#         cursor.execute(
-#             "EXEC dbo.GetOrderBundleList_ByBundID @BundID=%s",
-#             [bundle_id]
-#         )
-
-#         columns = [col[0] for col in cursor.description]
-#         results = [
-#             dict(zip(columns, row))
-#             for row in cursor.fetchall()
-#         ]
-
-#     return Response(results)
-
-
 
 @api_view(['GET'])
 def get_bundle_data(request):
@@ -294,47 +192,6 @@ def get_bundle_data(request):
         )
 
 from .models import qc_piece_data
-
-# @api_view(['POST'])
-# def save_piece(request):
-#     data = request.data
-#     bundle_no = data.get("bundle_no")
-#     bundle_id = data.get("bundle_id")
-#     jobno = data.get("jobno")
-#     product = data.get("product")
-#     color = data.get("color")
-#     size = data.get("size")
-#     unit = data.get("unit")
-#     line = data.get("line")
-#     qc_type = data.get("qc_type")
-#     total_pieces = data.get("total_pieces")
-#     piece_no = data.get("piece_no")
-#     total_mistake = data.get("total_mistake")
-#     mistake_percentage = data.get("mistake_percentage")
-#     defects = data.get("defects", [])
-
-#     for defect in defects:
-#         qc_piece_data.objects.create(
-#             bundle_no=bundle_no,
-#             bundle_id=bundle_id,
-#             jobno=jobno,
-#             product=product,
-#             color=color,
-#             size=size,
-#             unit=unit,
-#             line=line,
-#             qc_type=qc_type,
-#             total_pieces=total_pieces,
-#             piece_no=piece_no,
-#             total_mistake=total_mistake,
-#             mistake_percentage=mistake_percentage,
-#             category=defect.get("category", ""),
-#             mistake_name=defect.get("mistake_name", ""),
-#             mistake_count=defect.get("mistake_count", 0)
-#         )
-
-#     return Response({"status": "success"})
-
 
 
 @api_view(['POST'])
@@ -473,30 +330,53 @@ def save_final_piece(request):
 
 @api_view(["GET"])
 def get_last_bundle(request):
-    from .models import qc_piece_data, qc_piece_final
+    from .models import qc_piece_data, qc_piece_final, roving_qc_mistake
+
     unit = request.GET.get("unit")
     line = request.GET.get("line")
     qc_type = request.GET.get("qc_type")
 
-    last = qc_piece_data.objects.filter(unit=unit,line=line,qc_type=qc_type).order_by("-id").first()
-
+    last = qc_piece_data.objects.filter(
+        unit=unit,
+        line=line,
+        qc_type=qc_type
+    ).order_by("-id").first()
 
     if not last:
         return Response({"error": "No bundle found"}, status=404)
 
     bundle_id = last.bundle_id
-    
-    line = last.line
-    unit= last.unit
-    piece= last.piece_no
-
-    print("bundle_id", bundle_id)
-    print("line", line)
-    print("unit", unit)
-    print("qc_type", qc_type)
-
+    piece = last.piece_no
 
     is_completed = qc_piece_final.objects.filter(bundle_id=bundle_id).exists()
+
+    # =========================
+    # 👉 ROVING QC EXTRA DATA
+    # =========================
+    roving_data = {}
+
+    if qc_type and qc_type.strip().lower() == "rowing_qc":
+        mistakes = roving_qc_mistake.objects.filter(qc_piece__bundle_id=last.bundle_id)
+        print("Mistakes count for bundle:", mistakes.count())
+        roving_data = {
+            "machine_id": mistakes.first().machine_id if mistakes.exists() else None,
+            "operation": mistakes.first().operation if mistakes.exists() else None,
+            "operator": mistakes.first().emb_id if mistakes.exists() else None,
+            "user_id": last.user_id,
+            "roving_mistakes": [
+                {
+                    "machine_id": m.machine_id,
+                    "operation": m.operation,
+                    "emb_id": m.emb_id,
+                    "shade_var": m.shade_var,
+                    "num_sticker": m.num_sticker,
+                    "remark": m.remark
+                }
+                for m in mistakes
+            ]
+        }
+
+        print("roving_data", roving_data)
 
     return Response({
         "bundle_id": bundle_id,
@@ -506,11 +386,13 @@ def get_last_bundle(request):
         "color": last.color,
         "size": last.size,
         "total_pieces": last.total_pieces,
-        "piece_no":piece,
+        "piece_no": piece,
         "checked_pieces": piece,
-        "is_completed": is_completed   
-    })
+        "is_completed": is_completed,
 
+        # 👇 extra only for roving
+        **roving_data
+    })
 
 
 @api_view(["GET"])
@@ -725,7 +607,7 @@ class EmpAllocateAPIView(APIView):
             unit=unit,
             line=line,
             date=today  # use correct field
-        ).first()
+        ).first() # get latest allocation if multiple exist
 
         if allocation:
             allocation.status = status
@@ -758,58 +640,6 @@ def get_process_sequence(request):
 
 
 
-# @api_view(['GET'])
-# def get_machine_employee(request, identity):
-#     try:
-#         identity = identity.rstrip('/')
-
-#         machine = machine_details.objects.get(Identity__iexact=identity)
-
-#         today = now().date()
-
-#         last_entry = emp_allocate.objects.filter(
-#             machine=machine,
-#             date=today
-#         ).order_by('-id').first()
-
-#         # 🔥 default values
-#         emp_code = None
-#         emp_name = None
-#         photo_url = "https://www.example.com/default-profile.png"
-
-#         # ✅ only if allocation exists
-#         if last_entry:
-#             emp_code = last_entry.emp_code
-
-#             employee = Empwisesal.objects.using('main').filter(
-#                 status='working',
-#                 code=emp_code
-#             ).first()
-
-#             if employee:
-#                 emp_name = employee.name
-
-#                 if employee.photo:
-#                     filename = employee.photo.split('\\')[-1]
-#                     staff_url = settings.STAFF_IMAGES_URL.rstrip('/')
-#                     photo_url = f"http://127.0.0.1:8000/{staff_url}/{filename}"
-
-#         return Response({
-#             "machine_identity": machine.Identity,
-#             "machine_id": machine.id,
-#             "emp_code": emp_code,
-#             "employee_name": emp_name,
-#             "emp_photo": photo_url,
-#             "has_data": True if last_entry else False
-#         })
-
-#     except machine_details.DoesNotExist:
-#         return Response({
-#             "error": "Machine not found",
-#             "has_data": False
-#         }, status=404)
-
-
 
 @api_view(['GET'])
 def get_machine_employee(request, identity):
@@ -833,7 +663,7 @@ def get_machine_employee(request, identity):
                 if employee.photo:
                     filename = employee.photo.split('\\')[-1]
                     staff_url = settings.STAFF_IMAGES_URL.rstrip('/')
-                    photo_url = f"http://127.0.0.1:8000/{staff_url}/{filename}"
+                    photo_url = f"https://hfapi.herofashion.com/{staff_url}/{filename}"
 
         # Fetch matching processes from VueProcessSequence
         jobno = request.query_params.get('jobno')

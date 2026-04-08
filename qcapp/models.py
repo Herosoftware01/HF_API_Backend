@@ -251,6 +251,7 @@ class emp_allocate(models.Model):
     unit = models.IntegerField()
     line = models.IntegerField()
     status = models.BooleanField(default=False)
+    seq = models.CharField(max_length=100, null=True, blank=True)
 
 
 class VueProcessSequence(models.Model):

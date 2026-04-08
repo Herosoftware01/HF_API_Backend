@@ -85,7 +85,7 @@ class MachineAllocationSerializer(serializers.ModelSerializer):
             filename = emp_details.photo.split('\\')[-1]
             # Ensure no double slashes
             staff_url = settings.STAFF_IMAGES_URL.rstrip('/')
-            photo_url = f"http://127.0.0.1:8000/{staff_url}/{filename}"
+            photo_url = f"https://hfapi.herofashion.com/{staff_url}/{filename}"
         else:
             # Default profile picture if none exists
             photo_url = "https://www.example.com/default-profile.png"
@@ -112,27 +112,6 @@ class VueProcessSequenceSerializer(serializers.ModelSerializer):
         fields = ['process_des', 'sl', 'prsid']
 
 
-
-# class MachineTrasnsferSerializer(serializers.ModelSerializer):
-#     machine_id = serializers.PrimaryKeyRelatedField(
-#         queryset=machine_details.objects.all(),
-#         source='machine'
-#     )
-#     machine = serializers.CharField(source='machine.Identity', read_only=True)
-#     unit_name = serializers.CharField(source='unit.name', read_only=True)
-#     line_number = serializers.IntegerField(source='line.line_number', read_only=True)
-
-#     class Meta:
-#         model = MachineAllocation
-#         fields = ['id', 'machine', 'machine_id', 'unit', 'unit_name', 'line', 'line_number', 'allocated_at']
-
-#     def validate(self, data):
-#         # Validate that line belongs to the unit
-#         unit = data.get('unit', getattr(self.instance, 'unit', None))
-#         line = data.get('line', getattr(self.instance, 'line', None))
-#         if line and unit and line.unit != unit:
-#             raise serializers.ValidationError("Selected line does not belong to the selected unit")
-#         return data
 
 
 class MachineTrasnsferSerializer(serializers.ModelSerializer):
