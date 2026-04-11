@@ -7,7 +7,7 @@ from django.core.exceptions import ValidationError
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, permissions
-from .models import QcAdminMistake,Unit,Line,roving_qc_mistake,qc_piece_final, MachineAllocation, machine_details, emp_allocate, Empwisesal, VueProcessSequence
+from .models import QcAdminMistake,Unit,Line,roving_qc_mistake,qc_piece_final,VueUser, MachineAllocation, machine_details, emp_allocate, Empwisesal, VueProcessSequence
 from .serializers import QcAdminMistakeSerializer,UnitSerializer,MachineTrasnsferSerializer,MachineSerializer,LineSerializer, MachineAllocationSerializer, VueProcessSequenceSerializer
 from rest_framework.parsers import MultiPartParser, FormParser
 from collections import defaultdict
@@ -277,6 +277,7 @@ def save_final_piece(request):
         unit = request.data.get("unit")
         line = request.data.get("line")
         user_id = request.data.get("userId", None)
+        seq = request.data.get("seq")
         qc_type = request.data.get("qc_type")
         total_pieces = int(request.data.get("total_pieces", 0))
         checked_piece = int(request.data.get("checked_piece", 0))
@@ -311,7 +312,8 @@ def save_final_piece(request):
             total_pieces=total_pieces,
             checked_piece=checked_piece,
             force_save=force_save,
-            user_id=user_id
+            user_id=user_id,
+            seq=seq
         )
 
         return Response(
@@ -567,19 +569,65 @@ class MachineAllocationDetailAPIView(APIView):
 
 
 
+# class EmployeeAPIView(APIView):
+#     def get(self, request):
+        
+#         employees = Empwisesal.objects.using('main').filter(status='working').values('code', 'name', 'photo','dept')
+
+#         data = [
+#             {
+#                 "code": emp['code'],
+#                 "name": emp['name'],
+#                 "dept": emp['dept'],
+#             }
+#             for emp in employees
+#         ]
+      
+#         return Response(data)
+
+
 class EmployeeAPIView(APIView):
     def get(self, request):
+        employees = Empwisesal.objects.using('main').filter(status='working').values('code', 'name', 'photo', 'dept')
         
-        employees = Empwisesal.objects.using('main').filter(status='working').values('code', 'name', 'photo')
+        staff_url = settings.STAFF_IMAGES_URL.rstrip('/')
 
-        data = [
-            {
+        data = []
+        for emp in employees:
+            photo_url = None
+            if emp.get('photo'):
+                filename = emp['photo'].split('\\')[-1]
+                photo_url = f"https://hfapi.herofashion.com/{staff_url}/{filename}"
+
+            data.append({
                 "code": emp['code'],
                 "name": emp['name'],
-            }
-            for emp in employees
-        ]
-      
+                "dept": emp['dept'],
+                "photo": photo_url,
+            })
+
+        return Response(data)
+
+class Employee_and_staffAPIView(APIView):
+    def get(self, request):
+        employees = VueUser.objects.using('main').values('code', 'name', 'photo', 'wunit')
+        
+        staff_url = settings.STAFF_IMAGES_URL.rstrip('/')
+
+        data = []
+        for emp in employees:
+            photo_url = None
+            if emp.get('photo'):
+                filename = emp['photo'].split('\\')[-1]
+                photo_url = f"https://hfapi.herofashion.com/{staff_url}/{filename}"
+
+            data.append({
+                "code": emp['code'],
+                "name": emp['name'],
+                "dept": emp['wunit'],
+                "photo": photo_url,
+            })
+
         return Response(data)
 
 
@@ -591,6 +639,8 @@ class EmpAllocateAPIView(APIView):
         unit = request.data.get("unit")
         line = request.data.get("line")
         status = request.data.get("status", 1)  # default online
+        sequence = request.data.get("sequence")
+        
 
         if not emp_code or not machine_id or not unit or not line:
             return Response(
@@ -609,10 +659,16 @@ class EmpAllocateAPIView(APIView):
             date=today  # use correct field
         ).first() # get latest allocation if multiple exist
 
+        # if allocation:
+        #     allocation.status = status
+        #     allocation.save()
+        #     return Response({"message": "Status updated"})
         if allocation:
+            # Update case-layum sequence-ah save pannanum
             allocation.status = status
+            allocation.seq = sequence if sequence else None # Empty string-ah irundha NULL-ah save aagum
             allocation.save()
-            return Response({"message": "Status updated"})
+            return Response({"message": "Status and Sequence updated"})
         else:
             emp_allocate.objects.create(
                 emp_code=emp_code,
@@ -620,7 +676,8 @@ class EmpAllocateAPIView(APIView):
                 unit=unit,
                 line=line,
                 status=status,
-                date=today
+                date=today,
+                seq=sequence if sequence else None,
             )
             return Response({"message": "Employee allocated"})
 
@@ -637,8 +694,6 @@ def get_process_sequence(request):
     queryset = VueProcessSequence.objects.using('demo').filter(jobno=jobno, topbottom_des=topbottom_des).order_by('sl')
     serializer = VueProcessSequenceSerializer(queryset, many=True)
     return Response(serializer.data)
-
-
 
 
 @api_view(['GET'])

@@ -27,7 +27,7 @@ SECRET_KEY = 'django-insecure--jpqy*__tak#1#7_0u^g5gt=n@rlpjvp5mstua5m^&i7+!8uad
 DEBUG = True
 # DEBUG = False
 
-ALLOWED_HOSTS = ['hfapi.herofashion.com','localhost','127.0.0.1','10.1.21.13','10.1.21.154']
+ALLOWED_HOSTS = ['hfapi.herofashion.com','localhost','127.0.0.1','10.1.21.13','10.1.21.154','10.1.21.110']
 
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",

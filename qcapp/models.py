@@ -49,6 +49,7 @@ class qc_piece_data(models.Model):
     qc_type = models.CharField(max_length=50)
     user_id = models.IntegerField()
     date = models.DateTimeField(default=datetime.datetime.now)
+    
 
 class qc_piece_final(models.Model):
     bundle_no = models.CharField(max_length=20)
@@ -65,6 +66,8 @@ class qc_piece_final(models.Model):
     qc_type = models.CharField(max_length=50)
     user_id = models.IntegerField()
     date = models.DateTimeField(default=datetime.datetime.now)
+    seq = models.CharField(max_length=100)
+    machine_id = models.CharField(max_length=100)
 
 
 
@@ -83,6 +86,7 @@ class roving_qc_mistake(models.Model):
 
     remark = models.CharField(max_length=200, blank=True, null=True)
     date = models.DateTimeField(auto_now_add=True)
+    seq = models.CharField(max_length=100)
 
     def __str__(self):
         return f"{self.qc_piece.bundle_no} - {self.machine_id} - {self.operation}"
@@ -240,19 +244,16 @@ class Empwisesal(models.Model):
 
 class emp_allocate(models.Model):
     emp_code = models.CharField(max_length=50)
-
     machine = models.ForeignKey(
         machine_details,
         on_delete=models.CASCADE,
         related_name="emp_allocations"
     )
-
     date = models.DateField(auto_now_add=True)
     unit = models.IntegerField()
     line = models.IntegerField()
     status = models.BooleanField(default=False)
     seq = models.CharField(max_length=100, null=True, blank=True)
-
 
 class VueProcessSequence(models.Model):
     jobno = models.CharField(db_column='JOBNO', max_length=50)  # Field name made lowercase.
@@ -269,3 +270,14 @@ class VueProcessSequence(models.Model):
     class Meta:
         managed = False
         db_table = 'Vue_Process_Sequence'
+
+class VueUser(models.Model):
+    code = models.IntegerField()
+    name = models.CharField(max_length=100, blank=True, null=True)
+    wunit = models.CharField(db_column='Wunit', max_length=70, blank=True, null=True)  # Field name made lowercase.
+    cat = models.CharField(max_length=70, blank=True, null=True)
+    photo = models.CharField(max_length=400, blank=True, null=True)
+
+    class Meta:
+        managed = False
+        db_table = 'vue_user'
