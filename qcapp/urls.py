@@ -26,6 +26,7 @@ urlpatterns = [
     path('api/allocations/', MachineAllocationAPIView.as_view(), name='allocations-list-create'),
     path('api/allocations/<int:pk>/', MachineAllocationDetailAPIView.as_view(), name='allocations-detail'),
     path('api/employees/', EmployeeAPIView.as_view(), name='employees'),
+    path('api/employees_and_staff/', Employee_and_staffAPIView.as_view(), name='employees_and_staff'),
 
     # Allocate employee to machine
     path('api/emp_allocate/', EmpAllocateAPIView.as_view(), name='emp-allocate'),

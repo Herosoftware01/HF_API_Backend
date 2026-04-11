@@ -7,7 +7,7 @@ from django.core.exceptions import ValidationError
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, permissions
-from .models import QcAdminMistake,Unit,Line,roving_qc_mistake,qc_piece_final, MachineAllocation, machine_details, emp_allocate, Empwisesal, VueProcessSequence
+from .models import QcAdminMistake,VueUser,Unit,Line,roving_qc_mistake,qc_piece_final, MachineAllocation, machine_details, emp_allocate, Empwisesal, VueProcessSequence
 from .serializers import QcAdminMistakeSerializer,UnitSerializer,MachineTrasnsferSerializer,MachineSerializer,LineSerializer, MachineAllocationSerializer, VueProcessSequenceSerializer
 from rest_framework.parsers import MultiPartParser, FormParser
 from collections import defaultdict
@@ -142,7 +142,7 @@ class LineAPIView(APIView):
 def get_bundle_data(request):
     try:
         bundle_id = request.GET.get('bundle_id')
-
+       
         if not bundle_id:
             return Response({"error": "bundle_id is required"}, status=400)
 
@@ -169,10 +169,17 @@ def get_bundle_data(request):
             str(item.get('bundid')) for item in results if item.get('bundid') is not None
         ]
 
+        # checked_bundle_ids = set(
+        #     qc_piece_final.objects.filter(
+        #         bundle_id__in=bundle_ids_from_api
+        #     ).values_list('bundle_id', flat=True)
+        # )
+
         checked_bundle_ids = set(
             qc_piece_final.objects.filter(
                 bundle_id__in=bundle_ids_from_api
-            ).values_list('bundle_id', flat=True)
+            ).exclude(qc_type='rowing_qc')   # 👈 ignore rowing_qc
+            .values_list('bundle_id', flat=True)
         )
 
         for item in results:
@@ -210,6 +217,8 @@ def save_piece(request):
     size = data.get("size")
     unit = data.get("unit")
     line = data.get("line")
+    seq = data.get("seq")
+    machine_id = data.get("machineId")
     qc_type = data.get("qc_type")
     total_pieces = data.get("total_pieces")
     piece_no = data.get("piece_no")
@@ -217,7 +226,7 @@ def save_piece(request):
     mistake_percentage = data.get("mistake_percentage")
     defects = data.get("defects", [])
     emp_id = data.get("operator")
-    machine_id = data.get("machineId", "")
+    # machine_id = data.get("machineId", "")
     process = data.get("process", "")
     shade_variation = data.get("shade_variation", False)
     number_sticker = data.get("number_sticker", False)
@@ -236,6 +245,8 @@ def save_piece(request):
             size=size,
             unit=unit,
             line=line,
+            seq=seq,
+            machine_id=machine_id,
             qc_type=qc_type,
             total_pieces=total_pieces,
             piece_no=piece_no,
@@ -254,6 +265,7 @@ def save_piece(request):
             roving_qc_mistake.objects.create(
                 qc_piece=qc_piece,
                 machine_id=machine_id,
+                seq=seq,
                 operation=process,
                 emb_id=emp_id,  # add if you have embroidery ID
                 shade_var=shade_variation,
@@ -276,7 +288,9 @@ def save_final_piece(request):
         size = request.data.get("size")
         unit = request.data.get("unit")
         line = request.data.get("line")
+        machine_id = request.data.get("machineId")
         user_id = request.data.get("userId", None)
+        seq = request.data.get("seq")
         qc_type = request.data.get("qc_type")
         total_pieces = int(request.data.get("total_pieces", 0))
         checked_piece = int(request.data.get("checked_piece", 0))
@@ -311,7 +325,9 @@ def save_final_piece(request):
             total_pieces=total_pieces,
             checked_piece=checked_piece,
             force_save=force_save,
-            user_id=user_id
+            user_id=user_id,
+            seq=seq,
+            machine_id=machine_id
         )
 
         return Response(
@@ -335,11 +351,13 @@ def get_last_bundle(request):
     unit = request.GET.get("unit")
     line = request.GET.get("line")
     qc_type = request.GET.get("qc_type")
+    seq = request.GET.get("seq")
 
     last = qc_piece_data.objects.filter(
         unit=unit,
         line=line,
-        qc_type=qc_type
+        qc_type=qc_type,
+        seq__iexact=seq
     ).order_by("-id").first()
 
     if not last:
@@ -356,7 +374,7 @@ def get_last_bundle(request):
     roving_data = {}
 
     if qc_type and qc_type.strip().lower() == "rowing_qc":
-        mistakes = roving_qc_mistake.objects.filter(qc_piece__bundle_id=last.bundle_id)
+        mistakes = roving_qc_mistake.objects.filter(qc_piece__bundle_id=last.bundle_id,seq__iexact=seq)
         print("Mistakes count for bundle:", mistakes.count())
         roving_data = {
             "machine_id": mistakes.first().machine_id if mistakes.exists() else None,
@@ -569,19 +587,48 @@ class MachineAllocationDetailAPIView(APIView):
 
 class EmployeeAPIView(APIView):
     def get(self, request):
+        employees = Empwisesal.objects.using('main').filter(status='working').values('code', 'name', 'photo', 'dept')
         
-        employees = Empwisesal.objects.using('main').filter(status='working').values('code', 'name', 'photo')
+        staff_url = settings.STAFF_IMAGES_URL.rstrip('/')
 
-        data = [
-            {
+        data = []
+        for emp in employees:
+            photo_url = None
+            if emp.get('photo'):
+                filename = emp['photo'].split('\\')[-1]
+                photo_url = f"https://hfapi.herofashion.com/{staff_url}/{filename}"
+
+            data.append({
                 "code": emp['code'],
                 "name": emp['name'],
-            }
-            for emp in employees
-        ]
-      
+                "dept": emp['dept'],
+                "photo": photo_url,
+            })
+
         return Response(data)
 
+
+class Employee_and_staffAPIView(APIView):
+    def get(self, request):
+        employees = VueUser.objects.using('main').values('code', 'name', 'photo', 'wunit')
+        
+        staff_url = settings.STAFF_IMAGES_URL.rstrip('/')
+
+        data = []
+        for emp in employees:
+            photo_url = None
+            if emp.get('photo'):
+                filename = emp['photo'].split('\\')[-1]
+                photo_url = f"https://hfapi.herofashion.com/{staff_url}/{filename}"
+
+            data.append({
+                "code": emp['code'],
+                "name": emp['name'],
+                "dept": emp['wunit'],
+                "photo": photo_url,
+            })
+
+        return Response(data)
 
 
 class EmpAllocateAPIView(APIView):
@@ -648,6 +695,71 @@ def get_process_sequence(request):
     return Response(serializer.data)
 
 
+# @api_view(['GET'])
+# def get_machine_employee(request, identity):
+#     print("identity",identity)
+#     try:
+#         identity = identity.rstrip('/')
+#         machine = machine_details.objects.get(Identity__iexact=identity)
+
+#         today = now().date()
+#         last_entry = emp_allocate.objects.filter(machine=machine, date=today).order_by('-id').first()
+
+#         emp_code = None
+#         emp_name = None
+#         photo_url = "https://www.example.com/default-profile.png"
+
+#         if last_entry:
+#             emp_code = last_entry.emp_code
+#             employee = Empwisesal.objects.using('main').filter(status='working', code=emp_code).first()
+#             if employee:
+#                 emp_name = employee.name
+#                 if employee.photo:
+#                     filename = employee.photo.split('\\')[-1]
+#                     staff_url = settings.STAFF_IMAGES_URL.rstrip('/')
+#                     photo_url = f"https://hfapi.herofashion.com/{staff_url}/{filename}"
+
+#         # Fetch matching processes from VueProcessSequence
+#         jobno = request.query_params.get('jobno')
+#         topbottom_des = request.query_params.get('topbottom_des')
+
+#         processes = []
+#         if jobno and topbottom_des:
+#             queryset = VueProcessSequence.objects.using('demo').filter(
+#                 jobno=jobno,
+#                 topbottom_des=topbottom_des,
+#                 mc=machine.mcgrp
+#             ).order_by('sl')
+            
+#             processes = [
+#                 {
+#                     "sl": p.sl,
+#                     "sl1": p.sl1,
+#                     "prsid": p.prsid,
+#                     "process_des": p.process_des,
+#                     "mc": p.mc
+#                 } for p in queryset
+#             ]
+
+#         return Response({
+#             "machine_identity": machine.Identity,
+#             "machine_id": machine.id,
+#             "mcgrp": machine.mcgrp,
+#             "emp_code": emp_code,
+#             "employee_name": emp_name,
+#             "emp_photo": photo_url,
+#             "has_data": True if last_entry else False,
+#             "processes": processes
+#         })
+
+#     except machine_details.DoesNotExist:
+#         return Response({
+#             "error": "Machine not found",
+#             "has_data": False,
+#             "processes": []
+#         }, status=404)
+
+
 @api_view(['GET'])
 def get_machine_employee(request, identity):
     print("identity",identity)
@@ -678,11 +790,20 @@ def get_machine_employee(request, identity):
 
         processes = []
         if jobno and topbottom_des:
+            seq_match = list(
+                qc_piece_final.objects.filter(
+                    jobno=jobno,
+                    product=topbottom_des
+                ).values_list('seq', flat=True)
+            )
+
+            print("seq =", seq_match)
             queryset = VueProcessSequence.objects.using('demo').filter(
                 jobno=jobno,
                 topbottom_des=topbottom_des,
                 mc=machine.mcgrp
             ).order_by('sl')
+            
             processes = [
                 {
                     "sl": p.sl,
@@ -690,7 +811,9 @@ def get_machine_employee(request, identity):
                     "prsid": p.prsid,
                     "process_des": p.process_des,
                     "mc": p.mc
-                } for p in queryset
+                } 
+                for p in queryset
+                if p.process_des not in seq_match
             ]
 
         return Response({
@@ -710,6 +833,9 @@ def get_machine_employee(request, identity):
             "has_data": False,
             "processes": []
         }, status=404)
+
+
+
 
 
 from django.db.models import Max
@@ -768,3 +894,4 @@ class MachineTransferDetailAPIView(APIView):
         allocation = self.get_object(pk)
         allocation.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
