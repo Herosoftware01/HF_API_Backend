@@ -24,7 +24,9 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('', include('herofashion.urls')),
     path('qcapp/', include('qcapp.urls')),
-    path('syncfushion/', include('syncfushion.urls'))
+    path('syncfushion/', include('syncfushion.urls')),
+    path('advance/', include('advance.urls')) ,
+    path('reports/', include('reports.urls')) ,
 
 ] 
 

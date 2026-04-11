@@ -49,6 +49,8 @@ INSTALLED_APPS = [
     'herofashion',
     'qcapp',
     'syncfushion',
+    'advance',
+    'reports',
 ]
 
 
@@ -146,6 +148,18 @@ DATABASES = {
             'trusted_connection': "yes"
         }
     },
+    'mssql1' : {
+        'ENGINE': 'mssql',
+        'NAME': 'demo',
+        'USER': 'sa',
+        'PASSWORD': 'Fashion@01',
+        'HOST': '10.1.21.11',
+        'PORT': '1433',
+        'OPTIONS': {
+                'driver': 'ODBC Driver 17 for SQL Server',
+                'trusted_connection': "yes"
+            }
+    },
 }
 
 
@@ -199,3 +213,14 @@ STAFF_IMAGES_ROOT = r'\\10.1.21.11\D\Staff_Employee_Images'
 
 
 
+
+# Email configuration
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+
+EMAIL_HOST_USER = 'hfautomation2026@gmail.com'
+EMAIL_HOST_PASSWORD = 'tmiy sjdd vbon omsd'   # NOT normal password
+
+DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
