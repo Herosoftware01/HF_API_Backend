@@ -1,0 +1,549 @@
+from django.http import JsonResponse, HttpResponse
+from django.views.decorators.csrf import csrf_exempt
+from django.db.models import Max
+import json
+from .models import IncdebUsers, Adreq, Empwisesal,Employeeworking
+from django.db import connections
+import os
+from django.core.mail import send_mail
+from django.conf import settings
+from datetime import datetime
+from django.core.mail import EmailMultiAlternatives
+from django.template.loader import render_to_string
+from django.utils.html import strip_tags
+import requests
+import traceback
+from email.mime.image import MIMEImage
+import threading
+from django.core.cache import cache
+
+
+# ==========================================
+# USER LOGIN / REGISTER / UPDATE / DELETE
+# ==========================================
+@csrf_exempt
+def login(request):
+
+    # ================= GET USERS =================
+    if request.method == 'GET':
+        users = IncdebUsers.objects.using('demo').all().values()
+        return JsonResponse(list(users), safe=False)
+
+    # ================= POST (LOGIN / REGISTER) =================
+    elif request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            action = data.get('action')
+
+            # ---------- LOGIN ----------
+            if action != "register":
+                user = IncdebUsers.objects.using('demo').filter(
+                    username=data.get('username'),
+                    password=data.get('password')
+                ).first()
+
+                if user:
+                    return JsonResponse({
+                        "status": "success",
+                        "user": {
+                            "id": user.id,
+                            "username": user.username,
+                            "screen_per": user.screen_per,
+                            "app_n": user.app_n
+                        }
+                    })
+                else:
+                    return JsonResponse({"error": "Invalid credentials"}, status=400)
+
+            # ---------- REGISTER ----------
+            if action == "register":
+
+                if IncdebUsers.objects.using('demo').filter(
+                    username=data.get('username')
+                ).exists():
+                    return JsonResponse({"error": "User already exists"}, status=400)
+
+                new_user = IncdebUsers.objects.using('demo').create(
+                    username=data.get('username'),
+                    password=data.get('password'),
+                    screen_per=data.get('screen_per'),
+                    app_n=int(data.get('app_n'))   # ✅ FIX TYPE
+                )
+
+                return JsonResponse({
+                    "message": "User created",
+                    "id": new_user.id
+                })
+
+        except Exception as e:
+            print("POST ERROR:", str(e))
+            return JsonResponse({"error": str(e)}, status=500)
+
+    # ================= PUT (UPDATE USER) =================
+    elif request.method == 'PUT':
+        try:
+            data = json.loads(request.body)
+            print("PUT DATA:", data)
+
+            user_id = data.get('id')
+            if not user_id:
+                return JsonResponse({"error": "ID is required"}, status=400)
+
+            user = IncdebUsers.objects.using('mssql1').get(id=user_id)
+
+            user.username = data.get('username')
+
+            if data.get('password'):
+                user.password = data.get('password')
+
+            user.screen_per = data.get('screen_per')
+
+            # ✅ SAFE CONVERSION
+            app_n = data.get('app_n')
+            if app_n is not None and str(app_n).strip() != "":
+                user.app_n = int(app_n)
+
+            user.save()
+
+            return JsonResponse({"message": "User updated"})
+
+        except Exception as e:
+            print("PUT ERROR:", str(e))
+            return JsonResponse({"error": str(e)}, status=500)
+
+    # ================= DELETE USER =================
+    elif request.method == 'DELETE':
+        try:
+            data = json.loads(request.body)
+            user_id = data.get('id')
+
+            user = IncdebUsers.objects.using('mssql1').get(id=user_id)
+            user.delete()
+
+            return JsonResponse({"message": "User deleted"}, status=200)
+
+        except IncdebUsers.DoesNotExist:
+            return JsonResponse({"error": "User not found"}, status=404)
+
+        except Exception as e:
+            print("DELETE ERROR:", str(e))
+            return JsonResponse({"error": str(e)}, status=500)
+
+
+@csrf_exempt
+def request_advance(request):
+
+    # ================= GET =================
+    if request.method == 'GET':
+        empid = request.GET.get('empid')
+        smon  = request.GET.get('smon')
+        syear = request.GET.get('syear')
+
+        qs = Adreq.objects.using('mssql1').all()
+
+        if empid:
+            qs = qs.filter(empid=empid)
+        if smon:
+            qs = qs.filter(smon=smon)
+        if syear:
+            qs = qs.filter(syear=syear)
+
+        return JsonResponse(list(qs.values()), safe=False)
+
+    # ================= POST =================
+    elif request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+
+            empid = data.get('empid')
+            smon  = data.get('smon')
+            syear = data.get('syear')
+
+            exists = Adreq.objects.using('mssql1').filter(
+                empid=empid,
+                smon=smon,
+                syear=syear
+            ).exists()
+
+            if exists:
+                return JsonResponse(
+                    {"error": "Already submitted"},
+                    status=400
+                )
+
+            last = Adreq.objects.aggregate(Max('entryno'))['entryno__max'] or 0
+
+            obj = Adreq.objects.create(
+                entryno=last + 1,
+                dt=data.get('dt'),
+                empid=empid,
+                amt=data.get('amt'),
+                remarks=data.get('remarks', '')[:80],
+                smon=smon,
+                syear=syear,
+                elig=data.get('elig'),
+                status=data.get('status'),
+                comments=data.get('comments', '')[:150],
+                mail_sent=False,  # initially false
+            )
+
+            # ================= SEND EMAIL =================
+            try:
+                subject = "🧾 New Advance Request Submitted"
+
+                message = f"""
+                    Employee ID : {empid}
+                    Month       : {smon}-{syear}
+                    Amount      : ₹{data.get('amt')}
+                    Eligible    : ₹{data.get('elig')}
+                    Remarks     : {data.get('remarks')}
+                    """
+
+                send_mail(
+                    subject,
+                    message,
+                    settings.EMAIL_HOST_USER,   # from email
+                    ['kirsh650@email.com'],     # 👈 change to real email
+                    fail_silently=False,
+                )
+
+                # ✅ update mail_sent = True
+                obj.mail_sent = True
+                obj.save()
+
+                return JsonResponse({"message": "Created", "id": obj.entryno})
+
+            except Exception as mail_error:
+                print("MAIL ERROR:", str(mail_error))
+
+                return JsonResponse({"error": str(mail_error)}, status=500)
+
+        except Exception as e:
+            print("POST REQUEST ERROR:", str(e))
+            return JsonResponse({"error": str(e)}, status=500)
+
+    # ================= DELETE =================
+    elif request.method == 'DELETE':
+        try:
+            data = json.loads(request.body)
+            obj_id = data.get('id')
+
+            obj = Adreq.objects.using('mssql1').get(entryno=obj_id)  # ✅ FIXED
+            obj.delete()
+
+            return JsonResponse({"message": "Deleted"}, status=200)
+
+        except Adreq.DoesNotExist:
+            return JsonResponse({"error": "Not found"}, status=404)
+
+        except Exception as e:
+            print("DELETE REQUEST ERROR:", str(e))
+            return JsonResponse({"error": str(e)}, status=500)
+
+# views.py — Add this new view
+# ==============================
+# 🔥 BACKGROUND EMAIL SENDER
+# ==============================
+def send_mail_async(email):
+    try:
+        email.send()
+        print("✅ Email sent in background")
+    except Exception as e:
+        print("❌ Email failed:", str(e))
+
+
+# ==============================
+# 🔥 EMPLOYEE CACHE (5 mins)
+# ==============================
+def get_employee_data(api_url):
+    cache_key = "employee_data"
+
+    data = cache.get(cache_key)
+    if not data:
+        try:
+            response = requests.get(api_url, timeout=5)
+            if response.status_code == 200:
+                data = response.json()
+                cache.set(cache_key, data, timeout=300)  # 5 mins
+        except Exception as e:
+            print("⚠️ API ERROR:", str(e))
+            data = []
+
+    return data
+
+
+# ==============================
+# 🔥 FAST LOOKUP
+# ==============================
+def get_employee_map(employees):
+    return {str(emp.get('code')).strip(): emp for emp in employees}
+
+
+@csrf_exempt
+def send_advance_mail(request):
+    if request.method == 'POST':
+        try:
+            print("\n===== 🚀 FAST MAIL API START =====")
+
+            data = json.loads(request.body)
+            entryno = data.get('entryno')
+
+            # 🔹 OPTIMIZED DB QUERY
+            obj = Adreq.objects.only('empid', 'amt', 'remarks').get(entryno=entryno)
+
+            # 🔹 API CACHE
+            api_url = "https://app.herofashion.com/incentive/api/emp/"
+            employees = get_employee_data(api_url)
+            emp_map = get_employee_map(employees)
+
+            emp = emp_map.get(str(obj.empid).strip(), {})
+            emp_name = emp.get('name', 'Not Found')
+            emp_dept = emp.get('dept', 'Not Found')
+            photo_name = emp.get('photo')
+
+            # 🔥 EMAIL OBJECT
+            email = EmailMultiAlternatives(
+                "🧾 New Advance Request Submitted",
+                "",
+                settings.EMAIL_HOST_USER,
+                ['kirsh650@gmail.com'],
+            )
+
+            # 🔥 IMAGE ATTACH (optional)
+            photo_cid = None
+            if photo_name:
+                try:
+                    filename = os.path.basename(photo_name)
+                    local_path = os.path.join(settings.STAFF_IMAGES_ROOT, filename)
+
+                    if os.path.exists(local_path):
+                        with open(local_path, "rb") as f:
+                            img = MIMEImage(f.read())
+                            photo_cid = f"photo_{obj.empid}"
+                            img.add_header("Content-ID", f"<{photo_cid}>")
+                            email.attach(img)
+                except Exception as e:
+                    print("⚠️ Image error:", str(e))
+
+            # 🔹 TEMPLATE
+            html_content = render_to_string('mail.html', {
+                'name': emp_name,
+                'dept': emp_dept,
+                'empid': obj.empid,
+                'amt': obj.amt,
+                'remarks': obj.remarks,
+                'approve_url': f"http://10.1.21.13:8100/approve?entryno={entryno}&status=Y",
+                'reject_url': f"http://10.1.21.13:8100/approve?entryno={entryno}&status=N",
+                'photo_cid': photo_cid
+            })
+
+            text_content = strip_tags(html_content)
+
+            email.body = text_content
+            email.attach_alternative(html_content, "text/html")
+
+            # 🔥 BACKGROUND SEND
+            threading.Thread(target=send_mail_async, args=(email,)).start()
+
+            return JsonResponse({"message": "Mail queued (fast 🚀)"})
+
+        except Exception as e:
+            print("❌ ERROR:", str(e))
+            return JsonResponse({"error": str(e)}, status=500)
+
+    return JsonResponse({"error": "Invalid request"}, status=400)
+        
+
+@csrf_exempt
+def send_approval_mail(request):
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            entryno = data.get('entryno')
+            status = data.get('status')
+
+            # 🔹 FAST DB
+            obj = Adreq.objects.using('mssql1').only('empid', 'amt', 'remarks').get(entryno=entryno)
+
+            # 🔹 CACHE API
+            api_url = "http://10.1.21.13:8600/empwisesal/"
+            employees = get_employee_data(api_url)
+            emp_map = get_employee_map(employees)
+
+            emp = emp_map.get(str(obj.empid).strip(), {})
+            emp_name = emp.get('name', 'Not Found')
+            emp_dept = emp.get('dept', 'Not Found')
+
+            status_text = "APPROVED ✅" if status == "Y" else "REJECTED ❌"
+
+            subject = f"Advance Request {status_text}"
+
+            html_content = render_to_string('app.html', {
+                'name': emp_name,
+                'dept': emp_dept,
+                'empid': obj.empid,
+                'amt': obj.amt,
+                'remarks': obj.remarks,
+                'status': status_text,
+                'entryno': obj.entryno,
+            })
+
+            text_content = strip_tags(html_content)
+
+            email = EmailMultiAlternatives(
+                subject,
+                text_content,
+                settings.EMAIL_HOST_USER,
+                ['kirsh650@gmail.com', 'designervishwa10@gmail.com'],
+            )
+
+            email.attach_alternative(html_content, "text/html")
+
+            # 🔥 BACKGROUND SEND
+            threading.Thread(target=send_mail_async, args=(email,)).start()
+
+            return JsonResponse({"message": "Approval mail queued 🚀"})
+
+        except Exception as e:
+            print("ERROR:", e)
+            return JsonResponse({"error": str(e)}, status=500)
+
+    return JsonResponse({"error": "Invalid request"}, status=400)
+
+@csrf_exempt
+def ad_approve(request):
+    if request.method == 'PUT':
+        try:
+            data = json.loads(request.body)
+            obj_id = data.get('id')
+
+            obj = Adreq.objects.using('mssql1').get(entryno=obj_id)
+            obj.status = data.get('status')
+            obj.status_dt = data.get('status_dt')
+            obj.save()
+
+            return JsonResponse({"message": "Updated"}, status=200)
+
+        except Adreq.DoesNotExist:
+            return JsonResponse({"error": "Not found"}, status=404)
+
+        except Exception as e:
+            return JsonResponse({"error": str(e)}, status=500)
+
+    return JsonResponse({"error": "Method not allowed"}, status=405)
+
+@csrf_exempt
+def get_eligibleamt(request):
+    try:
+        emp_id = request.GET.get('id')
+        mon = request.GET.get('mon')
+        year = request.GET.get('year')
+
+        if not emp_id or not mon or not year:
+            return JsonResponse({"error": "id, mon and year are required"}, status=400)
+
+        with connections['main'].cursor() as cursor:
+            # ✅ Pass all 3 parameters to the stored procedure
+            cursor.execute(
+                "EXEC GetEligibleamt @id=%s, @mon=%s, @year=%s",
+                [emp_id, mon, year]
+            )
+            columns = [col[0] for col in cursor.description]
+            rows = cursor.fetchall()
+
+        data = []
+        for row in rows:
+            row_dict = dict(zip(columns, row))
+            data.append({
+                "shift":   row_dict.get("shift"),
+                "Wage":    row_dict.get("Wage"),
+                "salary":  row_dict.get("salary"),
+                "Eligible": row_dict.get("Eligible"),
+            })
+
+        return JsonResponse(data, safe=False)
+
+    except Exception as e:
+        return JsonResponse({"status": False, "error": str(e)}, status=500)
+    
+
+
+
+@csrf_exempt
+def empwisesal(request):
+    if request.method == 'GET':
+        
+        # Step 1: Get working employees with monthly salary
+        qs = Empwisesal.objects.using('main').filter(
+            monthlysalary='Y',
+            status='working'
+        )
+
+        # Step 2: Fetch category mapping from EmployeeWorking
+        working_map = {
+            emp.code: emp.category
+            for emp in Employeeworking.objects.using('main').all()
+        }
+
+        data = []
+
+        for rec in qs:
+            # Photo URL
+            if rec.photo:
+                filename = os.path.basename(rec.photo)
+                photo_url = f"https://app.herofashion.com/staff_images/{filename}"
+            else:
+                photo_url = None
+
+            # Get designation from EmployeeWorking
+            designation = working_map.get(rec.code)
+
+            data.append({
+                "code": rec.code,
+                "name": rec.name,
+                "dept": rec.dept,
+                "salary": float(rec.salary) if rec.salary else None,
+                "wrkunit": rec.wrkunit,
+                "designation": designation,   # ✅ replaced
+                "monthlysalary": rec.monthlysalary,
+                "photo": photo_url
+            })
+
+        return JsonResponse(data, safe=False)
+    
+
+@csrf_exempt
+def state(request):
+    if request.method == 'GET':
+        data = Adreq.objects.using('mssql1').all()
+
+        # 🔍 Get query params
+        empid = request.GET.get('empid')
+        status = request.GET.get('status')
+        from_date = request.GET.get('from_date')
+        to_date = request.GET.get('to_date')
+
+        # 👤 EmpID filter
+        if empid:
+            data = data.filter(empid=empid)
+
+        # 📌 Status filter
+        if status == 'P':
+            data = data.filter(status__isnull=True)
+        elif status:
+            data = data.filter(status=status)
+
+
+        # 📅 Date range filter
+        if from_date and to_date:
+            try:
+                from_date = datetime.strptime(from_date, "%Y-%m-%d")
+                to_date = datetime.strptime(to_date, "%Y-%m-%d")
+                data = data.filter(date__range=[from_date, to_date])
+            except ValueError:
+                return JsonResponse({"error": "Invalid date format. Use YYYY-MM-DD"}, status=400)
+
+        # 🔄 Convert queryset to list
+        result = list(data.values())
+
+        return JsonResponse(result, safe=False)
