@@ -160,6 +160,30 @@ DATABASES = {
                 'trusted_connection': "yes"
             }
     },
+     'app' : {
+        'ENGINE': 'mssql',
+        'NAME': 'Django',
+        'USER': 'sa',
+        'PASSWORD': 'Fashion@01',
+        'HOST': '10.1.21.11',
+        'PORT': '1433',
+        'OPTIONS': {
+                'driver': 'ODBC Driver 17 for SQL Server',
+                'trusted_connection': "yes"
+            }
+    },
+     'demo1': {
+            'ENGINE': 'mssql',
+            'NAME': 'NewPowerBi',
+            'USER': 'sa',
+            'PASSWORD': 'Fashion@01',
+            'HOST': '10.1.21.11',
+            'PORT': '1433',
+            'OPTIONS': {
+                'driver': 'ODBC Driver 17 for SQL Server',
+                'trusted_connection': "yes"
+            }
+    },
 }
 
 
