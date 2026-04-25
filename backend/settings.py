@@ -248,3 +248,13 @@ EMAIL_HOST_USER = 'hfautomation2026@gmail.com'
 EMAIL_HOST_PASSWORD = 'tmiy sjdd vbon omsd'   # NOT normal password
 
 DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
+
+
+
+# Bold Reports configuration (Application-level)
+BOLD_REPORTS = {
+    "URL": "https://api.herofashion.com",
+    "SITE_IDENTIFIER": "site3",
+    "USER_EMAIL": "admin@veahtech.com",
+    "EMBED_SECRET_KEY": "RMkS8LRS119c632BGyGeScftReTRIRI",
+}

@@ -247,3 +247,5 @@ class RoleMenuPermissionDetailAPI(generics.RetrieveUpdateDestroyAPIView):
     queryset = RoleMenuPermission.objects.all()
     serializer_class = RoleMenuPermissionSerializer
     permission_classes = [permissions.IsAuthenticated]
+
+
