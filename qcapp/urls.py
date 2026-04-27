@@ -37,6 +37,9 @@ urlpatterns = [
     path('api/machine-transfer/', MachineTransferListCreateAPIView.as_view(), name='machine-transfer-list-create'),
     path('api/machine-transfer/<int:pk>/', MachineTransferDetailAPIView.as_view(), name='machine-transfer-detail'),
 
+    path('get_order_measurements',views.get_order_measurements,name='get_order_measurements'),
+    path("save-measurement/", views.save_measurement),
+    path("final-save-measurement/", views.final_save_measurement),
     
 
 ]

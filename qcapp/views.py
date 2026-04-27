@@ -7,7 +7,7 @@ from django.core.exceptions import ValidationError
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, permissions
-from .models import QcAdminMistake,VueUser,Unit,Needle_change,Line,roving_qc_mistake,qc_piece_final, MachineAllocation, machine_details, emp_allocate, Empwisesal, VueProcessSequence
+from .models import QcAdminMistake,cut_sample_data,cut_sample_data_final,VueUser,Unit,Needle_change,Line,roving_qc_mistake,qc_piece_final, MachineAllocation, machine_details, emp_allocate, Empwisesal, VueProcessSequence
 from .serializers import QcAdminMistakeSerializer,UnitSerializer,MachineTrasnsferSerializer,MachineSerializer,LineSerializer, MachineAllocationSerializer, VueProcessSequenceSerializer
 from rest_framework.parsers import MultiPartParser, FormParser
 from collections import defaultdict
@@ -20,7 +20,7 @@ from django.conf import settings
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 import json
-
+from django.db import connection
 
 class QcAdminMistakeAPIView(APIView):
     permission_classes = [permissions.IsAuthenticated]
@@ -1131,4 +1131,152 @@ def needle_details_api(request):
     return JsonResponse({
         "message": "Needle details saved successfully"
     })
+
+
+
+
+def get_order_measurements(request):
+    ordid = request.GET.get('ordid')
+    topbottom = request.GET.get('TopBottom_des')
+    siz = request.GET.get('siz')
+
+    with connections['demo'].cursor() as cursor:
+        cursor.execute(
+            """
+            EXEC usp_GetOrderMeasurements
+                @ordid=%s,
+                @TopBottom_des=%s,
+                @siz=%s
+            """,
+            [ordid, topbottom, siz]
+        )
+
+        columns = [col[0] for col in cursor.description]
+        rows = cursor.fetchall()
+
+    result = [
+        dict(zip(columns, row))
+        for row in rows
+    ]
+
+    return JsonResponse({
+        "status": "success",
+        "data": result
+    })
+
+
+# @csrf_exempt
+# def save_measurement(request):
+#     if request.method == "POST":
+#         try:
+#             data = json.loads(request.body)
+
+#             obj = cut_sample_data.objects.create(
+#                 jobno=data.get("jobNo"),
+#                 bundle_no=data.get("bundleNo"),
+#                 product=data.get("product"),
+#                 color=data.get("colour"),
+#                 size=data.get("size"),
+#                 title=data.get("title"),
+#                 measurement_dtls=data.get("measurement_dtls"),
+#                 measurement=data.get("measurement"),
+#                 reading1=data.get("reading1"),
+#                 reading2=data.get("reading2"),
+#                 reading3=data.get("reading3"),
+#             )
+
+#             return JsonResponse({"status": "success", "id": obj.id})
+
+#         except Exception as e:
+#             return JsonResponse({"status": "error", "message": str(e)})
+
+
+@csrf_exempt
+def save_measurement(request):
+    if request.method == "POST":
+        try:
+            data = json.loads(request.body)
+
+            jobno = data.get("jobNo")
+            bundle_no = data.get("bundleNo")
+            measurement_dtls = data.get("measurement_dtls")
+
+            update_fields = {}
+
+            # only update if NOT null
+            if data.get("reading1") is not None:
+                update_fields["reading1"] = data.get("reading1")
+
+            if data.get("reading2") is not None:
+                update_fields["reading2"] = data.get("reading2")
+
+            if data.get("reading3") is not None:
+                update_fields["reading3"] = data.get("reading3")
+
+            if data.get("pcs_no_r1") is not None:
+                update_fields["pcs_no_r1"] = data.get("pcs_no_r1")
+
+            if data.get("pcs_no_r2") is not None:
+                update_fields["pcs_no_r2"] = data.get("pcs_no_r2")
+
+            if data.get("pcs_no_r3") is not None:
+                update_fields["pcs_no_r3"] = data.get("pcs_no_r3")
+
+            obj, created = cut_sample_data.objects.update_or_create(
+                jobno=jobno,
+                bundle_no=bundle_no,
+                measurement_dtls=measurement_dtls,
+                defaults={
+                    "product": data.get("product"),
+                    "color": data.get("colour"),
+                    "size": data.get("size"),
+                    "title": data.get("title"),
+                    "measurement": data.get("measurement"),
+                    **update_fields
+                }
+            )
+
+            return JsonResponse({
+                "status": "success",
+                "created": created,
+                "id": obj.id
+            })
+
+        except Exception as e:
+            return JsonResponse({
+                "status": "error",
+                "message": str(e)
+            })
+        
+
+@csrf_exempt
+def final_save_measurement(request):
+    if request.method == "POST":
+        try:
+            data = json.loads(request.body)
+
+            obj = cut_sample_data_final.objects.create(
+                jobno=data.get("jobNo"),
+                bundle_no=data.get("bundleNo"),
+                product=data.get("product"),
+                color=data.get("colour"),
+                size=data.get("size"),
+
+                bf_ironing=data.get("bf_ironing", False),
+                af_ironing=data.get("af_ironing", False),
+
+                # 🔥 force save = 1 when button clicked
+                force_save=True if data.get("force_save") else False
+            )
+
+            return JsonResponse({
+                "status": "success",
+                "id": obj.id
+            })
+
+        except Exception as e:
+            return JsonResponse({
+                "status": "error",
+                "message": str(e)
+            })
 
