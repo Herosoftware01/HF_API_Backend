@@ -284,3 +284,97 @@ class VueUser(models.Model):
     class Meta:
         managed = False
         db_table = 'vue_user'
+
+class Mas_contractor(models.Model):
+    name = models.CharField(max_length=100)
+    code = models.CharField(max_length=50, blank=True, unique=True)
+
+    def __str__(self):
+        return self.name
+
+    def save(self, *args, **kwargs):
+        if not self.code:
+            prefix = self.name[:2].lower()
+
+            # same prefix உள்ள last record எடுக்க
+            last = Mas_contractor.objects.filter(
+                code__startswith=prefix
+            ).order_by('-code').first()
+
+            if last:
+                last_number = int(last.code[-4:])
+                new_number = last_number + 1
+            else:
+                new_number = 1
+
+            self.code = f"{prefix}{new_number:04d}"
+
+        super().save(*args, **kwargs)
+
+
+class Cont_employee(models.Model):
+    name = models.CharField(max_length=100)
+    code = models.CharField(max_length=50, blank=True, unique=True)
+    con_id = models.ForeignKey(Mas_contractor, on_delete=models.CASCADE)
+
+    def __str__(self):
+        return f"{self.name} ({self.code})"
+
+    def save(self, *args, **kwargs):
+        if not self.code:
+            prefix = self.name[:2].lower()
+
+            last = Cont_employee.objects.filter(
+                code__startswith=prefix
+            ).order_by('-code').first()
+
+            if last:
+                last_number = int(last.code[-4:])
+                new_number = last_number + 1
+            else:
+                new_number = 1
+
+            self.code = f"{prefix}{new_number:04d}"
+
+        super().save(*args, **kwargs)
+
+
+class Needle_change(models.Model):
+    machine = models.CharField(max_length=100)
+    emp_code = models.CharField(max_length=50)
+    line = models.CharField(max_length=10)
+    unit = models.CharField(max_length=10)
+    n_count=models.IntegerField()
+    date = models.DateTimeField(auto_now_add=True)
+
+class cut_sample_data(models.Model):
+    jobno = models.CharField(max_length=50)
+    bundle_no = models.CharField(max_length=50)
+    bundle_id = models.CharField(max_length=50)
+    pcs_no_r1 = models.IntegerField(null=True, blank=True)
+    pcs_no_r2 = models.IntegerField(null=True, blank=True)
+    pcs_no_r3 = models.IntegerField(null=True, blank=True)
+    product = models.CharField(max_length=100)
+    color = models.CharField(max_length=100)
+    size = models.CharField(max_length=50)
+    title = models.CharField(max_length=50)
+    measurement_dtls = models.CharField(max_length=100)
+    measurement = models.CharField(max_length=50)
+    reading1 = models.CharField(max_length=50, blank=True, null=True)
+    reading2 = models.CharField(max_length=50, blank=True, null=True)
+    reading3 = models.CharField(max_length=50, blank=True, null=True)
+    date = models.DateTimeField(auto_now_add=True)
+    bf_ironing = models.BooleanField(default=False)
+    af_ironing = models.BooleanField(default=False)
+
+class cut_sample_data_final(models.Model):
+    jobno = models.CharField(max_length=50)
+    bundle_no = models.CharField(max_length=50)
+    bundle_id = models.CharField(max_length=50)
+    product = models.CharField(max_length=100)
+    color = models.CharField(max_length=100)
+    size = models.CharField(max_length=50)
+    date = models.DateTimeField(auto_now_add=True)
+    bf_ironing = models.BooleanField(default=False)
+    af_ironing = models.BooleanField(default=False)
+    force_save = models.BooleanField(default=False)

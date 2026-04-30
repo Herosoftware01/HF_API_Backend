@@ -27,7 +27,7 @@ SECRET_KEY = 'django-insecure--jpqy*__tak#1#7_0u^g5gt=n@rlpjvp5mstua5m^&i7+!8uad
 DEBUG = True
 # DEBUG = False
 
-ALLOWED_HOSTS = ['hfapi.herofashion.com','localhost','127.0.0.1','10.1.21.13','10.1.21.154','10.1.21.110']
+ALLOWED_HOSTS = ['hfapi.herofashion.com','localhost','127.0.0.1','10.1.21.13','10.1.21.154','10.1.21.110','10.1.21.133']
 
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
@@ -267,3 +267,13 @@ EMAIL_HOST_USER = 'hfautomation2026@gmail.com'
 EMAIL_HOST_PASSWORD = 'tmiy sjdd vbon omsd'   # NOT normal password
 
 DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
+
+
+
+# Bold Reports configuration (Application-level)
+BOLD_REPORTS = {
+    "URL": "https://api.herofashion.com",
+    "SITE_IDENTIFIER": "site3",
+    "USER_EMAIL": "admin@veahtech.com",
+    "EMBED_SECRET_KEY": "RMkS8LRS119c632BGyGeScftReTRIRI",
+}

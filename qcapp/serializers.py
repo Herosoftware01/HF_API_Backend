@@ -1,8 +1,10 @@
 from rest_framework import serializers
 from django.conf import settings
 from datetime import date
+from django.utils import timezone
+from django.db.models import Sum
 
-from .models import QcAdminMistake,Unit, Line, MachineAllocation, machine_details, emp_allocate,Empwisesal,VueProcessSequence
+from .models import QcAdminMistake,Needle_change,Unit, Line, MachineAllocation, machine_details, emp_allocate,Empwisesal,VueProcessSequence
 
 
 class QcAdminMistakeSerializer(serializers.ModelSerializer):
@@ -33,15 +35,17 @@ from django.utils import timezone
 class MachineAllocationSerializer(serializers.ModelSerializer):
     # Accept machine ID on write
     machine_id = serializers.PrimaryKeyRelatedField(queryset=machine_details.objects.all(), write_only=True)
-
+    
     # Show machine details on read
     machine = MachineSerializer(read_only=True)
 
     employees = serializers.SerializerMethodField()
+    needle_count = serializers.SerializerMethodField()
+    needle_details = serializers.SerializerMethodField()
 
     class Meta:
         model = MachineAllocation
-        fields = ['id', 'machine', 'machine_id', 'unit', 'line', 'allocated_at', 'employees']  # ✅ include machine_id
+        fields = ['id', 'machine', 'machine_id', 'unit', 'line', 'allocated_at', 'employees','needle_count','needle_details']  # ✅ include machine_id
 
     def validate(self, data):
         if data.get('line') and data.get('unit') and data['line'].unit != data['unit']:
@@ -55,14 +59,6 @@ class MachineAllocationSerializer(serializers.ModelSerializer):
 
     def get_employees(self, obj):
         today = timezone.now().date()
-
-        # Get the latest allocation for today
-        # latest_emp = (
-        #     emp_allocate.objects
-        #     .filter(machine_id=obj.machine.id, date=today)
-        #     .order_by('-id')  # higher ID = last allocation
-        #     .first()
-        # )
         latest_emp = (
             emp_allocate.objects
             .filter(
@@ -96,6 +92,44 @@ class MachineAllocationSerializer(serializers.ModelSerializer):
                 "status": latest_emp.status,
                 "photo":photo_url
             }
+        ]
+    # ✅ Needle count (TODAY SUM)
+    def get_needle_count(self, obj):
+        today = timezone.now().date()
+
+        total = (
+            Needle_change.objects
+            .filter(
+                machine=obj.machine.Identity,   # ⚠️ important mapping
+                date__date=today,
+                unit=str(obj.unit.id),
+                line=str(obj.line.id)
+            )
+            .aggregate(total=Sum('n_count'))['total']
+        )
+
+        return total or 0
+    
+    def get_needle_details(self, obj):
+        today = timezone.now().date()
+
+        records = (
+            Needle_change.objects
+            .filter(
+                machine=obj.machine.Identity,
+                date__date=today,
+                unit=str(obj.unit.id),
+                line=str(obj.line.id)
+            )
+            .order_by('-date')
+        )
+
+        return [
+            {
+                "time": r.date.strftime("%Y-%m-%d %H:%M:%S"),
+                "count": r.n_count
+            }
+            for r in records
         ]
     
 

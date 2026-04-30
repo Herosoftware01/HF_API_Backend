@@ -1,13 +1,13 @@
-from django.shortcuts import render
+from django.shortcuts import render,get_object_or_404
 from django.db import connections
 from rest_framework.decorators import api_view
-import pandas as pd
+# import pandas as pd
 from django.http import HttpResponse
 from django.core.exceptions import ValidationError
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, permissions
-from .models import QcAdminMistake,VueUser,Unit,Line,roving_qc_mistake,qc_piece_final, MachineAllocation, machine_details, emp_allocate, Empwisesal, VueProcessSequence
+from .models import QcAdminMistake,cut_sample_data,cut_sample_data_final,VueUser,Unit,Needle_change,Line,roving_qc_mistake,qc_piece_final, MachineAllocation, machine_details, emp_allocate, Empwisesal, VueProcessSequence
 from .serializers import QcAdminMistakeSerializer,UnitSerializer,MachineTrasnsferSerializer,MachineSerializer,LineSerializer, MachineAllocationSerializer, VueProcessSequenceSerializer
 from rest_framework.parsers import MultiPartParser, FormParser
 from collections import defaultdict
@@ -16,6 +16,10 @@ from datetime import date
 from django.utils.timezone import now
 from django.conf import settings
 
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+import json
+from django.db import connection
 
 class QcAdminMistakeAPIView(APIView):
     permission_classes = [permissions.IsAuthenticated]
@@ -178,7 +182,7 @@ def get_bundle_data(request):
         checked_bundle_ids = set(
             qc_piece_final.objects.filter(
                 bundle_id__in=bundle_ids_from_api
-            ).exclude(qc_type='rowing_qc')   # 👈 ignore rowing_qc
+            ).exclude(qc_type='rowing_qc')   #  ignore rowing_qc
             .values_list('bundle_id', flat=True)
         )
 
@@ -369,7 +373,7 @@ def get_last_bundle(request):
     is_completed = qc_piece_final.objects.filter(bundle_id=bundle_id).exists()
 
     # =========================
-    # 👉 ROVING QC EXTRA DATA
+    #  ROVING QC EXTRA DATA
     # =========================
     roving_data = {}
 
@@ -408,7 +412,7 @@ def get_last_bundle(request):
         "checked_pieces": piece,
         "is_completed": is_completed,
 
-        # 👇 extra only for roving
+        #  extra only for roving
         **roving_data
     })
 
@@ -435,45 +439,45 @@ def check_bundle_entry_status(request):
     
 
 
-def import_machine_details_from_excel(request):
-    file_path = 'C:/Users/Murthy/Desktop/Full App/HF_API/machine.xlsx'
+# def import_machine_details_from_excel(request):
+#     file_path = 'C:/Users/Murthy/Desktop/Full App/HF_API/machine.xlsx'
 
-    try:
-        # Read Excel, header is at row 4 (index 3)
-        df = pd.read_excel(file_path, header=3)
+#     try:
+#         # Read Excel, header is at row 4 (index 3)
+#         df = pd.read_excel(file_path, header=3)
 
-        # Clean column names
-        df.columns = df.columns.str.strip()
+#         # Clean column names
+#         df.columns = df.columns.str.strip()
 
-        required_columns = ['Identity', 'Item', 'Description']
+#         required_columns = ['Identity', 'Item', 'Description']
 
-        missing_cols = [col for col in required_columns if col not in df.columns]
-        if missing_cols:
-            return HttpResponse(f"Error: Missing columns {missing_cols}")
+#         missing_cols = [col for col in required_columns if col not in df.columns]
+#         if missing_cols:
+#             return HttpResponse(f"Error: Missing columns {missing_cols}")
 
-        # Drop rows with empty required fields
-        df = df.dropna(subset=required_columns)
+#         # Drop rows with empty required fields
+#         df = df.dropna(subset=required_columns)
 
-        count = 0
-        skipped = 0
+#         count = 0
+#         skipped = 0
 
-        for _, row in df.iterrows():
-            try:
-                machine_details.objects.create(
-                    Identity=str(row['Identity']).strip(),
-                    Item=str(row['Item']).strip(),
-                    Description=str(row['Description']).strip()
-                )
-                count += 1
-            except Exception as e:
-                # Likely a unique constraint or DB error
-                skipped += 1
-                continue
+#         for _, row in df.iterrows():
+#             try:
+#                 machine_details.objects.create(
+#                     Identity=str(row['Identity']).strip(),
+#                     Item=str(row['Item']).strip(),
+#                     Description=str(row['Description']).strip()
+#                 )
+#                 count += 1
+#             except Exception as e:
+#                 # Likely a unique constraint or DB error
+#                 skipped += 1
+#                 continue
 
-        return HttpResponse(f"Success: {count} records imported, {skipped} skipped due to DB constraints")
+#         return HttpResponse(f"Success: {count} records imported, {skipped} skipped due to DB constraints")
 
-    except Exception as e:
-        return HttpResponse(f"Error: {str(e)}")
+#     except Exception as e:
+#         return HttpResponse(f"Error: {str(e)}")
 
 
 
@@ -777,50 +781,174 @@ def get_process_sequence(request):
 #         }, status=404)
 
 
+# @api_view(['GET'])
+# def get_machine_employee(request, identity):
+#     print("identity",identity)
+#     try:
+#         unit = request.query_params.get('unit')
+#         line = request.query_params.get('line')
+#         print("unit==",unit, "line==",line)
+
+#         identity = identity.rstrip('/')
+#         machine = machine_details.objects.get(Identity__iexact=identity)
+#         # unit_data = Line.objects.filter(unit_id=unit,).values_list('line_number', flat=True).first()
+#         # print("unit_data",unit_data)
+#         today = now().date()
+#         last_entry = emp_allocate.objects.filter(machine=machine, date=today).order_by('-id').first()
+
+#         unit_data = Line.objects.filter(id=last_entry.line,line_number=line,unit_id=unit ).values_list('line_number', flat=True).first()
+
+#         print("last_entry",unit_data)
+
+#         emp_code = None
+#         emp_name = None
+#         photo_url = "https://www.example.com/default-profile.png"
+
+#         if last_entry:
+#             emp_code = last_entry.emp_code
+#             employee = Empwisesal.objects.using('main').filter(status='working', code=emp_code).first()
+#             if employee:
+#                 emp_name = employee.name
+#                 if employee.photo:
+#                     filename = employee.photo.split('\\')[-1]
+#                     staff_url = settings.STAFF_IMAGES_URL.rstrip('/')
+#                     photo_url = f"https://hfapi.herofashion.com/{staff_url}/{filename}"
+
+#         # Fetch matching processes from VueProcessSequence
+#         jobno = request.query_params.get('jobno')
+#         topbottom_des = request.query_params.get('topbottom_des')
+
+#         processes = []
+#         if jobno and topbottom_des:
+#             seq_match = list(
+#                 qc_piece_final.objects.filter(
+#                     jobno=jobno,
+#                     product=topbottom_des
+#                 ).values_list('seq', flat=True)
+#             )
+
+#             print("seq =", seq_match)
+#             queryset = VueProcessSequence.objects.using('demo').filter(
+#                 jobno=jobno,
+#                 topbottom_des=topbottom_des,
+#                 mc=machine.mcgrp
+#             ).order_by('sl')
+            
+#             processes = [
+#                 {
+#                     "sl": p.sl,
+#                     "sl1": p.sl1,
+#                     "prsid": p.prsid,
+#                     "process_des": p.process_des,
+#                     "mc": p.mc
+#                 } 
+#                 for p in queryset
+#                 if p.process_des not in seq_match
+#             ]
+
+#         return Response({
+#             "machine_identity": machine.Identity,
+#             "machine_id": machine.id,
+#             "mcgrp": machine.mcgrp,
+#             "emp_code": emp_code,
+#             "employee_name": emp_name,
+#             "emp_photo": photo_url,
+#             "has_data": True if last_entry else False,
+#             "processes": processes
+#         })
+
+#     except machine_details.DoesNotExist:
+#         return Response({
+#             "error": "Machine not found",
+#             "has_data": False,
+#             "processes": []
+#         }, status=404)
+
+
 @api_view(['GET'])
 def get_machine_employee(request, identity):
-    print("identity",identity)
+    print("identity", identity)
+
     try:
+        unit = request.query_params.get('unit')
+        line = request.query_params.get('line')
+        jobno = request.query_params.get('jobno')
+        topbottom_des = request.query_params.get('topbottom_des')
+        bundleNo = request.query_params.get('bundleNo')
+
+        print("unit==", unit, "line==", line)
+
         identity = identity.rstrip('/')
-        machine = machine_details.objects.get(Identity__iexact=identity)
-
         today = now().date()
-        last_entry = emp_allocate.objects.filter(machine=machine, date=today).order_by('-id').first()
 
-        emp_code = None
+        #  Step 1: Get line_id from Line table
+        line_obj = Line.objects.filter(
+            unit_id=unit,
+            line_number=line
+        ).first()
+
+        if not line_obj:
+            return Response({
+                "error": "Line not found",
+                "has_data": False,
+                "processes": []
+            }, status=404)
+
+        #  Step 2: Match EVERYTHING in one query
+        last_entry = emp_allocate.objects.select_related('machine').filter(
+            machine__Identity__iexact=identity,
+            date=today,
+            unit=unit,
+            line=line_obj.id   # FK match
+        ).order_by('-id').first()
+
+        #  If not match → Machine not found
+        if not last_entry:
+            return Response({
+                "error": "Machine not found",
+                "has_data": False,
+                "processes": []
+            }, status=404)
+
+        machine = last_entry.machine
+
+        # ---------------- EMPLOYEE ----------------
+        emp_code = last_entry.emp_code
         emp_name = None
         photo_url = "https://www.example.com/default-profile.png"
 
-        if last_entry:
-            emp_code = last_entry.emp_code
-            employee = Empwisesal.objects.using('main').filter(status='working', code=emp_code).first()
-            if employee:
-                emp_name = employee.name
-                if employee.photo:
-                    filename = employee.photo.split('\\')[-1]
-                    staff_url = settings.STAFF_IMAGES_URL.rstrip('/')
-                    photo_url = f"https://hfapi.herofashion.com/{staff_url}/{filename}"
+        employee = Empwisesal.objects.using('main').filter(
+            status='working',
+            code=emp_code
+        ).first()
 
-        # Fetch matching processes from VueProcessSequence
-        jobno = request.query_params.get('jobno')
-        topbottom_des = request.query_params.get('topbottom_des')
+        if employee:
+            emp_name = employee.name
+            if employee.photo:
+                filename = employee.photo.split('\\')[-1]
+                staff_url = settings.STAFF_IMAGES_URL.rstrip('/')
+                photo_url = f"https://hfapi.herofashion.com/{staff_url}/{filename}"
 
+        # ---------------- PROCESSES ----------------
         processes = []
+
         if jobno and topbottom_des:
             seq_match = list(
                 qc_piece_final.objects.filter(
                     jobno=jobno,
-                    product=topbottom_des
+                    product=topbottom_des,
+                    bundle_no=bundleNo
                 ).values_list('seq', flat=True)
             )
 
-            print("seq =", seq_match)
             queryset = VueProcessSequence.objects.using('demo').filter(
                 jobno=jobno,
                 topbottom_des=topbottom_des,
                 mc=machine.mcgrp
+            ).exclude(
+                process_des__in=seq_match
             ).order_by('sl')
-            
+
             processes = [
                 {
                     "sl": p.sl,
@@ -828,11 +956,11 @@ def get_machine_employee(request, identity):
                     "prsid": p.prsid,
                     "process_des": p.process_des,
                     "mc": p.mc
-                } 
+                }
                 for p in queryset
-                if p.process_des not in seq_match
             ]
 
+        # ---------------- RESPONSE ----------------
         return Response({
             "machine_identity": machine.Identity,
             "machine_id": machine.id,
@@ -840,18 +968,17 @@ def get_machine_employee(request, identity):
             "emp_code": emp_code,
             "employee_name": emp_name,
             "emp_photo": photo_url,
-            "has_data": True if last_entry else False,
+            "has_data": True,
             "processes": processes
         })
 
-    except machine_details.DoesNotExist:
+    except Exception as e:
+        print("ERROR:", str(e))
         return Response({
-            "error": "Machine not found",
+            "error": "Internal server error",
             "has_data": False,
             "processes": []
-        }, status=404)
-
-
+        }, status=500)
 
 
 
@@ -911,4 +1038,296 @@ class MachineTransferDetailAPIView(APIView):
         allocation = self.get_object(pk)
         allocation.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+@csrf_exempt
+def machine_status_api(request):
+    
+    if request.method == "POST":
+        try:
+            data = json.loads(request.body)
+            identity = data.get("machine_id")
+        except:
+            return JsonResponse({"error": "Invalid JSON"}, status=400)
+
+    elif request.method == "GET":
+        identity = request.GET.get("Identity")
+
+    else:
+        return JsonResponse({"error": "Only GET and POST allowed"}, status=405)
+
+    if not identity:
+        return JsonResponse({"error": "Identity is required"}, status=400)
+
+    identity = identity.strip()
+
+    try:
+        machine = machine_details.objects.get(Identity__iexact=identity)
+    except machine_details.DoesNotExist:
+        return JsonResponse({"error": "Machine not found"}, status=404)
+
+    today = date.today()
+
+    allocation = emp_allocate.objects.filter(
+        machine=machine,
+        date=today
+    ).order_by('-id').first()
+
+    if not allocation:
+        return JsonResponse({
+            "message": "Machine not allocated today"
+        })
+
+    if not allocation.status:
+        return JsonResponse({
+            "message": "Machine is offline"
+        })
+
+    return JsonResponse({
+        "message": "Machine is online",
+        "emp_code": allocation.emp_code,
+        "unit": allocation.unit,
+        "line": allocation.line
+    })
+
+
+@csrf_exempt
+def needle_details_api(request):
+
+    if request.method != "POST":
+        return JsonResponse({"error": "Only POST allowed"}, status=405)
+
+    try:
+        data = json.loads(request.body)
+
+        machine = data.get("machine_id")
+        emp_code = data.get("emp_code")  # optional (frontend add pannala na empty)
+        line = data.get("line")
+        unit = data.get("unit")
+        count = data.get("count", 0)
+        needle_changed = data.get("needle_changed", 0)
+
+    except Exception as e:
+        return JsonResponse({"error": "Invalid JSON"}, status=400)
+
+    #  validation
+    if not machine:
+        return JsonResponse({"error": "machine_id is required"}, status=400)
+
+    # needle change illa na count = 0
+    if not needle_changed:
+        count = 0
+
+    #  save
+    Needle_change.objects.create(
+        machine=machine,
+        emp_code=emp_code if emp_code else "",
+        line=line,
+        unit=unit,
+        n_count=count
+    )
+
+    return JsonResponse({
+        "message": "Needle details saved successfully"
+    })
+
+
+
+def get_order_measurements(request):
+    ordid = request.GET.get('ordid')
+    topbottom = request.GET.get('TopBottom_des')
+    siz = request.GET.get('siz')
+
+    with connections['demo'].cursor() as cursor:
+        cursor.execute(
+            """
+            EXEC usp_GetOrderMeasurements
+                @ordid=%s,
+                @TopBottom_des=%s,
+                @siz=%s
+            """,
+            [ordid, topbottom, siz]
+        )
+
+        columns = [col[0] for col in cursor.description]
+        rows = cursor.fetchall()
+
+    result = [
+        dict(zip(columns, row))
+        for row in rows
+    ]
+
+    return JsonResponse({
+        "status": "success",
+        "data": result
+    })
+
+
+
+@csrf_exempt
+def save_measurement(request):
+    if request.method == "POST":
+        try:
+            data = json.loads(request.body)
+
+            jobno = data.get("jobNo")
+            bundle_no = data.get("bundleNo")
+            bundle_id = data.get("bundle_id")
+            measurement_dtls = data.get("measurement_dtls")
+            bf_ironing = data.get("bf_ironing")
+            af_ironing = data.get("af_ironing")
+
+            update_fields = {}
+
+            # only update if NOT null
+            if data.get("reading1") is not None:
+                update_fields["reading1"] = data.get("reading1")
+
+            if data.get("reading2") is not None:
+                update_fields["reading2"] = data.get("reading2")
+
+            if data.get("reading3") is not None:
+                update_fields["reading3"] = data.get("reading3")
+
+            if data.get("pcs_no_r1") is not None:
+                update_fields["pcs_no_r1"] = data.get("pcs_no_r1")
+
+            if data.get("pcs_no_r2") is not None:
+                update_fields["pcs_no_r2"] = data.get("pcs_no_r2")
+
+            if data.get("pcs_no_r3") is not None:
+                update_fields["pcs_no_r3"] = data.get("pcs_no_r3")
+
+            obj, created = cut_sample_data.objects.update_or_create(
+                jobno=jobno,
+                bundle_no=bundle_no,
+                bundle_id=bundle_id,
+                bf_ironing=bf_ironing,
+                af_ironing=af_ironing,
+                measurement_dtls=measurement_dtls,
+                defaults={
+                    "product": data.get("product"),
+                    "color": data.get("colour"),
+                    "size": data.get("size"),
+                    "title": data.get("title"),
+                    "measurement": data.get("measurement"),
+                    **update_fields
+                }
+            )
+
+            return JsonResponse({
+                "status": "success",
+                "created": created,
+                "id": obj.id
+            })
+
+        except Exception as e:
+            return JsonResponse({
+                "status": "error",
+                "message": str(e)
+            })
+        
+
+@csrf_exempt
+def final_save_measurement(request):
+    if request.method == "POST":
+        try:
+            data = json.loads(request.body)
+
+            obj = cut_sample_data_final.objects.create(
+                jobno=data.get("jobNo"),
+                bundle_no=data.get("bundleNo"),
+                bundle_id=data.get("bundle_id"),
+                product=data.get("product"),
+                color=data.get("colour"),
+                size=data.get("size"),
+
+                bf_ironing=data.get("bf_ironing"),
+                af_ironing=data.get("af_ironing"),
+
+                # force save = 1 when button clicked
+                force_save=True if data.get("force_save") else False
+            )
+
+            return JsonResponse({
+                "status": "success",
+                "id": obj.id
+            })
+
+        except Exception as e:
+            return JsonResponse({
+                "status": "error",
+                "message": str(e)
+            })
+
+
+@csrf_exempt
+def check_ironing_status(request):
+    if request.method == "GET":
+        jobno = request.GET.get("jobno")
+        bundle_no = request.GET.get("bundle_no")
+
+        try:
+            qs = cut_sample_data_final.objects.filter(
+                jobno=jobno,
+                bundle_no=bundle_no
+            )
+
+            #  No record
+            if not qs.exists():
+                return JsonResponse({
+                    "status": "new",
+                    "bf_ironing": False,
+                    "af_ironing": False
+                })
+
+            # CHECK FULL HISTORY
+            bf_done = qs.filter(bf_ironing=True).exists()
+            af_done = qs.filter(af_ironing=True).exists()
+
+            return JsonResponse({
+                "status": "exists",
+                "bf_ironing": bf_done,
+                "af_ironing": af_done
+            })
+
+        except Exception as e:
+            return JsonResponse({
+                "status": "error",
+                "message": str(e)
+            })
+        
+
+@api_view(['GET'])
+def get_existing_measurements(request):
+    bundle_id = request.GET.get('bundle_id')
+    product = request.GET.get('product')
+    bf_ironing = request.GET.get('bf_ironing')
+    af_ironing = request.GET.get('af_ironing')
+
+    bf_ironing = True if bf_ironing in ["true", "1", True] else False
+    af_ironing = True if af_ironing in ["true", "1", True] else False
+
+    data = cut_sample_data.objects.filter(
+        bundle_id=bundle_id,
+        product=product,
+        bf_ironing=bf_ironing,
+        af_ironing=af_ironing
+    )
+
+    result = []
+    for d in data:
+        result.append({
+            "title": d.title,
+            "measurement_dtls": d.measurement_dtls,
+            "measurement": d.measurement,
+            "pcs_no_r1": d.pcs_no_r1,
+            "pcs_no_r2": d.pcs_no_r2,
+            "pcs_no_r3": d.pcs_no_r3,
+            "reading1": d.reading1,
+            "reading2": d.reading2,
+            "reading3": d.reading3,
+        })
+
+    return Response({"data": result})
 
