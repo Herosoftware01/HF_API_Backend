@@ -329,3 +329,37 @@ class LabAtt(models.Model):
     class Meta:
         managed = False
         db_table = 'lab_att'
+
+class RptCutting(models.Model):
+    planno = models.IntegerField(db_column='PLANNO',primary_key=True)  # Field name made lowercase.
+    dt = models.DateTimeField(db_column='DT')  # Field name made lowercase.
+    jobno = models.CharField(db_column='JOBNO', max_length=50, db_collation='SQL_Latin1_General_CP1_CI_AS')  # Field name made lowercase.
+    sample_descr = models.CharField(db_column='SAMPLE_DESCR', max_length=50, db_collation='SQL_Latin1_General_CP1_CI_AS')  # Field name made lowercase.
+    per = models.DecimalField(db_column='PER', max_digits=18, decimal_places=2)  # Field name made lowercase.
+    lot = models.CharField(db_column='LOT', max_length=50, db_collation='SQL_Latin1_General_CP1_CI_AS')  # Field name made lowercase.
+    tply = models.IntegerField(db_column='TPLY')  # Field name made lowercase.
+    topbottom_des = models.CharField(db_column='TopBottom_des', max_length=50, db_collation='SQL_Latin1_General_CP1_CI_AS')  # Field name made lowercase.
+    topbottom_id = models.IntegerField(db_column='TopBottom_id')  # Field name made lowercase.
+    mtr = models.DecimalField(db_column='MTR', max_digits=18, decimal_places=3, blank=True, null=True)  # Field name made lowercase.
+    rls = models.IntegerField(db_column='RLS', blank=True, null=True)  # Field name made lowercase.
+    fdeldt = models.DateTimeField(db_column='FDELDT', blank=True, null=True)  # Field name made lowercase.
+    plan_mtr = models.DecimalField(db_column='PLAN_MTR', max_digits=18, decimal_places=3, blank=True, null=True)  # Field name made lowercase.
+    plan_kg = models.DecimalField(db_column='PLAN_KG', max_digits=18, decimal_places=3, blank=True, null=True)  # Field name made lowercase.
+    cutdt = models.DateTimeField(blank=True, null=True)
+    aply = models.IntegerField(blank=True, null=True)
+    ratio_stick_dt = models.DateTimeField(blank=True, null=True)
+    bitcheck_dt = models.DateTimeField(blank=True, null=True)
+    mas_bud_dt = models.DateTimeField(blank=True, null=True)
+    unitdel_dt = models.DateTimeField(blank=True, null=True)
+
+    class Meta:
+        managed = False
+        db_table = 'RPT_CUTTING01'
+
+class VueOrdersinhand(models.Model):
+    orderno = models.CharField(db_column='OrderNo', max_length=50 ,primary_key=True)  # Field name made lowercase.
+      
+
+    class Meta:
+        managed = False
+        db_table = 'vue_Ordersinhand'

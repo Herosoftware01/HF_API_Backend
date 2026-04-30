@@ -539,7 +539,7 @@ def state(request):
             try:
                 from_date = datetime.strptime(from_date, "%Y-%m-%d")
                 to_date = datetime.strptime(to_date, "%Y-%m-%d")
-                data = data.filter(date__range=[from_date, to_date])
+                data = data.filter(dt__range=[from_date, to_date])
             except ValueError:
                 return JsonResponse({"error": "Invalid date format. Use YYYY-MM-DD"}, status=400)
 

@@ -4,7 +4,7 @@ from django.views.decorators.csrf import csrf_exempt
 import os
 import json
 from datetime import datetime
-from .models import LaySp, MasterFinalMistake, UnitBundlereport, FinalPlans,Corarlck1,CoraRollcheck,AttUnt,EmbAbsetnt,Holiday,LabAtt
+from .models import LaySp, MasterFinalMistake, UnitBundlereport, FinalPlans,Corarlck1,CoraRollcheck,AttUnt,EmbAbsetnt,Holiday,LabAtt,RptCutting,VueOrdersinhand
 from django.db.models import Q
 from django.db.models import F
 from django.db import connections
@@ -12,20 +12,26 @@ from django.db.models import OuterRef, Subquery
 from django.db.models import Sum
 from datetime import datetime, timedelta
 import os
+from django.db.models import OuterRef
 
 @csrf_exempt
 def holdwage_report(request):
     if request.method == 'GET':
-        code = request.GET.get("code")
+        try:
+            code = request.GET.get("code")
 
-        qs = VueHoldwage.objects.using('demo')
+            qs = VueHoldwage.objects.using('demo')
 
-        if code:
-            qs = qs.filter(code=code)
+            if code:
+                qs = qs.filter(code=code)
 
-        data = list(qs.values())
+            data = list(qs.values())
 
-        return JsonResponse(data, safe=False)
+            return JsonResponse(data, safe=False)
+        except OSError as e:
+            return JsonResponse({'error': f'Database connection error: {str(e)}'}, status=500)
+        except Exception as e:
+            return JsonResponse({'error': f'Error retrieving holdwage data: {str(e)}'}, status=500)
     
 @csrf_exempt
 def empwisesal(request):
@@ -108,6 +114,10 @@ def holdwagepaid_api(request):
 
         except Holdwagepaid.DoesNotExist:
             return JsonResponse({"error": "Not found"}, status=404)
+        except OSError as e:
+            return JsonResponse({"error": f"Database connection error: {str(e)}"}, status=500)
+        except Exception as e:
+            return JsonResponse({"error": f"Error retrieving holdwage data: {str(e)}"}, status=500)
 
     # ✅ POST (CREATE)
     elif request.method == "POST":
@@ -161,6 +171,9 @@ def holdwagepaid_api(request):
                 "entry_no": obj.entry_no
             })
 
+        except OSError as e:
+            print("DATABASE ERROR:", e)
+            return JsonResponse({"error": f"Database connection error: {str(e)}"}, status=500)
         except Exception as e:
             print("ERROR:", e)
             return JsonResponse({"error": str(e)}, status=400)
@@ -195,6 +208,8 @@ def holdwagepaid_api(request):
 
         except Holdwagepaid.DoesNotExist:
             return JsonResponse({"error": "Not found"}, status=404)
+        except OSError as e:
+            return JsonResponse({"error": f"Database connection error: {str(e)}"}, status=500)
         except Exception as e:
             return JsonResponse({"error": str(e)}, status=400)
 
@@ -211,6 +226,10 @@ def holdwagepaid_api(request):
 
         except Holdwagepaid.DoesNotExist:
             return JsonResponse({"error": "Not found"}, status=404)
+        except OSError as e:
+            return JsonResponse({"error": f"Database connection error: {str(e)}"}, status=500)
+        except Exception as e:
+            return JsonResponse({"error": str(e)}, status=500)
 
     return JsonResponse({"error": "Invalid request"}, status=400)
 
@@ -591,3 +610,70 @@ def abs_details(request):
             "status": "error",
             "message": str(e)
         }, status=500)
+    
+
+@csrf_exempt
+def cutdel(request):
+    if request.method == 'GET':
+        try:
+            # Get filter values from query params
+            jobno = request.GET.get('jobno')
+            planno = request.GET.get('planno')
+            topbottom = request.GET.get('topbottom')
+            lot = request.GET.get('lot')
+
+            # Fetch order numbers from test DB
+            orderno_list = list(
+                VueOrdersinhand.objects.using('test')
+                .values_list('orderno', flat=True)
+            )
+
+            # Base queryset
+            data = RptCutting.objects.using('demo').filter(
+                jobno__in=orderno_list
+            )
+
+            # Apply filters dynamically
+            if jobno:
+                data = data.filter(jobno__icontains=jobno)
+
+            if planno:
+                data = data.filter(planno__icontains=planno)
+
+            if topbottom:
+                data = data.filter(topbottom_des__icontains=topbottom)
+
+            if lot:
+                data = data.filter(lot__icontains=lot)
+
+            # Select required fields and convert to list
+            data = data.values(
+                'jobno',
+                'dt',
+                'planno',
+                'sample_descr',
+                'per',
+                'topbottom_des',
+                'lot',
+                'rls',
+                'fdeldt',
+                'plan_kg',
+                'mtr',
+                'cutdt',
+                'tply',
+                'aply',
+                'ratio_stick_dt',
+                'bitcheck_dt',
+                'mas_bud_dt',
+                'unitdel_dt',
+            )
+
+            result = list(data)
+            print("Total records:", len(result))
+
+            return JsonResponse(result, safe=False)
+        
+        except OSError as e:
+            return JsonResponse({'error': f'Database connection error: {str(e)}'}, status=500)
+        except Exception as e:
+            return JsonResponse({'error': f'Error retrieving cutting data: {str(e)}'}, status=500)

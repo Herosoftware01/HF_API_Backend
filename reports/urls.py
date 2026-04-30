@@ -14,5 +14,6 @@ urlpatterns = [
     path('attendance/', views.attendance, name='attendance'),
     path('absent_details/', views.abs_details, name='absent_details'),
     path('present_details/', views.present_details, name='present_details'),
+    path('cutdel/', views.cutdel, name='cutdel'),
 
     ] 
