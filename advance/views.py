@@ -89,7 +89,7 @@ def login(request):
             if not user_id:
                 return JsonResponse({"error": "ID is required"}, status=400)
 
-            user = IncdebUsers.objects.using('mssql1').get(id=user_id)
+            user = IncdebUsers.objects.using('demo').get(id=user_id)
 
             user.username = data.get('username')
 
@@ -117,7 +117,7 @@ def login(request):
             data = json.loads(request.body)
             user_id = data.get('id')
 
-            user = IncdebUsers.objects.using('mssql1').get(id=user_id)
+            user = IncdebUsers.objects.using('demo').get(id=user_id)
             user.delete()
 
             return JsonResponse({"message": "User deleted"}, status=200)

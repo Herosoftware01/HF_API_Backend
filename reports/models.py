@@ -363,3 +363,91 @@ class VueOrdersinhand(models.Model):
     class Meta:
         managed = False
         db_table = 'vue_Ordersinhand'
+
+
+class ResignDtls(models.Model):
+    slno = models.BigIntegerField(db_column='SlNo',primary_key=True)  # Field name made lowercase.
+    code = models.IntegerField()
+    photo = models.CharField(max_length=400, blank=True, null=True)
+    name = models.CharField(max_length=100, blank=True, null=True)
+    mobile = models.CharField(max_length=50, blank=True, null=True)
+    dept = models.CharField(max_length=50, blank=True, null=True)
+    category = models.CharField(db_column='Category', max_length=50, blank=True, null=True)  # Field name made lowercase.
+    joindt = models.DateTimeField(db_column='JoinDt', blank=True, null=True)  # Field name made lowercase.
+    resigndt = models.DateTimeField(db_column='resignDt', blank=True, null=True)  # Field name made lowercase.
+    days_worked = models.IntegerField(db_column='Days_Worked', blank=True, null=True)  # Field name made lowercase.
+
+    class Meta:
+        managed = False
+        db_table = 'vue_resign_Dtls'
+
+class Empjoin(models.Model):
+    id = models.BigIntegerField(db_column='ID', primary_key=True)  # Field name made lowercase.
+    code = models.IntegerField()
+    name = models.CharField(max_length=100, blank=True, null=True)
+    mobile = models.CharField(max_length=50, blank=True, null=True)
+    photo = models.CharField(max_length=400, blank=True, null=True)
+    category = models.CharField(db_column='Category', max_length=50, blank=True, null=True)  # Field name made lowercase.
+    joindt = models.DateTimeField(db_column='JoinDt', blank=True, null=True)  # Field name made lowercase.
+    dept = models.CharField(max_length=50, blank=True, null=True)
+
+    class Meta:
+        managed = False
+        db_table = 'vue_empjoin'
+
+
+class AttStaff(models.Model):
+    rowno = models.BigIntegerField(db_column='RowNo', blank=True, null=True)  # Field name made lowercase.
+    dt = models.DateTimeField(db_column='Dt', blank=True, null=True)  # Field name made lowercase.
+    dept = models.CharField(max_length=70, blank=True, null=True)
+    onroll = models.IntegerField(blank=True, null=True)
+    present = models.IntegerField(blank=True, null=True)
+    leave = models.IntegerField(blank=True, null=True)
+    absent = models.IntegerField(blank=True, null=True)
+
+    class Meta:
+        managed = False
+        db_table = 'vue_att_staff'
+
+class StaffAbsent(models.Model):
+    rowno = models.BigIntegerField(db_column='RowNo', primary_key=True)  # Field name made lowercase.
+    photo = models.CharField(max_length=400, blank=True, null=True)
+    wunit = models.CharField(max_length=70, blank=True, null=True)
+    dt = models.DateTimeField(blank=True, null=True)
+    code = models.IntegerField(blank=True, null=True)
+    name = models.CharField(max_length=70)
+    s = models.IntegerField(blank=True, null=True)
+
+    class Meta:
+        managed = False
+        db_table = 'vue_staff_absent'
+
+class StaffAtt(models.Model):
+    code_emb_attendance_fact = models.IntegerField(db_column='code emb attendance fact', blank=True, null=True)  # Field renamed to remove unsuitable characters.
+    date = models.DateTimeField(blank=True, null=True)
+    dept = models.CharField(max_length=70, blank=True, null=True)
+    name = models.CharField(max_length=70, blank=True, null=True)
+    intime = models.DateTimeField(blank=True, null=True)
+    outtime = models.DateTimeField(blank=True, null=True)
+    emppic = models.CharField(db_column='Emppic', max_length=8000, blank=True, null=True)  # Field name made lowercase.
+    img = models.CharField(max_length=53, blank=True, null=True)
+    con_code_name_in_out = models.CharField(db_column='Con_Code_name_in_out', max_length=4000, blank=True, null=True)  # Field name made lowercase.
+    rel_code_name = models.CharField(db_column='Rel_code_name', max_length=82, blank=True, null=True)  # Field name made lowercase.
+
+    class Meta:
+        managed = False
+        db_table = 'staff_att'
+
+
+class ContractSec(models.Model):
+    name = models.CharField(max_length=70)
+    date = models.DateField(db_column='Date', blank=True, null=True)  # Field name made lowercase.
+    cat = models.CharField( max_length=70, blank=True, null=True)  # Field name made lowercase.
+    intime = models.TimeField(blank=True, null=True)
+    outtime = models.TimeField(blank=True, null=True)
+    code = models.CharField(max_length=20)
+    slno = models.BigIntegerField(blank=True, null=True)
+
+    class Meta:
+        managed = False
+        db_table = 'Contract_sec'

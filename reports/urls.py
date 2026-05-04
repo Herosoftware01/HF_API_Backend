@@ -11,9 +11,21 @@ urlpatterns = [
     path('get_unit_bundle_data/', views.get_unit_bundle_report_data, name='get_unit_bundle_data'),
     path('mistake_summary/', views.mistake_summary, name='mistake_summary'),
     path('coraroll/', views.cora, name='coraroll'),
+    path('cutdel/', views.cutdel, name='cutdel'),
+
+    # HR Reports
     path('attendance/', views.attendance, name='attendance'),
     path('absent_details/', views.abs_details, name='absent_details'),
     path('present_details/', views.present_details, name='present_details'),
-    path('cutdel/', views.cutdel, name='cutdel'),
+    path('resign_report/', views.resign_report, name='resign_report'),
+    path('join_data/', views.join_data, name='join_data'),
+    path('staff_overview/', views.staff_overview, name='staff_overview'),
+    path('staff_pre/', views.staff_pre, name='staff_pre'),
+    path('staff_abe/', views.staff_abe, name='staff_abe'),
+    path('staff_one/', views.staff_report_api, name='staff_report_api'), 
+    path('emp_one/', views.oneday_api, name='oneday_api'), 
+    path('security_list/', views.security_list, name='security_list'),
+    path('work_report/', views.workforce_trends_api, name='workforce_trends_api'),
+    path('work_report1/', views.workforce_unit_trends_api, name='workforce_unit_trends_api'), 
 
     ] 
