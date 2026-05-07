@@ -64,3 +64,24 @@ class HrWrkdtlsnew(models.Model):
     class Meta:
         managed = False
         db_table = 'HR_WrkDtlsNew'
+class VueNewprod02(models.Model):
+    t = models.CharField(max_length=2)
+    recno = models.IntegerField()
+    prdhour = models.IntegerField()
+    recdt = models.DateTimeField()
+    unit = models.CharField(max_length=50)
+    jobno = models.CharField(max_length=50)
+    topbottom_des = models.CharField(db_column='TopBottom_des', max_length=50, blank=True, null=True)  # Field name made lowercase.
+    process_des = models.CharField(db_column='Process_des', max_length=150, blank=True, null=True)  # Field name made lowercase.
+    scp = models.CharField(max_length=1, blank=True, null=True)
+    empid = models.IntegerField()
+    contract_des = models.CharField(max_length=50, blank=True, null=True)
+    trstype = models.CharField(max_length=50)
+    clr = models.CharField(max_length=50)
+    siz = models.CharField(max_length=50)
+    qty = models.IntegerField(blank=True, null=True)
+    bdl = models.CharField(max_length=50)
+
+    class Meta:
+        managed = False
+        db_table = 'vue_NewProd02'

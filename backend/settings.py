@@ -53,6 +53,7 @@ INSTALLED_APPS = [
     'syncfushion',
     'advance',
     'reports',
+    'imp_reports',
 ]
 
 

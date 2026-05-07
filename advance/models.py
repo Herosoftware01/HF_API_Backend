@@ -75,8 +75,20 @@ class Employeeworking(models.Model):
 
 
     
-    
+class RptCut002(models.Model):
+    sl = models.AutoField(primary_key=True)
+    dept = models.CharField(db_column='Dept', max_length=50, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)  # Field name made lowercase.
+    trn = models.IntegerField(db_column='Trn', blank=True, null=True)  # Field name made lowercase.
+    trn1 = models.CharField(db_column='Trn1', max_length=50, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)  # Field name made lowercase.
+    dt = models.DateTimeField(blank=True, null=True)
+    nos = models.IntegerField(db_column='Nos', blank=True, null=True)  # Field name made lowercase.
+    pc = models.IntegerField(db_column='Pc', blank=True, null=True)  # Field name made lowercase.
+    wgt = models.DecimalField(db_column='Wgt', max_digits=18, decimal_places=3, blank=True, null=True)  # Field name made lowercase.
+    mtr = models.DecimalField(db_column='Mtr', max_digits=18, decimal_places=2, blank=True, null=True)  # Field name made lowercase.
 
+    class Meta:
+        managed = False
+        db_table = 'Rpt_Cut002'
 
 class HrWrkdtlsnew(models.Model):
     monthlysalary = models.CharField(db_column='MonthlySalary', max_length=1, blank=True, null=True)  # Field name made lowercase.

@@ -28,4 +28,11 @@ urlpatterns = [
     path('work_report/', views.workforce_trends_api, name='workforce_trends_api'),
     path('work_report1/', views.workforce_unit_trends_api, name='workforce_unit_trends_api'), 
 
+
+
+    # Finance Reports
+    path('bill_age/', views.bill, name='bill_age'),
+    path('pass_age/', views.pass_data_api, name='pass_age'),
+    path('bill_mdapprove/', views.approval_api, name='bill_mdapprove'),
+
     ] 
