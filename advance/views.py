@@ -2,6 +2,7 @@ from django.http import JsonResponse, HttpResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.db.models import Max
 import json
+from .models import IncdebUsers, Adreq, Empwisesal,Employeeworking,HrWrkdtlsnew
 from .models import IncdebUsers, Adreq, Empwisesal,Employeeworking,RptCut002
 from django.db import connections
 import os
@@ -548,6 +549,50 @@ def state(request):
         result = list(data.values())
 
         return JsonResponse(result, safe=False)
+
+
+
+# google contact API
+def google_contact_api(request):
+    if request.method == 'GET':
+        # Fetch Google Contacts
+        contacts = HrWrkdtlsnew.objects.using('main').all()
+        contacts_data = []
+        for contact in contacts:
+            contacts_data.append({
+                "photo_url": contact.photo_url,
+                "code": contact.code,
+                "name": contact.name,
+                "dept": contact.dept,
+                "category": contact.category,
+                "phone": contact.mobile,
+                "sc": contact.sc,
+                "joindt": contact.joindt,
+            })
+        return JsonResponse(contacts_data, safe=False)
+
+
+
+def new_pros(request):
+    rec = request.GET.get('rec')
+    with connections['demo'].cursor() as cursor:
+        cursor.execute(
+            """
+            EXEC usp_GetProductionDetails
+                @rec=%s               
+            """,
+            [rec]
+        )
+        columns = [col[0] for col in cursor.description]
+        rows = cursor.fetchall()
+    result = [
+        dict(zip(columns, row))
+        for row in rows
+    ]
+    return JsonResponse({
+        "status": "success",
+        "data": result
+    })
     
 
 def fabric_cutting(request):

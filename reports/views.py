@@ -17,15 +17,14 @@ from django.db.models import Count
 from django.db.models.functions import TruncDate, TruncDay,Cast,Coalesce
 from dateutil.relativedelta import relativedelta
 from collections import defaultdict
+from django.utils import timezone
 from django.db.models.expressions import ExpressionWrapper
 from django.core.paginator import Paginator
 
 
 
+# dt_timezone = timezone.make_aware(timezone.datetime(2012, 1, 1), timezone=timezone.UTC)
 
-
-
-dt_timezone = timezone.UTC
 @csrf_exempt
 def holdwage_report(request):
     if request.method == 'GET':

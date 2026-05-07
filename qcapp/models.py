@@ -81,7 +81,7 @@ class roving_qc_mistake(models.Model):
     )
     machine_id = models.CharField(max_length=20)
     operation = models.CharField(max_length=100)
-    emb_id = models.CharField(max_length=20)
+    emb_id = models.CharField(max_length=100)
 
     shade_var = models.BooleanField(default=False)
     num_sticker = models.BooleanField(default=False)
