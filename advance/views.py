@@ -2,11 +2,8 @@ from django.http import JsonResponse, HttpResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.db.models import Max
 import json
-<<<<<<< HEAD
 from .models import IncdebUsers, Adreq, Empwisesal,Employeeworking,HrWrkdtlsnew
-=======
 from .models import IncdebUsers, Adreq, Empwisesal,Employeeworking,RptCut002
->>>>>>> 431ded575a06f6c598b95fbf5619786525777877
 from django.db import connections
 import os
 from django.core.mail import send_mail
@@ -552,7 +549,6 @@ def state(request):
         result = list(data.values())
 
         return JsonResponse(result, safe=False)
-<<<<<<< HEAD
 
 
 
@@ -597,7 +593,6 @@ def new_pros(request):
         "status": "success",
         "data": result
     })
-=======
     
 
 def fabric_cutting(request):
@@ -630,4 +625,3 @@ def fabric_cutting(request):
 
 
         
->>>>>>> 431ded575a06f6c598b95fbf5619786525777877
