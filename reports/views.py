@@ -1874,12 +1874,18 @@ def bill(request):
 # --- 2. API View (Handles AJAX Data) ---
 def pass_data_api(request):
     # Base Queryset
-    qs = BillPass.objects.using('demo1').all().order_by('module')  # default ordering
+    qs = BillPass.objects.using('demo1').all()
 
-    # --- BASIC FILTERS ---
-    module_param = request.GET.get('module')
+    # --- NEW: Get unique lists for dropdowns ---
+    # This ensures your dropdowns always match the data available
+    modules_list = list(BillPass.objects.using('demo1').values_list('module1', flat=True).distinct().order_by('module1'))
+    suppliers_list = list(BillPass.objects.using('demo1').values_list('suppliers', flat=True).distinct().order_by('suppliers'))
+    incharges_list = list(BillPass.objects.using('demo1').values_list('employees', flat=True).distinct().order_by('employees'))
+
+    # --- FILTERS ---
+    module_param = request.GET.get('module1')
     if module_param:
-        qs = qs.filter(module=module_param)
+        qs = qs.filter(module1=module_param)
 
     emp = request.GET.get('employees')
     if emp and emp != 'ALL':
@@ -1893,89 +1899,67 @@ def pass_data_api(request):
     if status and status != 'ALL':
         qs = qs.filter(paymentstatus__iexact=status)
 
-    # --- DATE FILTERS ---
+    # Bill Date Range
     bill_from = request.GET.get('bill_from')
     bill_to = request.GET.get('bill_to')
     if bill_from and bill_to:
         qs = qs.filter(billdate__range=[bill_from, bill_to])
-    elif bill_from:
-        qs = qs.filter(billdate__gte=bill_from)
-    elif bill_to:
-        qs = qs.filter(billdate__lte=bill_to)
-
+    
+    # Payment Date Range (New)
     pay_from = request.GET.get('pay_from')
     pay_to = request.GET.get('pay_to')
     if pay_from and pay_to:
         qs = qs.filter(paymentdate__range=[pay_from, pay_to])
-    elif pay_from:
-        qs = qs.filter(paymentdate__gte=pay_from)
-    elif pay_to:
-        qs = qs.filter(paymentdate__lte=pay_to)
 
-    # --- ANNOTATE AGING ---
-    # We must annotate BEFORE filtering by risk_category
+    # --- AGING LOGIC ---
     qs = qs.annotate(
-        calculated_aging=Coalesce(
-            F('paymentdate'),
-            Cast(timezone.now(), DateField())
-        ) - F('billdate')
+        calculated_aging=Coalesce(F('paymentdate'), Cast(timezone.now(), DateField())) - F('billdate')
     )
 
-    # --- CALCULATE OVERALL STATS ---
-    # Do this BEFORE the risk_category filter so cards show the full overview
+    # --- STATS ---
     stats_data = qs.aggregate(
         normal_count=Count('no', filter=Q(calculated_aging__lte=timedelta(days=30))),
-        risk_count=Count('no', filter=Q(calculated_aging__gt=timedelta(days=30),
-                                      calculated_aging__lte=timedelta(days=45))),
+        risk_count=Count('no', filter=Q(calculated_aging__gt=timedelta(days=30), calculated_aging__lte=timedelta(days=45))),
         high_risk_count=Count('no', filter=Q(calculated_aging__gt=timedelta(days=45))),
         total_sum=Sum('amount')
     )
 
-    # --- APPLY RISK CATEGORY FILTER (FOR TABLE) ---
+    # Risk Category Filter
     risk_cat = request.GET.get('risk_category')
-    if risk_cat:
-        if risk_cat == 'Normal':
-            qs = qs.filter(calculated_aging__lte=timedelta(days=30))
-        elif risk_cat == 'Risk':
-            qs = qs.filter(calculated_aging__gt=timedelta(days=30),
-                          calculated_aging__lte=timedelta(days=45))
-        elif risk_cat == 'High Risk':
-            qs = qs.filter(calculated_aging__gt=timedelta(days=45))
+    if risk_cat == 'Normal':
+        qs = qs.filter(calculated_aging__lte=timedelta(days=30))
+    elif risk_cat == 'Risk':
+        qs = qs.filter(calculated_aging__gt=timedelta(days=30), calculated_aging__lte=timedelta(days=45))
+    elif risk_cat == 'High Risk':
+        qs = qs.filter(calculated_aging__gt=timedelta(days=45))
 
-    # --- PAGINATION & RESULTS ---
-    # Sort by module (ascending), then billdate (ascending)
+    # Pagination
     qs = qs.order_by('module', 'billdate')
-
     paginator = Paginator(qs, 500)
     page_obj = paginator.get_page(request.GET.get('page', 1))
 
-    results = []
-    for x in page_obj:
-        # calculated_aging is a timedelta object; extract .days for JSON
-        days = x.calculated_aging.days if x.calculated_aging else 0
-        results.append({
-            "id": x.no,
-            "billdate": x.billdate.isoformat() if x.billdate else None,
-            "paymentdate": x.paymentdate.isoformat() if x.paymentdate else None,
-            "calculated_aging": days,
-            "paymentstatus": x.paymentstatus,
-            "module": x.module,
-            "suppliers": x.suppliers,
-            "employees": x.employees,
-            "user_name": "Admin",
-            "billno": x.billno,
-            "amount": float(x.amount or 0)
-        })
+    results = [{
+        "id": x.no,
+        "billdate": x.billdate,
+        "paymentdate": x.paymentdate,
+        "calculated_aging": x.calculated_aging.days if x.calculated_aging else 0,
+        "paymentstatus": x.paymentstatus,
+        "module1": x.module1,
+        "suppliers": x.suppliers,
+        "employees": x.employees,
+        "user_name": "Admin",
+        "billno": x.billno,
+        "amount": float(x.amount or 0)
+    } for x in page_obj]
 
     return JsonResponse({
         "results": results,
+        "modules_list": modules_list,
+        "suppliers_list": suppliers_list, # Send to frontend
+        "incharges_list": incharges_list, # Send to frontend
         "page": page_obj.number,
         "total_pages": paginator.num_pages,
         "total_count": paginator.count,
-        "start_index": page_obj.start_index(),
-        "end_index": page_obj.end_index(),
-        "has_next": page_obj.has_next(),
-        "has_previous": page_obj.has_previous(),
         "stats": {
             "normal": stats_data['normal_count'] or 0,
             "risk": stats_data['risk_count'] or 0,
@@ -2045,7 +2029,7 @@ def approval_api(request):
             "no": idx,
             "billdate": item.billdate,
             "edate": item.edate,
-            "module": item.lz_module_name1,
+            "module1": item.lz_module_name1,
             "supplier": item.supplier, # Display name
             "supplier": item.supplier, # Filter name
             "username": item.username,
