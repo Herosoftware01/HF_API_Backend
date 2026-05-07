@@ -252,10 +252,10 @@ STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
-
 STAFF_IMAGES_URL = '/staff_images/'
 STAFF_IMAGES_ROOT = r'\\10.1.21.11\D\Staff_Employee_Images'
 
+PDF_STORAGE_PATH = r"\\adminserver\File Sharing\AAAA Hero\Syncfusion Pdf Reports"
 
 
 

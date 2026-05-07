@@ -10,4 +10,6 @@ urlpatterns = [
     path('state/', views.state, name='state'),
     path('send-advance-mail/', views.send_advance_mail, name='send_advance_mail'),
     path('approve_mail/', views.send_approval_mail, name='approve_mail'),
+    path('g_contact/', views.google_contact_api, name='g_contact'),
+    path('new_pros/', views.new_pros, name='new_pros'),
 ]   
