@@ -26,7 +26,9 @@ urlpatterns = [
     path('qcapp/', include('qcapp.urls')),
     path('syncfushion/', include('syncfushion.urls')),
     path('reports/', include('reports.urls')) ,
-    path('advance/', include('advance.urls'))
+    path('advance/', include('advance.urls')),
+    path('imp_reports/', include('imp_reports.urls')),
+   
 
 ] 
 

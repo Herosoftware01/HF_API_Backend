@@ -5,8 +5,8 @@ import os
 import json
 from datetime import datetime
 from .models import LaySp, MasterFinalMistake, UnitBundlereport, FinalPlans,Corarlck1,CoraRollcheck,AttUnt,EmbAbsetnt,Holiday,LabAtt,RptCutting,VueOrdersinhand
-from django.db.models import Q
-from django.db.models import F
+from .models import BillAge,BillMdapprove,BillPass
+from django.db.models import F, Q , IntegerField,DateField,Case, When, Value,CharField
 from django.db import connections
 from django.db.models import OuterRef, Subquery
 from django.db.models import Sum
@@ -14,9 +14,13 @@ from datetime import datetime, timedelta,date
 from django.utils import timezone
 from django.conf import settings
 from django.db.models import Count
-from django.db.models.functions import TruncDate, TruncDay
+from django.db.models.functions import TruncDate, TruncDay,Cast,Coalesce
 from dateutil.relativedelta import relativedelta
 from collections import defaultdict
+from django.db.models.expressions import ExpressionWrapper
+from django.core.paginator import Paginator
+
+
 
 
 
@@ -901,10 +905,10 @@ def join_data(request):
 
         rows.append({
             "id": rec.id,
-            "empcode": getattr(rec, 'empcode', ''),
+            "empcode": getattr(rec, 'code', ''),
             "name": getattr(rec, 'name', ''),
             "dept": getattr(rec, 'dept', ''),
-            "designation": getattr(rec, 'designation', ''),
+            "designation": getattr(rec, 'category', ''),
             "joindt": rec.joindt.strftime("%Y-%m-%d %H:%M:%S") if rec.joindt else None,
             "photo": photo_url,
         })
@@ -1792,3 +1796,435 @@ def workforce_unit_trends_api(request):
         "unit_daily_join_series": unit_daily_join_series,
         "unit_daily_resign_series": unit_daily_resign_series
     })
+
+
+    # Finance REports API
+
+
+
+#  Finance Reports API
+
+
+def bill(request):
+    qs = BillAge.objects.using('demo1')
+
+    # ---------------- FILTERS ----------------
+    supplier = request.GET.get('supplier')
+    module = request.GET.get('module')
+    employee = request.GET.get('employees')
+    company = request.GET.get('company')
+    from_date = request.GET.get('from_date')
+    to_date = request.GET.get('to_date')
+
+    if supplier and supplier != "ALL":
+        qs = qs.filter(suppliers=supplier)
+
+    if module and module != "ALL":
+        qs = qs.filter(module=module)
+
+    if employee and employee != "ALL":
+        qs = qs.filter(employees=employee)
+
+    if company and company != "ALL":
+        qs = qs.filter(company=company)
+
+    if from_date:
+        qs = qs.filter(billdate__date__gte=from_date)
+
+    if to_date:
+        qs = qs.filter(billdate__date__lte=to_date)
+
+    # ---------------- AGING (DB SIDE) ----------------
+    qs = qs.annotate(
+        aging=ExpressionWrapper(
+            Cast(F('edate'), IntegerField()) -
+            Cast(F('billdate'), IntegerField()),
+            output_field=IntegerField()
+        )
+    )
+
+    # ---------------- SORTING ----------------
+    qs = qs.order_by('module', '-aging')
+
+    # ⚠️ SAFETY LIMIT (remove only if data < 50k)
+    
+
+    # ---------------- SERIALIZE ----------------
+    data = []
+    for idx, item in enumerate(qs, start=1):
+        data.append({
+            "no": idx,
+            "supplier": item.suppliers,
+            "company": item.company,
+            "module": item.module,
+            "employee": item.employees,
+            "billdate": item.billdate,
+            "edate": item.edate,
+            "aging": item.aging,
+            "amount": item.amount,
+            "billno": item.billno,
+        })
+
+    return JsonResponse({
+        "count": len(data),
+        "results": data
+    }, safe=False)
+
+
+# --- 2. API View (Handles AJAX Data) ---
+def pass_data_api(request):
+    # Base Queryset
+    qs = BillPass.objects.using('demo1').all().order_by('module')  # default ordering
+
+    # --- BASIC FILTERS ---
+    module_param = request.GET.get('module')
+    if module_param:
+        qs = qs.filter(module=module_param)
+
+    emp = request.GET.get('employees')
+    if emp and emp != 'ALL':
+        qs = qs.filter(employees=emp)
+
+    supplier = request.GET.get('supplier')
+    if supplier and supplier != 'ALL':
+        qs = qs.filter(suppliers=supplier)
+
+    status = request.GET.get('payment_status')
+    if status and status != 'ALL':
+        qs = qs.filter(paymentstatus__iexact=status)
+
+    # --- DATE FILTERS ---
+    bill_from = request.GET.get('bill_from')
+    bill_to = request.GET.get('bill_to')
+    if bill_from and bill_to:
+        qs = qs.filter(billdate__range=[bill_from, bill_to])
+    elif bill_from:
+        qs = qs.filter(billdate__gte=bill_from)
+    elif bill_to:
+        qs = qs.filter(billdate__lte=bill_to)
+
+    pay_from = request.GET.get('pay_from')
+    pay_to = request.GET.get('pay_to')
+    if pay_from and pay_to:
+        qs = qs.filter(paymentdate__range=[pay_from, pay_to])
+    elif pay_from:
+        qs = qs.filter(paymentdate__gte=pay_from)
+    elif pay_to:
+        qs = qs.filter(paymentdate__lte=pay_to)
+
+    # --- ANNOTATE AGING ---
+    # We must annotate BEFORE filtering by risk_category
+    qs = qs.annotate(
+        calculated_aging=Coalesce(
+            F('paymentdate'),
+            Cast(timezone.now(), DateField())
+        ) - F('billdate')
+    )
+
+    # --- CALCULATE OVERALL STATS ---
+    # Do this BEFORE the risk_category filter so cards show the full overview
+    stats_data = qs.aggregate(
+        normal_count=Count('no', filter=Q(calculated_aging__lte=timedelta(days=30))),
+        risk_count=Count('no', filter=Q(calculated_aging__gt=timedelta(days=30),
+                                      calculated_aging__lte=timedelta(days=45))),
+        high_risk_count=Count('no', filter=Q(calculated_aging__gt=timedelta(days=45))),
+        total_sum=Sum('amount')
+    )
+
+    # --- APPLY RISK CATEGORY FILTER (FOR TABLE) ---
+    risk_cat = request.GET.get('risk_category')
+    if risk_cat:
+        if risk_cat == 'Normal':
+            qs = qs.filter(calculated_aging__lte=timedelta(days=30))
+        elif risk_cat == 'Risk':
+            qs = qs.filter(calculated_aging__gt=timedelta(days=30),
+                          calculated_aging__lte=timedelta(days=45))
+        elif risk_cat == 'High Risk':
+            qs = qs.filter(calculated_aging__gt=timedelta(days=45))
+
+    # --- PAGINATION & RESULTS ---
+    # Sort by module (ascending), then billdate (ascending)
+    qs = qs.order_by('module', 'billdate')
+
+    paginator = Paginator(qs, 500)
+    page_obj = paginator.get_page(request.GET.get('page', 1))
+
+    results = []
+    for x in page_obj:
+        # calculated_aging is a timedelta object; extract .days for JSON
+        days = x.calculated_aging.days if x.calculated_aging else 0
+        results.append({
+            "id": x.no,
+            "billdate": x.billdate.isoformat() if x.billdate else None,
+            "paymentdate": x.paymentdate.isoformat() if x.paymentdate else None,
+            "calculated_aging": days,
+            "paymentstatus": x.paymentstatus,
+            "module": x.module,
+            "suppliers": x.suppliers,
+            "employees": x.employees,
+            "user_name": "Admin",
+            "billno": x.billno,
+            "amount": float(x.amount or 0)
+        })
+
+    return JsonResponse({
+        "results": results,
+        "page": page_obj.number,
+        "total_pages": paginator.num_pages,
+        "total_count": paginator.count,
+        "start_index": page_obj.start_index(),
+        "end_index": page_obj.end_index(),
+        "has_next": page_obj.has_next(),
+        "has_previous": page_obj.has_previous(),
+        "stats": {
+            "normal": stats_data['normal_count'] or 0,
+            "risk": stats_data['risk_count'] or 0,
+            "high_risk": stats_data['high_risk_count'] or 0,
+            "total_amount": float(stats_data['total_sum'] or 0)
+        }
+    })
+
+
+
+# --- 2. API View (Handles Data & Filters) ---
+def approval_api(request):
+    qs = BillMdapprove.objects.using('demo1').all()
+
+    # --- Filters ---
+    module = request.GET.get('module')
+    supplier = request.GET.get('supplier')
+    incharge = request.GET.get('employees') # Receiving Name directly
+    md_status = request.GET.get('mdapproval')
+    from_date = request.GET.get('from_date')
+    to_date = request.GET.get('to_date')
+
+    if module and module != "ALL":
+        qs = qs.filter(lz_module_name1=module) # Note: Checked field name from your code
+    
+    if supplier and supplier != "ALL":
+        qs = qs.filter(lz_supplier=supplier)
+        
+    if incharge and incharge != "ALL":
+        qs = qs.filter(lz_incharge=incharge)
+
+    # --- MD Approval Mapping (Database Level) ---
+    md_map_yes = ["1", "yes", "y", "Approved", "approved", "approved by md"]
+    md_map_no = ["0", "no", "n", "Not approved", "not approved", "rejected"]
+
+    if md_status:
+        if md_status.lower() == "yes":
+            qs = qs.filter(mdapproval__in=md_map_yes)
+        elif md_status.lower() == "no":
+            qs = qs.filter(mdapproval__in=md_map_no)
+
+    # --- Date Filter ---
+    if from_date:
+        qs = qs.filter(billdate__date__gte=from_date)
+    if to_date:
+        qs = qs.filter(billdate__date__lte=to_date)
+
+    # --- Sorting ---
+    # Incharge ASC -> Bill Date DESC -> E-Date ASC
+    qs = qs.order_by('lz_incharge', '-billdate', 'edate')
+
+    # --- Pagination ---
+    paginator = Paginator(qs, 500) # 500 records per page
+    page_number = request.GET.get('page', 1)
+    page_obj = paginator.get_page(page_number)
+
+    # --- Serialization ---
+    results = []
+    start_idx = page_obj.start_index()
+
+    for idx, item in enumerate(page_obj, start=start_idx):
+        # Normalize MD Status
+        raw_md = (item.mdapproval or "").lower().strip()
+        md_norm = "Yes" if raw_md in md_map_yes else ("No" if raw_md in md_map_no else "-")
+
+        results.append({
+            "no": idx,
+            "billdate": item.billdate,
+            "edate": item.edate,
+            "module": item.lz_module_name1,
+            "supplier": item.supplier, # Display name
+            "supplier": item.supplier, # Filter name
+            "username": item.username,
+            "incharge": item.lz_incharge,
+            "company": item.company_name,
+            "billno": item.billno1,
+            "md_status": md_norm,
+            "amount": item.ra_billvalue
+        })
+
+    return JsonResponse({
+        "results": results,
+        "total_records": paginator.count,
+        "page": page_obj.number,
+        "num_pages": paginator.num_pages,
+        "has_next": page_obj.has_next(),
+        "has_previous": page_obj.has_previous()
+    })
+# Adjust import based on your app structure
+# from .models import BillAge 
+
+def bill_details(request):
+    employee = request.GET.get('employee')
+    module = request.GET.get('module')
+    bucket = request.GET.get('bucket')
+    from_date = request.GET.get('from_date')
+    to_date = request.GET.get('to_date')
+    search_query = request.GET.get('search')
+
+    bills = BillAge.objects.using('demo1').all()
+
+    if employee:
+        if employee == 'Ganesh & Vijaya Kumar':
+            bills = bills.filter(employees__in=['Ganesh', 'Vijaya Kumar'])
+        else:
+            bills = bills.filter(employees__iexact=employee.strip())
+
+    if module and module.lower() != 'none':
+        bills = bills.filter(module__iexact=module.strip())
+
+    if from_date and to_date:
+        bills = bills.filter(
+            Q(billdate__date__range=[from_date, to_date]) |
+            Q(edate__date__range=[from_date, to_date])
+        )
+
+    if bucket == 'less_3':
+        bills = bills.filter(ageing__lt=3)
+    elif bucket == 'eq_3':
+        bills = bills.filter(ageing=3)
+    elif bucket == 'more_3':
+        bills = bills.filter(ageing__gt=3)
+
+    if search_query:
+        bills = bills.filter(
+            Q(suppliers__icontains=search_query) |
+            Q(billno__icontains=search_query)
+        )
+
+    bills = bills.order_by('-ageing', '-billdate')
+
+    data = list(bills.values())
+
+    return JsonResponse({"bills": data}, safe=False)
+
+
+def pay_dashboard(request):
+    target_employees = ['Vijaya Kumar', 'Accessory', 'Senthil', 'Ganesh']
+
+    qs = BillPass.objects.using('demo1').filter(
+        employees__in=target_employees
+    )
+
+    from_date = request.GET.get('from_date')
+    to_date = request.GET.get('to_date')
+
+    if from_date and to_date:
+        qs = qs.filter(
+            Q(billdate__date__range=[from_date, to_date]) |
+            Q(edate__date__range=[from_date, to_date])
+        )
+
+    today = timezone.now().date()
+    date_30_days_ago = today - timedelta(days=30)
+    date_45_days_ago = today - timedelta(days=45)
+
+    qs = qs.annotate(
+        display_name=Case(
+            When(employees__in=['Ganesh', 'Vijaya Kumar'], then=Value('Ganesh & Vijaya Kumar')),
+            default=F('employees'),
+            output_field=CharField(),
+        )
+    )
+
+    entry = (
+        qs.values('display_name', 'module')
+        .annotate(
+            total_bills=Count('no'),
+            paid_count=Count(Case(When(paymentdate__isnull=False, then=1), output_field=IntegerField())),
+
+            paid_lt_30=Count(Case(When(paymentdate__isnull=False, billdate__gte=date_30_days_ago, then=1), output_field=IntegerField())),
+            paid_30_45=Count(Case(When(paymentdate__isnull=False, billdate__lt=date_30_days_ago, billdate__gte=date_45_days_ago, then=1), output_field=IntegerField())),
+            paid_gt_45=Count(Case(When(paymentdate__isnull=False, billdate__lt=date_45_days_ago, then=1), output_field=IntegerField())),
+
+            unpaid_count=Count(Case(When(paymentdate__isnull=True, then=1), output_field=IntegerField())),
+
+            unpaid_lt_30=Count(Case(When(paymentdate__isnull=True, billdate__gte=date_30_days_ago, then=1), output_field=IntegerField())),
+            unpaid_30_45=Count(Case(When(paymentdate__isnull=True, billdate__lt=date_30_days_ago, billdate__gte=date_45_days_ago, then=1), output_field=IntegerField())),
+            unpaid_gt_45=Count(Case(When(paymentdate__isnull=True, billdate__lt=date_45_days_ago, then=1), output_field=IntegerField())),
+        )
+        .order_by('display_name', 'module')
+    )
+
+    return JsonResponse({
+        "data": list(entry),
+        "from_date": from_date,
+        "to_date": to_date
+    }, safe=False)
+
+
+def pay_bill_details(request):
+    employee = request.GET.get('employee')
+    module = request.GET.get('module')
+    status = request.GET.get('status')
+    aging = request.GET.get('aging')
+    from_date = request.GET.get('from_date')
+    to_date = request.GET.get('to_date')
+    search_query = request.GET.get('search')
+
+    bills = BillPass.objects.using('demo1').all()
+
+    today = timezone.now().date()
+    date_30_days_ago = today - timedelta(days=30)
+    date_45_days_ago = today - timedelta(days=45)
+
+    if employee:
+        if employee == 'Ganesh & Vijaya Kumar':
+            bills = bills.filter(employees__in=['Ganesh', 'Vijaya Kumar'])
+        else:
+            bills = bills.filter(employees__iexact=employee.strip())
+
+    if module:
+        clean_module = module.strip()
+        if clean_module.lower() == 'none' or clean_module == '':
+            bills = bills.filter(
+                Q(module__isnull=True) |
+                Q(module__exact='') |
+                Q(module__iexact='None')
+            )
+        else:
+            bills = bills.filter(module__iexact=clean_module)
+
+    if from_date and to_date:
+        bills = bills.filter(
+            Q(billdate__date__range=[from_date, to_date]) |
+            Q(edate__date__range=[from_date, to_date])
+        )
+
+    if status == 'paid':
+        bills = bills.filter(paymentdate__isnull=False)
+    elif status == 'unpaid':
+        bills = bills.filter(paymentdate__isnull=True)
+
+    if aging == 'lt30':
+        bills = bills.filter(billdate__gte=date_30_days_ago)
+    elif aging == '30to45':
+        bills = bills.filter(billdate__lt=date_30_days_ago, billdate__gte=date_45_days_ago)
+    elif aging == 'gt45':
+        bills = bills.filter(billdate__lt=date_45_days_ago)
+
+    if search_query:
+        bills = bills.filter(
+            Q(suppliers__icontains=search_query) |
+            Q(billno__icontains=search_query) |
+            Q(billno1__icontains=search_query)
+        )
+
+    bills = bills.order_by('-billdate')
+
+    return JsonResponse({
+        "bills": list(bills.values())
+    }, safe=False)

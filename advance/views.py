@@ -2,7 +2,7 @@ from django.http import JsonResponse, HttpResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.db.models import Max
 import json
-from .models import IncdebUsers, Adreq, Empwisesal,Employeeworking
+from .models import IncdebUsers, Adreq, Empwisesal,Employeeworking,RptCut002
 from django.db import connections
 import os
 from django.core.mail import send_mail
@@ -12,10 +12,11 @@ from django.core.mail import EmailMultiAlternatives
 from django.template.loader import render_to_string
 from django.utils.html import strip_tags
 import requests
-import traceback
 from email.mime.image import MIMEImage
 import threading
 from django.core.cache import cache
+from django.utils.timezone import now
+from datetime import datetime
 
 
 # ==========================================
@@ -547,3 +548,35 @@ def state(request):
         result = list(data.values())
 
         return JsonResponse(result, safe=False)
+    
+
+def fabric_cutting(request):
+
+    if request.method == 'GET':
+        data = RptCut002.objects.using('demo').all()
+
+        # Get query params
+        from_date = request.GET.get('from_date')
+        to_date = request.GET.get('to_date')
+
+        # --- 1. Today Filter (default if no dates passed) ---
+        if not from_date and not to_date:
+            today = now().date()
+            data = data.filter(dt=today)
+
+        # --- 2. Date Range Filter ---
+        if from_date and to_date:
+            try:
+                from_date = datetime.strptime(from_date, "%Y-%m-%d").date()
+                to_date = datetime.strptime(to_date, "%Y-%m-%d").date()
+
+                data = data.filter(dt__range=[from_date, to_date])
+
+            except ValueError:
+                return JsonResponse({"error": "Invalid date format. Use YYYY-MM-DD"}, status=400)
+
+        return JsonResponse(list(data.values()), safe=False)
+
+
+
+        
