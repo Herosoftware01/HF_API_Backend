@@ -9,7 +9,7 @@ from .models import BillAge,BillMdapprove,BillPass
 from django.db.models import F, Q , IntegerField,DateField,Case, When, Value,CharField
 from django.db import connections
 from django.db.models import OuterRef, Subquery
-from django.db.models import Sum
+from django.db.models import Sum,Max
 from datetime import datetime, timedelta,date
 from django.utils import timezone
 from django.conf import settings
@@ -496,68 +496,110 @@ def attendance(request):
 
         queryset = AttUnt.objects.using("demo").all()
 
-        # Department filter
+        # ---------------- DEPARTMENT FILTER ----------------
         if dept != "ALL":
             queryset = queryset.filter(dept__iexact=dept)
 
-        # Date filter
+        # ---------------- DATE FILTER ----------------
         if not start_date_str or not end_date_str:
             start_date, end_date = get_friday_thursday_range()
         else:
             try:
-                start_date = datetime.strptime(start_date_str, "%Y-%m-%d").date()
-                end_date = datetime.strptime(end_date_str, "%Y-%m-%d").date()
+                start_date = datetime.strptime(
+                    start_date_str,
+                    "%Y-%m-%d"
+                ).date()
+
+                end_date = datetime.strptime(
+                    end_date_str,
+                    "%Y-%m-%d"
+                ).date()
+
             except:
                 start_date, end_date = get_friday_thursday_range()
 
-        queryset = queryset.filter(dt__date__range=[start_date, end_date])
+        queryset = queryset.filter(
+            dt__date__range=[start_date, end_date]
+        )
 
-        # Aggregate data
-        data_qs = queryset.values("dt").annotate(
-            total=Sum("onroll"),
-            tail_onr=Sum("tail_onr"),
-            ntail_onr=Sum("ntail_onr"),
-            present=Sum("present"),
-            tailor=Sum("tailor"),
-            n_tailor=Sum("n_tailor"),
-            absent=Sum("absent"),
-            tabsent=Sum("tabsent"),
-            ntabsent=Sum("ntabsent"),
-            le=Sum("le"),
-            tlv=Sum("tlv"),
-            ntlv=Sum("ntlv"),
-        ).order_by("dt")
+        # ---------------- REMOVE DUPLICATE DATA ----------------
+        # Using MAX for all fields because duplicate rows
+        # contain same values in your table
+
+        data_qs = queryset.annotate(
+            att_date=TruncDate("dt")
+        ).values(
+            "att_date"
+        ).annotate(
+
+            total=Max("onroll"),
+
+            tail_onr=Max("tail_onr"),
+            ntail_onr=Max("ntail_onr"),
+
+            present=Max("present"),
+            tailor=Max("tailor"),
+            n_tailor=Max("n_tailor"),
+
+            absent=Max("absent"),
+            tabsent=Max("tabsent"),
+            ntabsent=Max("ntabsent"),
+
+            le=Max("le"),
+            tlv=Max("tlv"),
+            ntlv=Max("ntlv"),
+
+        ).order_by("att_date")
 
         result = []
 
         for row in data_qs:
+
             total = row["total"] or 0
 
             def pct(val):
-                return round((val / total) * 100) if total else 0
+                return round((val / total) * 100, 1) if total else 0
 
             result.append({
-                "date": row["dt"].strftime("%Y-%m-%d"),
+                "date": row["att_date"].strftime("%Y-%m-%d"),
+
+                # TOTAL
                 "total": total,
+
+                # PRESENT
                 "present": row["present"] or 0,
                 "present_pct": pct(row["present"] or 0),
+
+                # ABSENT
                 "absent": row["absent"] or 0,
                 "absent_pct": pct(row["absent"] or 0),
+
+                # LEAVE
                 "le": row["le"] or 0,
                 "le_pct": pct(row["le"] or 0),
+
+                # TLV
                 "tlv": row["tlv"] or 0,
                 "tlv_pct": pct(row["tlv"] or 0),
+
+                # NTLV
                 "ntlv": row["ntlv"] or 0,
                 "ntlv_pct": pct(row["ntlv"] or 0),
+
+                # TAILOR ONROLL
                 "tail_onr": row["tail_onr"] or 0,
                 "ntail_onr": row["ntail_onr"] or 0,
+
+                # TAILOR PRESENT
                 "tailor": row["tailor"] or 0,
                 "n_tailor": row["n_tailor"] or 0,
+
+                # TAILOR ABSENT
                 "tabsent": row["tabsent"] or 0,
                 "ntabsent": row["ntabsent"] or 0,
             })
 
-        # Holidays
+        # ---------------- HOLIDAYS ----------------
         holidays_qs = Holiday.objects.using("main").filter(
             dt__date__range=[start_date, end_date]
         ).values("dt", "descr")
@@ -567,6 +609,7 @@ def attendance(request):
             for h in holidays_qs
         }
 
+        # ---------------- RESPONSE ----------------
         return JsonResponse({
             "status": "success",
             "unit": dept,
@@ -581,6 +624,7 @@ def attendance(request):
             "status": "error",
             "message": str(e)
         }, status=500)
+    
 
 
 # ===============================
@@ -1951,7 +1995,7 @@ def pass_data_api(request):
         "amount": float(x.amount or 0)
     } for x in page_obj]
 
-    return JsonResponse({
+    return JsonResponse({ 
         "results": results,
         "modules_list": modules_list,
         "suppliers_list": suppliers_list, # Send to frontend
@@ -2049,6 +2093,66 @@ def approval_api(request):
     })
 # Adjust import based on your app structure
 # from .models import BillAge 
+
+def bill_dashboard(request):
+    target_employees = ['Vijaya Kumar', 'Accessory', 'Senthil', 'Ganesh']
+
+    qs = BillAge.objects.using('demo1').filter(
+        employees__in=target_employees
+    )
+
+    from_date = request.GET.get('from_date')
+    to_date = request.GET.get('to_date')
+
+    if from_date and to_date:
+        qs = qs.filter(
+            Q(billdate__date__range=[from_date, to_date]) |
+            Q(edate__date__range=[from_date, to_date])
+        )
+
+    qs = qs.annotate(
+        display_name=Case(
+            When(
+                employees__in=['Ganesh', 'Vijaya Kumar'],
+                then=Value('Ganesh & Vijaya Kumar')
+            ),
+            default=F('employees'),
+            output_field=CharField(),
+        )
+    )
+
+    entry = list(
+        qs.values('display_name', 'module')
+        .annotate(
+            total_bills=Count('no'),
+            less_3=Count(
+                Case(
+                    When(ageing__lt=3, then=1),
+                    output_field=IntegerField()
+                )
+            ),
+            eq_3=Count(
+                Case(
+                    When(ageing=3, then=1),
+                    output_field=IntegerField()
+                )
+            ),
+            more_3=Count(
+                Case(
+                    When(ageing__gt=3, then=1),
+                    output_field=IntegerField()
+                )
+            ),
+        )
+        .order_by('display_name', 'module')
+    )
+
+    return JsonResponse({
+        "status": "success",
+        "from_date": from_date,
+        "to_date": to_date,
+        "data": entry
+    })
 
 def bill_details(request):
     employee = request.GET.get('employee')
