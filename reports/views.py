@@ -522,30 +522,32 @@ def attendance(request):
             dt__date__range=[start_date, end_date]
         )
 
-        # ---------------- DATE WISE AGGREGATION ----------------
+        # ---------------- REMOVE DUPLICATE DATA ----------------
+        # Using MAX for all fields because duplicate rows
+        # contain same values in your table
+
         data_qs = queryset.annotate(
             att_date=TruncDate("dt")
         ).values(
             "att_date"
         ).annotate(
 
-            # MASTER VALUES → USE MAX
             total=Max("onroll"),
+
             tail_onr=Max("tail_onr"),
             ntail_onr=Max("ntail_onr"),
 
-            # TRANSACTION VALUES → USE SUM
-            present=Sum("present"),
-            tailor=Sum("tailor"),
-            n_tailor=Sum("n_tailor"),
+            present=Max("present"),
+            tailor=Max("tailor"),
+            n_tailor=Max("n_tailor"),
 
-            absent=Sum("absent"),
-            tabsent=Sum("tabsent"),
-            ntabsent=Sum("ntabsent"),
+            absent=Max("absent"),
+            tabsent=Max("tabsent"),
+            ntabsent=Max("ntabsent"),
 
-            le=Sum("le"),
-            tlv=Sum("tlv"),
-            ntlv=Sum("ntlv"),
+            le=Max("le"),
+            tlv=Max("tlv"),
+            ntlv=Max("ntlv"),
 
         ).order_by("att_date")
 
