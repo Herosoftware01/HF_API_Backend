@@ -334,8 +334,8 @@ def send_advance_mail(request):
                 'empid': obj.empid,
                 'amt': obj.amt,
                 'remarks': obj.remarks,
-                'approve_url': f"http://10.1.21.13:8100/approve?entryno={entryno}&status=Y",
-                'reject_url': f"http://10.1.21.13:8100/approve?entryno={entryno}&status=N",
+                'approve_url': f"http://10.1.21.13:8200/approve?entryno={entryno}&status=Y",
+                'reject_url': f"http://10.1.21.13:8200/approve?entryno={entryno}&status=N",
                 'photo_cid': photo_cid
             })
 

@@ -26,7 +26,7 @@ def get_lay_sp_data(request):
         # 2. Define the Employee/Table Subquery 
         # Joining based on the table_id and date from the FinalPlans 
         # (Since LaySp doesn't have table_id directly)
-        emp_qs = LaySpreadingLayemployee.objects.using('mssql').filter(
+        emp_qs = LaySpreadingLayemployee.objects.using('app').filter(
             table=OuterRef('final_plans__table_id'),
             date=OuterRef('date')
         )
