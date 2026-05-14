@@ -2020,7 +2020,7 @@ def approval_api(request):
     # --- Filters ---
     module = request.GET.get('module')
     supplier = request.GET.get('supplier')
-    incharge = request.GET.get('employees') # Receiving Name directly
+    incharge = request.GET.get('lz_incharge') # Receiving Name directly
     md_status = request.GET.get('mdapproval')
     from_date = request.GET.get('from_date')
     to_date = request.GET.get('to_date')

@@ -285,15 +285,15 @@ def get_employee_map(employees):
 def send_advance_mail(request):
     if request.method == 'POST':
         try:
-            print("\n===== 🚀 FAST MAIL API START =====")
+            print("\n=====  FAST MAIL API START =====")
 
             data = json.loads(request.body)
             entryno = data.get('entryno')
 
-            # 🔹 OPTIMIZED DB QUERY
+            # OPTIMIZED DB QUERY
             obj = Adreq.objects.using('mssql1').only('empid', 'amt', 'remarks').get(entryno=entryno)
 
-            # 🔹 API CACHE
+            # API CACHE
             api_url = "https://app.herofashion.com/incentive/api/emp/"
             employees = get_employee_data(api_url)
             emp_map = get_employee_map(employees)
@@ -303,7 +303,7 @@ def send_advance_mail(request):
             emp_dept = emp.get('dept', 'Not Found')
             photo_name = emp.get('photo')
 
-            # 🔥 EMAIL OBJECT
+            #  EMAIL OBJECT
             email = EmailMultiAlternatives(
                 "🧾 New Advance Request Submitted",
                 "",
@@ -311,7 +311,7 @@ def send_advance_mail(request):
                 ['kirsh650@gmail.com'],
             )
 
-            # 🔥 IMAGE ATTACH (optional)
+            # IMAGE ATTACH (optional)
             photo_cid = None
             if photo_name:
                 try:
@@ -327,15 +327,15 @@ def send_advance_mail(request):
                 except Exception as e:
                     print("⚠️ Image error:", str(e))
 
-            # 🔹 TEMPLATE
+            # TEMPLATE
             html_content = render_to_string('mail.html', {
                 'name': emp_name,
                 'dept': emp_dept,
                 'empid': obj.empid,
                 'amt': obj.amt,
                 'remarks': obj.remarks,
-                'approve_url': f"http://10.1.21.13:8200/approve?entryno={entryno}&status=Y",
-                'reject_url': f"http://10.1.21.13:8200/approve?entryno={entryno}&status=N",
+                'approve_url': f"https://hf.herofashion.com/approve?entryno={entryno}&status=Y",
+                'reject_url': f"https://hf.herofashion.com/approve?entryno={entryno}&status=N",
                 'photo_cid': photo_cid
             })
 
@@ -344,7 +344,7 @@ def send_advance_mail(request):
             email.body = text_content
             email.attach_alternative(html_content, "text/html")
 
-            # 🔥 BACKGROUND SEND
+            # BACKGROUND SEND
             threading.Thread(target=send_mail_async, args=(email,)).start()
 
             return JsonResponse({"message": "Mail queued (fast 🚀)"})
@@ -364,11 +364,11 @@ def send_approval_mail(request):
             entryno = data.get('entryno')
             status = data.get('status')
 
-            # 🔹 FAST DB
+            # FAST DB
             obj = Adreq.objects.using('mssql1').only('empid', 'amt', 'remarks').get(entryno=entryno)
 
-            # 🔹 CACHE API
-            api_url = "http://10.1.21.13:8600/empwisesal/"
+            # CACHE API
+            api_url = "https://app.herofashion.com/incentive/api/emp/"
             employees = get_employee_data(api_url)
             emp_map = get_employee_map(employees)
 
@@ -396,16 +396,15 @@ def send_approval_mail(request):
                 subject,
                 text_content,
                 settings.EMAIL_HOST_USER,
-                ['kirsh650@gmail.com', 'designervishwa10@gmail.com'],
+                ['kirsh650@gmail.com'],
             )
 
             email.attach_alternative(html_content, "text/html")
 
-            # 🔥 BACKGROUND SEND
+            # BACKGROUND SEND
             threading.Thread(target=send_mail_async, args=(email,)).start()
 
-            return JsonResponse({"message": "Approval mail queued 🚀"})
-
+            return JsonResponse({"message": "Approval mail queued "})
         except Exception as e:
             print("ERROR:", e)
             return JsonResponse({"error": str(e)}, status=500)

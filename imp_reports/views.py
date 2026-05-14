@@ -18,7 +18,7 @@ def get_lay_sp_data(request):
     if request.method == 'GET':
         # 1. Define the FinalPlans Subquery
         # We use .strip() logic conceptually, but in SQL, ensure these match.
-        final_plan_qs = FinalPlans.objects.using('mssql').filter(
+        final_plan_qs = FinalPlans.objects.using('app').filter(
             plan_no=OuterRef('plan_no'),
             job_no=OuterRef('job_no')
         )
@@ -32,7 +32,7 @@ def get_lay_sp_data(request):
         )
 
         data = (
-            LaySp.objects.using('mssql')
+            LaySp.objects.using('app')
             .annotate(
                 # Fetching fields from FinalPlans
                 final_plans__pcs=Subquery(final_plan_qs.values('pcs')[:1]),
@@ -64,7 +64,7 @@ def get_lay_sp_data(request):
 @csrf_exempt
 def lay_sp_sal(request):
     if request.method == 'GET':
-        data = VueAdGrid1.objects.using('mssql1').all().filter(dept='cutting').values()
+        data = VueAdGrid1.objects.using('demo').all().filter(dept='cutting').values()
         data_list = list(data)
         return JsonResponse(data_list, safe=False)
     
@@ -72,7 +72,7 @@ def lay_sp_sal(request):
 @csrf_exempt
 def get_master_final_mistake_data(request):
     if request.method == 'GET':
-        data = MasterFinalMistake.objects.using('mssql').all().values()
+        data = MasterFinalMistake.objects.using('app').all().values()
         data_list = list(data)
         return JsonResponse(data_list, safe=False)
     
@@ -86,7 +86,7 @@ def get_unit_bundle_report_data(request):
     queryset = UnitBundlereport.objects.using("app").all()
 
     # Default start from 2026-04-20 if no start_date provided
-    effective_from = parse_date(start_date) if start_date else date(2026, 4, 20)
+    effective_from = parse_date(start_date) if start_date else date(2026, 5, 10)
     queryset = queryset.filter(s_date__date__gte=effective_from)
 
     # end_date is optional, only apply if provided
@@ -201,7 +201,7 @@ def unit_bundle(request):
         queryset = queryset.filter(unitname__in=target_units)
 
     # Default start from 2026-04-20 if no from_date provided
-    effective_from = parse_date(from_date) if from_date else date(2026, 4, 20)
+    effective_from = parse_date(from_date) if from_date else date(2026, 5, 10)
     queryset = queryset.filter(r_dt__date__gte=effective_from)
 
     # to_date is optional, only apply if provided
