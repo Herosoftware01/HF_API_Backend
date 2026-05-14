@@ -85,3 +85,32 @@ class DiWasg_img(models.Model):
     class Meta:
         managed = False
         db_table = 'dI_Wasg_img'
+
+
+    
+class TrsMaildtls(models.Model):
+    sl = models.AutoField(db_column='Sl', primary_key=True)  # Field name made lowercase.
+    dt = models.DateTimeField(db_column='Dt')  # Field name made lowercase.
+    ordid = models.CharField(db_column='OrdID', max_length=50, db_collation='Latin1_General_CI_AI')  # Field name made lowercase.
+    mail_content = models.CharField(db_column='Mail_Content', max_length=750, db_collation='Latin1_General_CI_AI')  # Field name made lowercase.
+
+    class Meta:
+        managed = False
+        db_table = 'Trs_Maildtls'
+
+class SyncfushionKanban(models.Model):
+    Id = models.AutoField(db_column='Id', primary_key=True)
+    Title = models.CharField(db_column='Title', max_length=255)  
+    Status = models.CharField(db_column='Status', max_length=50)  
+    Description = models.TextField(db_column='Description',  blank=True, null=True)  
+    Type = models.CharField(db_column='Type', max_length=50, blank=True, null=True)  
+    Priority = models.CharField(db_column='Priority', max_length=20, blank=True, null=True)  
+    Tags = models.CharField(db_column='Tags', max_length=255, blank=True, null=True)  
+    Estimate = models.DecimalField(db_column='Estimate', max_digits=5, decimal_places=2, blank=True, null=True)  
+    Assignee = models.CharField(db_column='Assignee', max_length=100, blank=True, null=True)  
+    Rankid = models.IntegerField(db_column='RankId', blank=True, null=True)  
+    Reporter = models.CharField(db_column='Reporter', max_length=100,  blank=True, null=True)  
+
+    class Meta:
+        managed = False
+        db_table = 'syncfushion_kanban'

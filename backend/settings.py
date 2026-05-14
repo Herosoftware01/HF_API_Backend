@@ -261,16 +261,18 @@ PDF_STORAGE_PATH = r"\\adminserver\File Sharing\AAAA Hero\Syncfusion Pdf Reports
 
 
 # Email configuration
+
+
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = 'smtp.gmail.com'
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
-
 EMAIL_HOST_USER = 'hfautomation2026@gmail.com'
-EMAIL_HOST_PASSWORD = 'tmiy sjdd vbon omsd'   # NOT normal password
+EMAIL_HOST_PASSWORD = 'tmiy sjdd vbon omsd'   
+
+
 
 DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
-
 
 
 # Bold Reports configuration (Application-level)

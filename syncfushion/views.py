@@ -1,9 +1,9 @@
 from django.shortcuts import render
 from django.http import JsonResponse
-# Create your views here.
+from rest_framework import status
 from rest_framework import viewsets
-from .models import GridSetting,DiWasg,DiWasg_img
-from .serializers import GridSettingSerializer
+from .models import GridSetting,DiWasg,DiWasg_img,TrsMaildtls, SyncfushionKanban
+from .serializers import GridSettingSerializer,TrsMaildtlsSerializer
 from rest_framework.permissions import IsAuthenticated  # optional
 import json
 from django.views.decorators.csrf import csrf_exempt
@@ -225,3 +225,156 @@ def list_pdfs(request):
             })
 
     return JsonResponse(files, safe=False)
+
+
+
+
+#############################################
+
+def get_mailss(request):
+    if request.method == "GET":
+
+        mails = list(
+            TrsMaildtls.objects.values()
+        )
+
+        return JsonResponse(
+            {
+                "message": "Mail list fetched successfully",
+                "data": mails
+            },
+            safe=False
+        )
+@api_view(['GET'])
+def get_mails(request):
+    mails = TrsMaildtls.objects.all()
+    serializer = TrsMaildtlsSerializer(mails, many=True)
+    return Response(serializer.data)
+
+
+# ADD API
+@api_view(['POST'])
+def add_mail(request):
+    serializer = TrsMaildtlsSerializer(data=request.data)
+
+    if serializer.is_valid():
+        serializer.save()
+        return Response(
+            {
+                "message": "Mail details added successfully",
+                "data": serializer.data
+            },
+            status=status.HTTP_201_CREATED
+        )
+
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+# UPDATE API
+@api_view(['PUT'])
+def update_mail(request, pk):
+    try:
+        mail = TrsMaildtls.objects.get(pk=pk)
+    except TrsMaildtls.DoesNotExist:
+        return Response(
+            {"error": "Record not found"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+    serializer = TrsMaildtlsSerializer(mail, data=request.data, partial=True)
+
+    if serializer.is_valid():
+        serializer.save()
+        return Response(
+            {
+                "message": "Mail details updated successfully",
+                "data": serializer.data
+            }
+        )
+
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+# DELETE API
+@api_view(['DELETE'])
+def delete_mail(request, pk):
+    try:
+        mail = TrsMaildtls.objects.get(pk=pk)
+    except TrsMaildtls.DoesNotExist:
+        return Response(
+            {"error": "Record not found"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+    mail.delete()
+
+    return Response(
+        {"message": "Mail details deleted successfully"},
+        status=status.HTTP_200_OK
+    )
+
+#### syncfusion kanban
+@csrf_exempt
+def tasks_create(request):
+
+    if request.method == "POST":
+        body = json.loads(request.body)
+        obj = SyncfushionKanban.objects.using('mssql1').create(
+
+            Title=body.get("Title"),
+            Status=body.get("Status"),
+            Description=body.get("Description"),
+            Type=body.get("Type"),
+            Priority=body.get("Priority"),
+            Tags=body.get("Tags"),
+            Estimate=body.get("Estimate"),
+            Assignee=body.get("Assignee"),
+            Rankid=body.get("RankId"),
+            Reporter=body.get("Reporter")
+        )
+        
+        return JsonResponse({ "message": "Created", "Id": obj.Id })
+
+# READ ALL
+def tasks_list(request):
+
+    data = list(SyncfushionKanban.objects.using('mssql1').values())
+    return JsonResponse(data, safe=False)
+
+# READ SINGLE
+def tasks_single(request, id):
+
+    data = SyncfushionKanban.objects.using('mssql1').filter(Id=id).values().first()
+    return JsonResponse(data, safe=False)
+
+# UPDATE
+@csrf_exempt
+def tasks_update(request, id):
+
+    if request.method == "PUT":
+        body = json.loads(request.body)
+        SyncfushionKanban.objects.using('mssql1').filter(Id=id).update(
+
+            Title=body.get("Title"),
+            Status=body.get("Status"),
+            Description=body.get("Description"),
+            Type=body.get("Type"),
+            Priority=body.get("Priority"),
+            Tags=body.get("Tags"),
+            Estimate=body.get("Estimate"),
+            Assignee=body.get("Assignee"),
+            RankId=body.get("RankId"),
+            Reporter=body.get("Reporter")
+
+        )
+
+        return JsonResponse({ "message": "Updated" })
+
+# DELETE
+@csrf_exempt
+def tasks_delete(request, id):
+
+    if request.method == "DELETE":
+
+        SyncfushionKanban.objects.using('mssql1').filter(Id=id).delete()
+        return JsonResponse({ "message": "Deleted" })
