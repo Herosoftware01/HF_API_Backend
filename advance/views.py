@@ -2,7 +2,8 @@ from django.http import JsonResponse, HttpResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.db.models import Max
 import json
-from .models import IncdebUsers, Adreq, Empwisesal,Employeeworking
+from .models import IncdebUsers, Adreq, Empwisesal,Employeeworking,HrWrkdtlsnew
+from .models import IncdebUsers, Adreq, Empwisesal,Employeeworking,RptCut002
 from django.db import connections
 import os
 from django.core.mail import send_mail
@@ -12,10 +13,11 @@ from django.core.mail import EmailMultiAlternatives
 from django.template.loader import render_to_string
 from django.utils.html import strip_tags
 import requests
-import traceback
 from email.mime.image import MIMEImage
 import threading
 from django.core.cache import cache
+from django.utils.timezone import now
+from datetime import datetime
 
 
 # ==========================================
@@ -89,7 +91,7 @@ def login(request):
             if not user_id:
                 return JsonResponse({"error": "ID is required"}, status=400)
 
-            user = IncdebUsers.objects.using('mssql1').get(id=user_id)
+            user = IncdebUsers.objects.using('demo').get(id=user_id)
 
             user.username = data.get('username')
 
@@ -117,7 +119,7 @@ def login(request):
             data = json.loads(request.body)
             user_id = data.get('id')
 
-            user = IncdebUsers.objects.using('mssql1').get(id=user_id)
+            user = IncdebUsers.objects.using('demo').get(id=user_id)
             user.delete()
 
             return JsonResponse({"message": "User deleted"}, status=200)
@@ -283,15 +285,15 @@ def get_employee_map(employees):
 def send_advance_mail(request):
     if request.method == 'POST':
         try:
-            print("\n===== 🚀 FAST MAIL API START =====")
+            print("\n=====  FAST MAIL API START =====")
 
             data = json.loads(request.body)
             entryno = data.get('entryno')
 
-            # 🔹 OPTIMIZED DB QUERY
+            # OPTIMIZED DB QUERY
             obj = Adreq.objects.using('mssql1').only('empid', 'amt', 'remarks').get(entryno=entryno)
 
-            # 🔹 API CACHE
+            # API CACHE
             api_url = "https://app.herofashion.com/incentive/api/emp/"
             employees = get_employee_data(api_url)
             emp_map = get_employee_map(employees)
@@ -301,7 +303,7 @@ def send_advance_mail(request):
             emp_dept = emp.get('dept', 'Not Found')
             photo_name = emp.get('photo')
 
-            # 🔥 EMAIL OBJECT
+            #  EMAIL OBJECT
             email = EmailMultiAlternatives(
                 "🧾 New Advance Request Submitted",
                 "",
@@ -309,7 +311,7 @@ def send_advance_mail(request):
                 ['kirsh650@gmail.com'],
             )
 
-            # 🔥 IMAGE ATTACH (optional)
+            # IMAGE ATTACH (optional)
             photo_cid = None
             if photo_name:
                 try:
@@ -325,15 +327,15 @@ def send_advance_mail(request):
                 except Exception as e:
                     print("⚠️ Image error:", str(e))
 
-            # 🔹 TEMPLATE
+            # TEMPLATE
             html_content = render_to_string('mail.html', {
                 'name': emp_name,
                 'dept': emp_dept,
                 'empid': obj.empid,
                 'amt': obj.amt,
                 'remarks': obj.remarks,
-                'approve_url': f"http://10.1.21.13:8100/approve?entryno={entryno}&status=Y",
-                'reject_url': f"http://10.1.21.13:8100/approve?entryno={entryno}&status=N",
+                'approve_url': f"https://hf.herofashion.com/approve?entryno={entryno}&status=Y",
+                'reject_url': f"https://hf.herofashion.com/approve?entryno={entryno}&status=N",
                 'photo_cid': photo_cid
             })
 
@@ -342,7 +344,7 @@ def send_advance_mail(request):
             email.body = text_content
             email.attach_alternative(html_content, "text/html")
 
-            # 🔥 BACKGROUND SEND
+            # BACKGROUND SEND
             threading.Thread(target=send_mail_async, args=(email,)).start()
 
             return JsonResponse({"message": "Mail queued (fast 🚀)"})
@@ -362,11 +364,11 @@ def send_approval_mail(request):
             entryno = data.get('entryno')
             status = data.get('status')
 
-            # 🔹 FAST DB
+            # FAST DB
             obj = Adreq.objects.using('mssql1').only('empid', 'amt', 'remarks').get(entryno=entryno)
 
-            # 🔹 CACHE API
-            api_url = "http://10.1.21.13:8600/empwisesal/"
+            # CACHE API
+            api_url = "https://app.herofashion.com/incentive/api/emp/"
             employees = get_employee_data(api_url)
             emp_map = get_employee_map(employees)
 
@@ -394,16 +396,15 @@ def send_approval_mail(request):
                 subject,
                 text_content,
                 settings.EMAIL_HOST_USER,
-                ['kirsh650@gmail.com', 'designervishwa10@gmail.com'],
+                ['kirsh650@gmail.com'],
             )
 
             email.attach_alternative(html_content, "text/html")
 
-            # 🔥 BACKGROUND SEND
+            # BACKGROUND SEND
             threading.Thread(target=send_mail_async, args=(email,)).start()
 
-            return JsonResponse({"message": "Approval mail queued 🚀"})
-
+            return JsonResponse({"message": "Approval mail queued "})
         except Exception as e:
             print("ERROR:", e)
             return JsonResponse({"error": str(e)}, status=500)
@@ -539,7 +540,7 @@ def state(request):
             try:
                 from_date = datetime.strptime(from_date, "%Y-%m-%d")
                 to_date = datetime.strptime(to_date, "%Y-%m-%d")
-                data = data.filter(date__range=[from_date, to_date])
+                data = data.filter(dt__range=[from_date, to_date])
             except ValueError:
                 return JsonResponse({"error": "Invalid date format. Use YYYY-MM-DD"}, status=400)
 
@@ -547,3 +548,79 @@ def state(request):
         result = list(data.values())
 
         return JsonResponse(result, safe=False)
+
+
+
+# google contact API
+def google_contact_api(request):
+    if request.method == 'GET':
+        # Fetch Google Contacts
+        contacts = HrWrkdtlsnew.objects.using('main').all()
+        contacts_data = []
+        for contact in contacts:
+            contacts_data.append({
+                "photo_url": contact.photo_url,
+                "code": contact.code,
+                "name": contact.name,
+                "dept": contact.dept,
+                "category": contact.category,
+                "phone": contact.mobile,
+                "sc": contact.sc,
+                "joindt": contact.joindt,
+            })
+        return JsonResponse(contacts_data, safe=False)
+
+
+
+def new_pros(request):
+    rec = request.GET.get('rec')
+    with connections['demo'].cursor() as cursor:
+        cursor.execute(
+            """
+            EXEC usp_GetProductionDetails
+                @rec=%s               
+            """,
+            [rec]
+        )
+        columns = [col[0] for col in cursor.description]
+        rows = cursor.fetchall()
+    result = [
+        dict(zip(columns, row))
+        for row in rows
+    ]
+    return JsonResponse({
+        "status": "success",
+        "data": result
+    })
+    
+
+def fabric_cutting(request):
+
+    if request.method == 'GET':
+        data = RptCut002.objects.using('demo').all()
+
+        # Get query params
+        from_date = request.GET.get('from_date')
+        to_date = request.GET.get('to_date')
+
+        # --- 1. Today Filter (default if no dates passed) ---
+        if not from_date and not to_date:
+            today = now().date()
+            data = data.filter(dt=today)
+
+        # --- 2. Date Range Filter ---
+        if from_date and to_date:
+            try:
+                from_date = datetime.strptime(from_date, "%Y-%m-%d").date()
+                to_date = datetime.strptime(to_date, "%Y-%m-%d").date()
+
+                data = data.filter(dt__range=[from_date, to_date])
+
+            except ValueError:
+                return JsonResponse({"error": "Invalid date format. Use YYYY-MM-DD"}, status=400)
+
+        return JsonResponse(list(data.values()), safe=False)
+
+
+
+        

@@ -32,6 +32,8 @@ ALLOWED_HOSTS = ['hfapi.herofashion.com','10.1.21.153','localhost','127.0.0.1','
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "https://hf.herofashion.com",
+    "https://web.herofashion.com",
+    "https://dev.herofashion.com",
     "http://10.1.21.13:3000"
 ]
 # Application definition
@@ -51,7 +53,8 @@ INSTALLED_APPS = [
     'syncfushion',
     'advance',
     'reports',
-    'bit_checking'
+    'bit_checking',
+    'imp_reports',
 ]
 
 
@@ -122,7 +125,8 @@ DATABASES = {
         'OPTIONS': {
             'driver': 'ODBC Driver 17 for SQL Server',
             'trusted_connection': "yes"
-        }
+        },
+        'CONN_MAX_AGE': 300,
     },
 
     'demo': {
@@ -135,7 +139,8 @@ DATABASES = {
         'OPTIONS': {
             'driver': 'ODBC Driver 17 for SQL Server',
             'trusted_connection': "yes"
-        }
+        },
+        'CONN_MAX_AGE': 300,
     },
     'main': {
         'ENGINE': 'mssql',
@@ -147,7 +152,8 @@ DATABASES = {
         'OPTIONS': {
             'driver': 'ODBC Driver 17 for SQL Server',
             'trusted_connection': "yes"
-        }
+        },
+        'CONN_MAX_AGE': 300,
     },
     'mssql1' : {
         'ENGINE': 'mssql',
@@ -159,7 +165,8 @@ DATABASES = {
         'OPTIONS': {
                 'driver': 'ODBC Driver 17 for SQL Server',
                 'trusted_connection': "yes"
-            }
+            },
+        'CONN_MAX_AGE': 300,
     },
      'app' : {
         'ENGINE': 'mssql',
@@ -171,7 +178,8 @@ DATABASES = {
         'OPTIONS': {
                 'driver': 'ODBC Driver 17 for SQL Server',
                 'trusted_connection': "yes"
-            }
+            },
+        'CONN_MAX_AGE': 300,
     },
      'demo1': {
             'ENGINE': 'mssql',
@@ -183,7 +191,21 @@ DATABASES = {
             'OPTIONS': {
                 'driver': 'ODBC Driver 17 for SQL Server',
                 'trusted_connection': "yes"
-            }
+            },
+            'CONN_MAX_AGE': 300,
+    },
+    'test': {
+            'ENGINE': 'mssql',
+            'NAME': 'testerphero',
+            'USER': 'sa',
+            'PASSWORD': 'Fashion@01',
+            'HOST': '10.1.21.11',
+            'PORT': '1433',
+            'OPTIONS': {
+                'driver': 'ODBC Driver 17 for SQL Server',
+                'trusted_connection': "yes"
+            },
+            'CONN_MAX_AGE': 300,
     },
 }
 
@@ -232,22 +254,24 @@ STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
-
 STAFF_IMAGES_URL = '/staff_images/'
 STAFF_IMAGES_ROOT = r'\\10.1.21.11\D\Staff_Employee_Images'
 
+PDF_STORAGE_PATH = r"\\adminserver\File Sharing\AAAA Hero\Syncfusion Pdf Reports"
 
 # Email configuration
+
+
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = 'smtp.gmail.com'
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
-
 EMAIL_HOST_USER = 'hfautomation2026@gmail.com'
-EMAIL_HOST_PASSWORD = 'tmiy sjdd vbon omsd'   # NOT normal password
+EMAIL_HOST_PASSWORD = 'tmiy sjdd vbon omsd'   
+
+
 
 DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
-
 
 
 # Bold Reports configuration (Application-level)

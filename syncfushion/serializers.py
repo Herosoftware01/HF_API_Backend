@@ -7,8 +7,8 @@ class GridSettingSerializer(serializers.ModelSerializer):
         fields = ['id', 'name', 'data','user']
 
 
-
 class TrsMaildtlsSerializer(serializers.ModelSerializer):
     class Meta:
         model = TrsMaildtls
         fields = '__all__'
+

@@ -1,6 +1,7 @@
 from django.urls import path
 from .views import *
 from rest_framework_simplejwt.views import TokenRefreshView
+from .import views
 
 urlpatterns = [
     path("token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
@@ -37,4 +38,10 @@ urlpatterns = [
     path("role-menu-permissions/<int:pk>/", RoleMenuPermissionDetailAPI.as_view(), name="role-menu-permissions-detail"),
     path("role-submenu-permissions/", RoleSubMenuPermissionListCreateAPI.as_view(), name="role-submenu-permissions-list-create"),
     path("role-submenu-permissions/<int:pk>/", RoleSubMenuPermissionDetailAPI.as_view(), name="role-submenu-permissions-detail"),
+
+
+    path('', views.index, name='index'),
+    path('getdetails', views.getdetails, name='getdetails'),
+    path('dashboards', views.dashboards, name='dashboards'),
+    path('tokenGeneration', views.tokenGeneration, name='tokenGeneration')
 ]

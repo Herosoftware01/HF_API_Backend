@@ -11,6 +11,8 @@ from .models import QcAdminMistake,cut_sample_data,cut_sample_data_final,VueUser
 from .serializers import QcAdminMistakeSerializer,UnitSerializer,MachineTrasnsferSerializer,MachineSerializer,LineSerializer, MachineAllocationSerializer, VueProcessSequenceSerializer
 from rest_framework.parsers import MultiPartParser, FormParser
 from collections import defaultdict
+from django.shortcuts import get_object_or_404
+
 from datetime import date
 from django.utils.timezone import now
 from django.conf import settings
@@ -218,17 +220,18 @@ def save_piece(request):
     product = data.get("product")
     color = data.get("color")
     size = data.get("size")
-    unit = data.get("unit")
-    line = data.get("line")
+    # unit = data.get("unit")
+    unit = int(data.get("unit"))
+    line = int(data.get("line"))
     seq = data.get("seq")
     machine_id = data.get("machineId")
     qc_type = data.get("qc_type")
-    total_pieces = data.get("total_pieces")
-    piece_no = data.get("piece_no")
-    total_mistake = data.get("total_mistake")
+    total_pieces = int(data.get("total_pieces") or 0)
+    piece_no = int(data.get("piece_no") or 0)
+    total_mistake = int(data.get("total_mistake") or 0)
     mistake_percentage = data.get("mistake_percentage")
     defects = data.get("defects", [])
-    emp_id = data.get("operator")
+    # emp_id = data.get("operator")
     # machine_id = data.get("machineId", "")
     process = data.get("process", "")
     shade_variation = data.get("shade_variation", False)
@@ -270,7 +273,7 @@ def save_piece(request):
                 machine_id=machine_id,
                 seq=seq,
                 operation=process,
-                emb_id=emp_id,  # add if you have embroidery ID
+                # emb_id=emp_id,  # add if you have embroidery ID
                 shade_var=shade_variation,
                 num_sticker=number_sticker,
                 remark=remarks

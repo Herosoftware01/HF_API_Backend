@@ -25,9 +25,11 @@ urlpatterns = [
     path('', include('herofashion.urls')),
     path('qcapp/', include('qcapp.urls')),
     path('syncfushion/', include('syncfushion.urls')),
-    path('advance/', include('advance.urls')) ,
     path('reports/', include('reports.urls')) ,
     path('bit_checking/', include('bit_checking.urls')) ,
+    path('advance/', include('advance.urls')),
+    path('imp_reports/', include('imp_reports.urls')),
+   
 
 ] 
 

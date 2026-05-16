@@ -249,3 +249,131 @@ class RoleMenuPermissionDetailAPI(generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [permissions.IsAuthenticated]
 
 
+
+
+
+
+
+import datetime
+from django.shortcuts import render
+from django.http import HttpResponse, JsonResponse
+from rest_framework.decorators import api_view
+
+import requests
+import json
+import hashlib
+import hmac
+import base64
+from pathlib import Path
+from . import global_app_settings
+
+
+@api_view(['GET'])
+def dashboards(request):
+    """Return list of dashboards (ItemType=2) by calling Bold BI REST API server-side.
+    This avoids CORS and exposing embed secrets in the browser for the sample.
+    """
+    try:
+        cfg_path = Path(__file__).resolve().parents[1] / 'embedConfig.json'
+        with open(cfg_path, 'r', encoding='utf-8-sig') as f:
+            cfg = json.load(f)
+        embed = cfg.get('EmbedDetails', cfg)
+
+        server_url = (embed.get('ServerUrl') or embed.get('serverUrl') or embed.get('serverurl') or '').rstrip('/')
+        site_identifier = embed.get('SiteIdentifier') or embed.get('siteIdentifier') or embed.get('siteidentifier')
+        embed_secret = embed.get('EmbedSecret') or embed.get('embedSecret') or embed.get('embedsecret')
+        user_email = embed.get('UserEmail') or embed.get('userEmail') or embed.get('email')
+
+        if not server_url or not site_identifier:
+            return JsonResponse({'error': 'Missing ServerUrl or SiteIdentifier in embedConfig.json'}, status=500)
+
+        # Request API token using embed_secret grant
+        token_url = f"{server_url}/api/{site_identifier}/token"
+        token_payload = {
+            'username': user_email,
+            'embed_secret': embed_secret,
+            'grant_type': 'embed_secret'
+        }
+        token_res = requests.post(token_url, data=token_payload, headers={'Content-Type': 'application/x-www-form-urlencoded'}, timeout=30)
+        token_res.raise_for_status()
+        token_json = token_res.json()
+        access_token = token_json.get('access_token') or (token_json.get('Data') or {}).get('access_token')
+        if not access_token:
+            return JsonResponse({'error': 'Could not obtain access token', 'detail': token_json}, status=502)
+
+        # Get dashboards (ItemType=2)
+        items_url = f"{server_url}/api/{site_identifier}/v2.0/items?ItemType=2"
+        items_res = requests.get(items_url, headers={'Authorization': f'bearer {access_token}'}, timeout=30)
+        items_res.raise_for_status()
+        return JsonResponse(items_res.json(), safe=False)
+    except Exception as e:
+        return JsonResponse({'error': 'dashboards error', 'details': str(e)}, status=500)
+
+def index(request):
+    return render(request,'index.html')
+
+@api_view(['GET'])
+def getdetails(request):
+    # Read embedConfig.json at request time so changes are picked up immediately.
+    try:
+        cfg_path = Path(__file__).resolve().parents[1] / 'embedConfig.json'
+        with open(cfg_path, 'r', encoding='utf-8-sig') as f:
+            cfg = json.load(f)
+        embed = cfg.get('EmbedDetails', cfg)
+
+        # Normalize keys (allow multiple casing variants)
+        server_url = embed.get('ServerUrl') or embed.get('serverUrl') or embed.get('serverurl')
+        site_identifier = embed.get('SiteIdentifier') or embed.get('siteIdentifier') or embed.get('siteidentifier')
+        embed_secret = embed.get('EmbedSecret') or embed.get('embedSecret') or embed.get('embedsecret')
+        user_email = embed.get('UserEmail') or embed.get('userEmail') or embed.get('email')
+        dashboard_id = embed.get('DashboardId') or embed.get('dashboardId') or (embed.get('Dashboard') or {}).get('id')
+        embed_type = embed.get('EmbedType') or embed.get('embedType') or embed.get('embedtype')
+        environment = embed.get('Environment') or embed.get('environment')
+
+        return JsonResponse({
+            'DashboardId': dashboard_id,
+            'ServerUrl': server_url,
+            'EmbedType': embed_type,
+            'Environment': environment,
+            'SiteIdentifier': site_identifier,
+            'UserEmail': user_email,
+            'EmbedSecret': embed_secret,
+        })
+    except Exception as e:
+        return JsonResponse({'error': 'Could not load embed details', 'details': str(e)}, status=500)
+
+@api_view(['POST'])
+def tokenGeneration(request):
+    try:
+        cfg_path = Path(__file__).resolve().parents[1] / 'embedConfig.json'
+        with open(cfg_path, 'r', encoding='utf-8-sig') as f:
+            cfg = json.load(f)
+        embed = cfg.get('EmbedDetails', cfg)
+
+        server_url = embed.get('ServerUrl') or embed.get('serverUrl') or embed.get('serverurl')
+        site_identifier = embed.get('SiteIdentifier') or embed.get('siteIdentifier') or embed.get('siteidentifier')
+        embed_secret = embed.get('EmbedSecret') or embed.get('embedSecret') or embed.get('embedsecret')
+        user_email = embed.get('UserEmail') or embed.get('userEmail') or embed.get('email')
+        dashboard_id = embed.get('DashboardId') or embed.get('dashboardId') or (embed.get('Dashboard') or {}).get('id')
+
+        embed_details = {
+            'email': user_email,
+            'serverurl': server_url,
+            'siteidentifier': site_identifier,
+            'embedsecret': embed_secret,
+            'dashboard': { 'id': dashboard_id }
+        }
+
+        request_url = f"{embed_details['serverurl'].rstrip('/')}/api/{embed_details['siteidentifier']}/embed/authorize"
+        headers = {'Content-Type': 'application/json'}
+
+        result = requests.post(request_url, headers=headers, data=json.dumps(embed_details), timeout=30)
+        result.raise_for_status()
+
+        data = result.json()
+        try:
+            return HttpResponse(data.get('Data', {}).get('access_token') or data.get('token'))
+        except (KeyError, TypeError):
+            return HttpResponse(f"Unexpected response format: {data}", status=502)
+    except Exception as e:
+        return HttpResponse(str(e), status=500)
