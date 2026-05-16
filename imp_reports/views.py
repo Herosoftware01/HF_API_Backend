@@ -1,5 +1,6 @@
 from django.http import JsonResponse
 from .models import LaySp, MasterFinalMistake, UnitBundlereport, FinalPlans,Corarlck1,CoraRollcheck,BuntrackReport,LaySpreadingLayemployee,VueAdGrid1
+from .models import QcappQcPieceFinal
 from django.db.models import Q
 from django.views.decorators.csrf import csrf_exempt
 from django.db.models import F
@@ -218,3 +219,17 @@ def unit_bundle(request):
 
     return JsonResponse(data, safe=False)
 
+def qcfirst(request):
+
+    if request.method == 'GET':
+        data = QcappQcPieceFinal.objects.using('default').all().filter(qc_type='first_piece').values()
+        data_list = list(data)
+        return JsonResponse(data_list, safe=False)
+    
+
+def qcroving(request):
+
+    if request.method == 'GET':
+        data = QcappQcPieceFinal.objects.using('default').all().filter(qc_type='rowing_qc').values()
+        data_list = list(data)
+        return JsonResponse(data_list, safe=False)

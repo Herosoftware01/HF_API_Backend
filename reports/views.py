@@ -5,7 +5,7 @@ import os
 import json
 from datetime import datetime
 from .models import LaySp, MasterFinalMistake, UnitBundlereport, FinalPlans,Corarlck1,CoraRollcheck,AttUnt,EmbAbsetnt,Holiday,LabAtt,RptCutting,VueOrdersinhand
-from .models import BillAge,BillMdapprove,BillPass
+from .models import BillAge,BillMdapprove,BillPass,Leavempabsent
 from django.db.models import F, Q , IntegerField,DateField,Case, When, Value,CharField
 from django.db import connections
 from django.db.models import OuterRef, Subquery
@@ -902,6 +902,71 @@ def resign_report(request):
             "this_month_count": 0
         }, status=500)
     
+
+def empatlev(request):
+    leave_records = (
+        Leavempabsent.objects
+        .using('demo')
+        .all()
+        .order_by('-leav_applydt')
+    )
+
+    today = timezone.now().date()
+
+    records_data = []
+
+    for record in leave_records:
+
+        # ✅ Overdue Calculation
+        if record.expecdt:
+            record_date = record.expecdt.date()
+
+            if record_date < today:
+                calculated_overdue = (today - record_date).days
+            else:
+                calculated_overdue = 0
+        else:
+            calculated_overdue = 0
+
+        # ✅ JSON Data
+        records_data.append({
+            "leav_entno": record.leav_entno,
+            "code": record.code,
+            "name": record.name,
+            "dept": record.dept,
+            "mobile": record.mobile,
+            "category": record.category,
+            "expecdt": (
+                record.expecdt.strftime("%Y-%m-%d %H:%M:%S")
+                if record.expecdt else None
+            ),
+            "leav_applydt": (
+                record.leav_applydt.strftime("%Y-%m-%d %H:%M:%S")
+                if record.leav_applydt else None
+            ),
+            "calculated_overdue": calculated_overdue,
+        })
+
+    # ✅ Department List
+    departments = list(
+        Leavempabsent.objects
+        .using('demo')
+        .exclude(dept__isnull=True)
+        .exclude(dept='')
+        .values_list('dept', flat=True)
+        .distinct()
+        .order_by('dept')
+    )
+
+    return JsonResponse({
+        "status": True,
+        "message": "Leave records fetched successfully",
+        "total_records": len(records_data),
+        "departments": departments,
+        "leave_records": records_data
+    }, safe=False)
+
+
 
 def join_data(request):
     # Read GET params
