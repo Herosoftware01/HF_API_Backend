@@ -5,6 +5,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from .models import  Stickemp,VueMistakePartDetails, bit_checking_updates, BitcheckingPlyDetails, TrsCutstickerprodNew
 from django.views.decorators.csrf import csrf_exempt
+import json
 
 
 def qr_api(request):
@@ -268,6 +269,55 @@ def delete_checking(request):
         ).delete()
 
         update_records.delete()
+
+        return JsonResponse({
+            "status": True,
+            "message": "Deleted Successfully"
+        })
+
+    except Exception as e:
+
+        return JsonResponse({
+            "status": False,
+            "message": str(e)
+        })
+    
+
+@csrf_exempt
+def delete_single_checking(request):
+
+    if request.method != "POST":
+        return JsonResponse({
+            "status": False
+        })
+
+    try:
+
+        body = json.loads(request.body)
+
+        plan_no = body.get("plan_no")
+        descriptions = body.get("descriptions")
+        scaner_id = body.get("scaner_id")
+
+    
+        final_exists = BitcheckingPlyDetails.objects.using('demo').filter(
+            qr_id=scaner_id
+        ).exists()
+
+        if final_exists:
+
+            return JsonResponse({
+                "status": False,
+                "message":
+                "Final data already saved. Use main DELETE button."
+            })
+
+   
+        bit_checking_updates.objects.filter(
+            plan_no=plan_no,
+            descriptions=descriptions,
+            scaner_id=scaner_id
+        ).delete()
 
         return JsonResponse({
             "status": True,
