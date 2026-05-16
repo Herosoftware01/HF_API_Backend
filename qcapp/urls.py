@@ -33,7 +33,6 @@ urlpatterns = [
     path('api/process-sequence/', views.get_process_sequence, name='process-sequence'),
     path('api/machine/<path:identity>/', views.get_machine_employee),
 
-
     path('api/machine-transfer/', MachineTransferListCreateAPIView.as_view(), name='machine-transfer-list-create'),
     path('api/machine-transfer/<int:pk>/', MachineTransferDetailAPIView.as_view(), name='machine-transfer-detail'),
 
@@ -42,6 +41,8 @@ urlpatterns = [
     path("final-save-measurement/", views.final_save_measurement),
     path("check-ironing-status/", views.check_ironing_status),
     path("get-existing-measurements/", views.get_existing_measurements),
+    path("get_cutting_measurements/", views.get_cutting_measurements),
+  
 
 ]
 

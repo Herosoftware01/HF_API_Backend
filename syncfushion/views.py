@@ -1,16 +1,15 @@
 from django.shortcuts import render
-
-# Create your views here.
+# from django.db import connections
+from rest_framework import status
+# from django.http import JsonResponse
 from rest_framework import viewsets
-from .models import GridSetting
-from .serializers import GridSettingSerializer
+from .models import GridSetting,TrsMaildtls
+from .serializers import GridSettingSerializer,TrsMaildtlsSerializer
 from rest_framework.permissions import IsAuthenticated  # optional
 
 class GridSettingViewSet(viewsets.ModelViewSet):
     queryset = GridSetting.objects.all()
     serializer_class = GridSettingSerializer
-
-
 
 
 
@@ -26,9 +25,7 @@ from .services.boldreports_service import (
 
 @api_view(['GET'])
 def token_api(request):
-    """
-    GET /api/token/
-    """
+   
     try:
         reports = generate_auth_token()
         return Response({
@@ -43,9 +40,6 @@ def token_api(request):
 
 @api_view(['GET'])
 def reports_list_api(request):
-    """
-    GET /api/reports/
-    """
     try:
         reports = get_reports_list()
         return Response({
@@ -61,24 +55,7 @@ def reports_list_api(request):
 
 @api_view(["POST"])
 def export_report_api(request):
-    """
-    POST /api/export/
-    Body:
-    {
-        "report_id": "uuid",
-        "server_path": "",
-        "export_type": "PDF",
-        "filter_parameters": "{'ReportParameter1':['true'],'StartDate':['1/1/2003'],'SalesOrderNumber':['SO50750','SO50751']}"
-    }
-
-    Ex:{
-            "report_id": "b24c7b18-1a40-4716-b194-876d6b26e845",
-            "server_path": "",
-            "export_type": "PDF",
-            "filter_parameters": "{'SalesOrderNumber':['SO50751']}"
-        }
-    """
-
+   
     try:
         data = request.data
 
@@ -110,3 +87,76 @@ def export_report_api(request):
             "success": False,
             "error": str(e)
         }, status=500)
+    
+
+
+#############################################
+
+@api_view(['GET'])
+def get_mails(request):
+    mails = TrsMaildtls.objects.all()
+    serializer = TrsMaildtlsSerializer(mails, many=True)
+    return Response(serializer.data)
+
+# ADD API
+@api_view(['POST'])
+def add_mail(request):
+    serializer = TrsMaildtlsSerializer(data=request.data)
+
+    if serializer.is_valid():
+        serializer.save()
+        return Response(
+            {
+                "message": "Mail details added successfully",
+                "data": serializer.data
+            },
+            status=status.HTTP_201_CREATED
+        )
+
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+# UPDATE API
+@api_view(['PUT'])
+def update_mail(request, pk):
+    try:
+        mail = TrsMaildtls.objects.get(pk=pk)
+    except TrsMaildtls.DoesNotExist:
+        return Response(
+            {"error": "Record not found"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+    serializer = TrsMaildtlsSerializer(mail, data=request.data, partial=True)
+
+    if serializer.is_valid():
+        serializer.save()
+        return Response(
+            {
+                "message": "Mail details updated successfully",
+                "data": serializer.data
+            }
+        )
+
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+# DELETE API
+@api_view(['DELETE'])
+def delete_mail(request, pk):
+    try:
+        mail = TrsMaildtls.objects.get(pk=pk)
+    except TrsMaildtls.DoesNotExist:
+        return Response(
+            {"error": "Record not found"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+    mail.delete()
+
+    return Response(
+        {"message": "Mail details deleted successfully"},
+        status=status.HTTP_204_NO_CONTENT
+    )
+
+

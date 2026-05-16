@@ -27,7 +27,7 @@ SECRET_KEY = 'django-insecure--jpqy*__tak#1#7_0u^g5gt=n@rlpjvp5mstua5m^&i7+!8uad
 DEBUG = True
 # DEBUG = False
 
-ALLOWED_HOSTS = ['hfapi.herofashion.com','localhost','127.0.0.1','10.1.21.13','10.1.21.154','10.1.21.110','10.1.21.133']
+ALLOWED_HOSTS = ['hfapi.herofashion.com','10.1.21.153','localhost','127.0.0.1','10.1.21.13','10.1.21.154','10.1.21.110']
 
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
@@ -51,6 +51,7 @@ INSTALLED_APPS = [
     'syncfushion',
     'advance',
     'reports',
+    'bit_checking'
 ]
 
 
@@ -234,8 +235,6 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 STAFF_IMAGES_URL = '/staff_images/'
 STAFF_IMAGES_ROOT = r'\\10.1.21.11\D\Staff_Employee_Images'
-
-
 
 
 # Email configuration

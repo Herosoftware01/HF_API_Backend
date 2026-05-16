@@ -27,6 +27,7 @@ urlpatterns = [
     path('syncfushion/', include('syncfushion.urls')),
     path('advance/', include('advance.urls')) ,
     path('reports/', include('reports.urls')) ,
+    path('bit_checking/', include('bit_checking.urls')) ,
 
 ] 
 

@@ -11,15 +11,14 @@ from .models import QcAdminMistake,cut_sample_data,cut_sample_data_final,VueUser
 from .serializers import QcAdminMistakeSerializer,UnitSerializer,MachineTrasnsferSerializer,MachineSerializer,LineSerializer, MachineAllocationSerializer, VueProcessSequenceSerializer
 from rest_framework.parsers import MultiPartParser, FormParser
 from collections import defaultdict
-
 from datetime import date
 from django.utils.timezone import now
 from django.conf import settings
-
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 import json
 from django.db import connection
+
 
 class QcAdminMistakeAPIView(APIView):
     permission_classes = [permissions.IsAuthenticated]
@@ -372,9 +371,6 @@ def get_last_bundle(request):
 
     is_completed = qc_piece_final.objects.filter(bundle_id=bundle_id).exists()
 
-    # =========================
-    #  ROVING QC EXTRA DATA
-    # =========================
     roving_data = {}
 
     if qc_type and qc_type.strip().lower() == "rowing_qc":
@@ -415,6 +411,81 @@ def get_last_bundle(request):
         #  extra only for roving
         **roving_data
     })
+
+
+
+# @api_view(["GET"])
+# def get_last_bundle(request):
+#     from .models import qc_piece_data, qc_piece_final, roving_qc_mistake
+
+#     unit = request.GET.get("unit")
+#     line = request.GET.get("line")
+#     qc_type = request.GET.get("qc_type")
+#     seq = request.GET.get("seq")
+
+#     # completed bundle ids
+#     completed_bundle_ids = qc_piece_final.objects.filter(
+#         unit=unit,
+#         line=line,
+#         qc_type=qc_type,
+#         seq__iexact=seq
+#     ).values_list("bundle_id", flat=True)
+
+#     # get latest non-completed bundle
+#     last = qc_piece_data.objects.filter(
+#         unit=unit,
+#         line=line,
+#         qc_type=qc_type,
+#         seq__iexact=seq
+#     ).exclude(
+#         bundle_id__in=completed_bundle_ids
+#     ).order_by("-id").first()
+
+#     if not last:
+#         return Response({"error": "No pending bundle found"}, status=404)
+
+#     bundle_id = last.bundle_id
+#     piece = last.piece_no
+
+#     roving_data = {}
+
+#     if qc_type and qc_type.strip().lower() == "rowing_qc":
+#         mistakes = roving_qc_mistake.objects.filter(
+#             qc_piece__bundle_id=last.bundle_id,
+#             seq__iexact=seq
+#         )
+
+#         roving_data = {
+#             "machine_id": mistakes.first().machine_id if mistakes.exists() else None,
+#             "operation": mistakes.first().operation if mistakes.exists() else None,
+#             "operator": mistakes.first().emb_id if mistakes.exists() else None,
+#             "user_id": last.user_id,
+#             "roving_mistakes": [
+#                 {
+#                     "machine_id": m.machine_id,
+#                     "operation": m.operation,
+#                     "emb_id": m.emb_id,
+#                     "shade_var": m.shade_var,
+#                     "num_sticker": m.num_sticker,
+#                     "remark": m.remark
+#                 }
+#                 for m in mistakes
+#             ]
+#         }
+
+#     return Response({
+#         "bundle_id": bundle_id,
+#         "bundle_no": last.bundle_no,
+#         "jobno": last.jobno,
+#         "product": last.product,
+#         "color": last.color,
+#         "size": last.size,
+#         "total_pieces": last.total_pieces,
+#         "piece_no": piece,
+#         "checked_pieces": piece,
+
+#         **roving_data
+#     })
 
 
 @api_view(["GET"])
@@ -1330,4 +1401,34 @@ def get_existing_measurements(request):
         })
 
     return Response({"data": result})
+
+########## cutting measurement start ############
+
+def get_cutting_measurements(request):
+    sl = request.GET.get('sl')
+    
+    with connections['demo'].cursor() as cursor:
+        cursor.execute(
+            """
+            EXEC sp_GetStickerDetails_BySL
+                @sl=%s
+                
+            """,
+            [sl]
+        )
+
+        columns = [col[0] for col in cursor.description]
+        rows = cursor.fetchall()
+
+    result = [
+        dict(zip(columns, row))
+        for row in rows
+    ]
+
+    return JsonResponse({
+        "status": "success",
+        "data": result
+    })
+
+
 
