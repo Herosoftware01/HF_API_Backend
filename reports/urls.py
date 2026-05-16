@@ -27,6 +27,7 @@ urlpatterns = [
     path('security_list/', views.security_list, name='security_list'),
     path('work_report/', views.workforce_trends_api, name='workforce_trends_api'),
     path('work_report1/', views.workforce_unit_trends_api, name='workforce_unit_trends_api'), 
+    path('empleave/', views.empatlev, name='empleave'), 
 
 
 

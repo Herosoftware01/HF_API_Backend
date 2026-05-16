@@ -330,6 +330,20 @@ class LabAtt(models.Model):
         managed = False
         db_table = 'lab_att'
 
+class Leavempabsent(models.Model):
+    leav_entno = models.IntegerField(db_column='Leav_EntNo')  # Field name made lowercase.
+    code = models.IntegerField(primary_key=True)
+    name = models.CharField(max_length=100, blank=True, null=True)
+    dept = models.CharField(max_length=50, blank=True, null=True)
+    mobile = models.CharField(max_length=50, blank=True, null=True)
+    category = models.CharField(db_column='Category', max_length=50, blank=True, null=True)  # Field name made lowercase.
+    expecdt = models.DateTimeField(db_column='ExpecDt')  # Field name made lowercase.
+    leav_applydt = models.DateTimeField()
+
+    class Meta:
+        managed = False
+        db_table = 'vue_Trs_LeavEmpAbsent'
+
 class RptCutting(models.Model):
     planno = models.IntegerField(db_column='PLANNO',primary_key=True)  # Field name made lowercase.
     dt = models.DateTimeField(db_column='DT')  # Field name made lowercase.
