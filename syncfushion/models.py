@@ -15,6 +15,8 @@ class GridSetting(models.Model):
 
     def __str__(self):
         return self.name
+    
+
 
 
 class DiWasg(models.Model):
@@ -97,6 +99,7 @@ class TrsMaildtls(models.Model):
     class Meta:
         managed = False
         db_table = 'Trs_Maildtls'
+
 
 class SyncfushionKanban(models.Model):
     Id = models.AutoField(db_column='Id', primary_key=True)

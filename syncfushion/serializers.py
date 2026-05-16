@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import GridSetting,TrsMaildtls
+from .models import GridSetting, TrsMaildtls
 
 class GridSettingSerializer(serializers.ModelSerializer):
     class Meta:
@@ -11,3 +11,4 @@ class TrsMaildtlsSerializer(serializers.ModelSerializer):
     class Meta:
         model = TrsMaildtls
         fields = '__all__'
+

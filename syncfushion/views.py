@@ -1,4 +1,9 @@
 from django.shortcuts import render
+# from django.db import connections
+from rest_framework import status
+# from django.http import JsonResponse
+from rest_framework import viewsets
+from .models import GridSetting,TrsMaildtls
 from django.http import JsonResponse
 from rest_framework import status
 from rest_framework import viewsets
@@ -22,6 +27,14 @@ class GridSettingViewSet(viewsets.ModelViewSet):
 
 
 
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
+from django.http import HttpResponse
+from .services.boldreports_service import (
+    generate_auth_token,
+    get_reports_list,
+    export_report
+)
 
     
 
@@ -29,9 +42,7 @@ class GridSettingViewSet(viewsets.ModelViewSet):
 
 @api_view(['GET'])
 def token_api(request):
-    """
-    GET /api/token/
-    """
+   
     try:
         reports = generate_auth_token()
         return Response({
@@ -46,9 +57,6 @@ def token_api(request):
 
 @api_view(['GET'])
 def reports_list_api(request):
-    """
-    GET /api/reports/
-    """
     try:
         reports = get_reports_list()
         return Response({
@@ -64,24 +72,7 @@ def reports_list_api(request):
 
 @api_view(["POST"])
 def export_report_api(request):
-    """
-    POST /api/export/
-    Body:
-    {
-        "report_id": "uuid",
-        "server_path": "",
-        "export_type": "PDF",
-        "filter_parameters": "{'ReportParameter1':['true'],'StartDate':['1/1/2003'],'SalesOrderNumber':['SO50750','SO50751']}"
-    }
-
-    Ex:{
-            "report_id": "b24c7b18-1a40-4716-b194-876d6b26e845",
-            "server_path": "",
-            "export_type": "PDF",
-            "filter_parameters": "{'SalesOrderNumber':['SO50751']}"
-        }
-    """
-
+   
     try:
         data = request.data
 
@@ -114,6 +105,9 @@ def export_report_api(request):
             "error": str(e)
         }, status=500)
     
+
+
+#############################################
 
 @csrf_exempt
 def diwasg_list(request):
