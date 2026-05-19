@@ -5,7 +5,8 @@ from rest_framework.response import Response
 from rest_framework import status
 from .models import  Stickemp,VueMistakePartDetails, bit_checking_updates, BitcheckingPlyDetails, TrsCutstickerprodNew
 from django.views.decorators.csrf import csrf_exempt
-
+import json
+from django.utils.dateparse import parse_datetime
 
 def qr_api(request):
 
@@ -80,20 +81,64 @@ def qr_api(request):
         "descriptions": desc
     })
 
+# def emp_stick(request):
+#     queryset = Stickemp.objects.using('main').values()
+#     # Modify image paths
+#     for obj in queryset:
+#         raw_path = obj['photo'] if obj.get('photo') else None
+#         if raw_path:
+#             filename = raw_path.split('\\')[-1]
+#             obj['photo'] = f"http://10.1.21.153:7003/staff_images/{filename}"
+#         else:
+#             obj['photo'] = ""
+
+#     data = list(queryset)
+    
+#     return JsonResponse(data, safe=False)
+
+
+
 def emp_stick(request):
+
+    from_date = parse_datetime("2026-05-18 08:28:55.931995")
+    
+    existing_qr_ids = set(
+        BitcheckingPlyDetails.objects.using('demo')
+        .values_list('qr_id', flat=True)
+    )
+
+    pending_emp_ids = set(
+        bit_checking_updates.objects.filter(
+            date__gte=from_date
+        ).exclude(
+            scaner_id__in=existing_qr_ids   
+        ).values_list(
+            'emp_id',
+            flat=True
+        )
+    )
+
     queryset = Stickemp.objects.using('main').values()
-    # Modify image paths
+
+    data = []
+
     for obj in queryset:
-        raw_path = obj['photo'] if obj.get('photo') else None
+
+        if obj['code'] in pending_emp_ids:
+            continue
+
+        raw_path = obj.get('photo')
+
         if raw_path:
             filename = raw_path.split('\\')[-1]
             obj['photo'] = f"http://10.1.21.153:7003/staff_images/{filename}"
         else:
             obj['photo'] = ""
 
-    data = list(queryset)
-    
+        data.append(obj)
+
     return JsonResponse(data, safe=False)
+
 
 
 @api_view(['POST'])
@@ -183,13 +228,13 @@ def bitchecking_final_data(request):
                     "emp_id": emp_id,
                     "total_pcs": total_qty,
 
-                    "ok_pcs": item.get("ok_pcs"),
-                    "mistake_pcs": item.get("mistake_count"),
-                    "mistake_ply": item.get("mistake_pcs"),
+                    "ok_pcs": item.get("ok_pcs") or 0,
+                    "mistake_pcs": item.get("mistake_count") or 0,
+                    "mistake_ply": item.get("mistake_pcs") or 0,
 
-                    "result": item.get("total_select_pcs"),
-                    "final_tpcs": item.get("final_tpcs"),
-                    "out_ply": item.get("out_pcs"),
+                    "result": item.get("total_select_pcs") or 0,
+                    "final_tpcs": item.get("final_tpcs") or 0,
+                    "out_ply": item.get("out_pcs") or 0,
                 }
             )
 
@@ -280,3 +325,90 @@ def delete_checking(request):
             "status": False,
             "message": str(e)
         })
+    
+
+@csrf_exempt
+def delete_single_checking(request):
+
+    if request.method != "POST":
+        return JsonResponse({
+            "status": False
+        })
+
+    try:
+
+        body = json.loads(request.body)
+
+        plan_no = body.get("plan_no")
+        descriptions = body.get("descriptions")
+        scaner_id = body.get("scaner_id")
+
+    
+        final_exists = BitcheckingPlyDetails.objects.using('demo').filter(
+            qr_id=scaner_id
+        ).exists()
+
+        if final_exists:
+
+            return JsonResponse({
+                "status": False,
+                "message":
+                "Final data already saved. Use main DELETE button."
+            })
+
+   
+        bit_checking_updates.objects.filter(
+            plan_no=plan_no,
+            descriptions=descriptions,
+            scaner_id=scaner_id
+        ).delete()
+
+        return JsonResponse({
+            "status": True,
+            "message": "Deleted Successfully"
+        })
+
+    except Exception as e:
+
+        return JsonResponse({
+            "status": False,
+            "message": str(e)
+        })
+
+
+
+def pending_scaner_ids(request):
+
+    from_date = parse_datetime("2026-05-18 06:13:27.396456")
+
+    existing_qr_ids = list(
+        BitcheckingPlyDetails.objects.using('demo').values_list(
+            'qr_id',
+            flat=True
+        )
+    )
+
+    queryset = bit_checking_updates.objects.filter(
+        date__gte=from_date
+    ).exclude(
+        scaner_id__in=existing_qr_ids
+    ).order_by('scaner_id', 'date')
+
+    seen = set()
+    unique_data = []
+
+    for row in queryset:
+        if row.scaner_id not in seen:
+            seen.add(row.scaner_id)
+            unique_data.append({
+                "scaner_id": row.scaner_id,
+                "emp_id": row.emp_id,
+                "date": row.date
+            })
+
+    return JsonResponse({
+        "status": "success",
+        "count": len(unique_data),
+        "data": unique_data
+    })
+

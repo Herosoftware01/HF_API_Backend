@@ -15,6 +15,8 @@ urlpatterns = [
     path('final_bit_checking', views.bitchecking_final_data),
     path('check_final_saved', views.check_final_saved),
     path('delete_checking/',views.delete_checking,name='delete_checking'),
+    path('delete_single_checking/',views.delete_single_checking,name='delete_single_checking'),
+    path('pending-scaners/', views.pending_scaner_ids),
   
   
 
