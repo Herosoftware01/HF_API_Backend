@@ -3,9 +3,11 @@ from django.http import JsonResponse
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
-from .models import  Stickemp,VueMistakePartDetails, bit_checking_updates, BitcheckingPlyDetails, TrsCutstickerprodNew
+from .models import  Stickemp,VueMistakePartDetails, bit_checking_updates, BitcheckingPlyDetails, TrsCutstickerprodNew, bit_start_end_time
 from django.views.decorators.csrf import csrf_exempt
 import json
+from django.utils.dateparse import parse_datetime
+from django.utils import timezone
 
 
 def qr_api(request):
@@ -31,14 +33,19 @@ def qr_api(request):
         .values_list('det_part', flat=True)
     )
 
+    # ✅ START/END TABLE CHECK
+    start_entry = bit_start_end_time.objects.filter(
+        qrid=data['qrid']
+    ).first()
+
     saved_data = bit_checking_updates.objects.filter(
         scaner_id=data['qrid']
     )
 
 
-    if saved_data.exists():
+    if start_entry or saved_data.exists():
 
-        first = saved_data.first()
+        first = saved_data.first() if saved_data.exists() else None
 
         checked_data = {}
 
@@ -63,8 +70,9 @@ def qr_api(request):
             "pc": data['pc'],
 
             "employee": {
-                "code": first.emp_id
+                "code": first.emp_id if first else start_entry.empid
             },
+
 
             "descriptions": desc,
 
@@ -81,19 +89,47 @@ def qr_api(request):
         "descriptions": desc
     })
 
+
+
 def emp_stick(request):
+
+    from_date = parse_datetime("2026-05-18 08:28:55.931995")
+
+    existing_qr_ids = set(
+        BitcheckingPlyDetails.objects.using('demo')
+        .values_list('qr_id', flat=True)
+    )
+
+    pending_emp_ids = set(
+        bit_checking_updates.objects.filter(
+            date__gte=from_date
+        ).exclude(
+            scaner_id__in=existing_qr_ids   
+        ).values_list(
+            'emp_id',
+            flat=True
+        )
+    )
+
     queryset = Stickemp.objects.using('main').values()
-    # Modify image paths
+
+    data = []
+
     for obj in queryset:
-        raw_path = obj['photo'] if obj.get('photo') else None
+
+        if obj['code'] in pending_emp_ids:
+            continue
+
+        raw_path = obj.get('photo')
+
         if raw_path:
             filename = raw_path.split('\\')[-1]
             obj['photo'] = f"http://10.1.21.153:7003/staff_images/{filename}"
         else:
             obj['photo'] = ""
 
-    data = list(queryset)
-    
+        data.append(obj)
+
     return JsonResponse(data, safe=False)
 
 
@@ -192,6 +228,14 @@ def bitchecking_final_data(request):
                     "final_tpcs": item.get("final_tpcs"),
                     "out_ply": item.get("out_pcs"),
                 }
+            )
+
+            # UPDATE END TIME
+            bit_start_end_time.objects.filter(
+                qrid=scanner_id,
+                end__isnull=True
+            ).update(
+                end=timezone.now()
             )
 
         return Response(
@@ -330,3 +374,81 @@ def delete_single_checking(request):
             "status": False,
             "message": str(e)
         })
+    
+
+
+def pending_scaner_ids(request):
+
+    from_date = parse_datetime("2026-05-18 06:13:27.396456")
+
+    existing_qr_ids = list(
+        BitcheckingPlyDetails.objects.using('demo').values_list(
+            'qr_id',
+            flat=True
+        )
+    )
+
+    queryset = bit_start_end_time.objects.filter(
+        start__gte=from_date
+    ).exclude(
+        qrid__in=existing_qr_ids
+    ).order_by('qrid', 'start')
+
+    seen = set()
+    unique_data = []
+
+    for row in queryset:
+        if row.qrid not in seen:
+            seen.add(row.qrid)
+            unique_data.append({
+                "scaner_id": row.qrid,
+                "emp_id": row.empid,
+                "date": row.start
+            })
+
+    return JsonResponse({
+        "status": "success",
+        "count": len(unique_data),
+        "data": unique_data
+    })
+
+
+from django.utils import timezone
+
+@csrf_exempt
+def qc_start(request):
+
+    if request.method == "POST":
+
+        data = json.loads(request.body)
+
+        qrid = data.get("qrid")
+        empid = data.get("empid")
+
+        already_exists = bit_start_end_time.objects.filter(
+            qrid=qrid
+        ).exists()
+
+        if already_exists:
+
+            return JsonResponse({
+                "status": False,
+                "message": "QRID already exists"
+            })
+
+        ist_time = timezone.now()
+
+        obj = bit_start_end_time.objects.create(
+            qrid=qrid,
+            empid=empid,
+            start=ist_time
+        )
+
+        return JsonResponse({
+            "status": True,
+            "id": obj.id
+        })
+
+    return JsonResponse({
+        "status": False
+    })
