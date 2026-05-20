@@ -101,3 +101,11 @@ class TrsCutstickerprodNew(models.Model):
         managed = False
         db_table = 'Trs_CutStickerProd_New'
 
+
+class bit_start_end_time(models.Model):
+    qrid = models.IntegerField()
+    empid = models.IntegerField()
+    start = models.DateTimeField()
+    end = models.DateTimeField(null=True, blank=True)
+
+

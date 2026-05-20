@@ -89,6 +89,7 @@ class MachineAllocationSerializer(serializers.ModelSerializer):
         return [
             {
                 "emp_code": latest_emp.emp_code,
+                "name": emp_details.name,
                 "status": latest_emp.status,
                 "photo":photo_url
             }
