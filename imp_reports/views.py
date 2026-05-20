@@ -1,5 +1,5 @@
 from django.http import JsonResponse
-from .models import LaySp, MasterFinalMistake, UnitBundlereport, FinalPlans,Corarlck1,CoraRollcheck,BuntrackReport,LaySpreadingLayemployee,VueAdGrid1
+from .models import LaySp, MasterFinalMistake, UnitBundlereport, FinalPlans,Corarlck1,CoraRollcheck,BuntrackReport,LaySpreadingLayemployee,VueAdGrid1,VueStPunch
 from .models import QcappQcPieceFinal
 from django.db.models import Q
 from django.views.decorators.csrf import csrf_exempt
@@ -9,10 +9,10 @@ from django.db.models import OuterRef, Subquery
 from collections import Counter
 from datetime import date
 from django.utils.dateparse import parse_date
-
 from django.db.models import OuterRef, Subquery
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
+import os 
 
 @csrf_exempt
 def get_lay_sp_data(request): 
@@ -233,3 +233,30 @@ def qcroving(request):
         data = QcappQcPieceFinal.objects.using('default').all().filter(qc_type='rowing_qc').values()
         data_list = list(data)
         return JsonResponse(data_list, safe=False)
+    
+def punchst(request):
+
+    if request.method == 'GET':
+        data = VueStPunch.objects.using('main').all().order_by('-date', 'code')
+        response = []
+
+        for item in data:
+
+            photo_url = None
+
+            if item.photo:
+                filename = os.path.basename(str(item.photo))
+                photo_url = f"http://10.1.21.13:8200/staff_images/{filename}"
+
+            response.append({
+                "slno": item.slno,
+                "name": item.name,
+                "code": item.code,
+                "date": item.date.strftime('%Y-%m-%d') if item.date else None,
+                "cat": item.cat,
+                "photo": photo_url,
+                "intime": str(item.intime) if item.intime else None,
+                "outtime": str(item.outtime) if item.outtime else None,
+            })
+
+        return JsonResponse(response, safe=False)
