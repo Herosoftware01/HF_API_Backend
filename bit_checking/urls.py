@@ -17,9 +17,9 @@ urlpatterns = [
     path('delete_checking/',views.delete_checking,name='delete_checking'),
     path('delete_single_checking/',views.delete_single_checking,name='delete_single_checking'),
     path('pending-scaners/', views.pending_scaner_ids),
-  
-  
-
+    path("qc_start/", views.qc_start),
+    path('delete_pending_scanner/',views.delete_pending_scanner),
+    
 ]
 
 if settings.DEBUG:

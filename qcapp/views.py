@@ -743,8 +743,24 @@ class EmpAllocateAPIView(APIView):
             )
 
         today = now().date()
+        
+        jobno = None
+        top_bottom = None
+        seq = None
 
-        # Check if employee already allocated today
+        if sequence:
+
+            parts = sequence.split("~")
+
+            if len(parts) >= 3:
+                jobno = parts[0]
+                top_bottom = parts[1]
+                seq = parts[2]
+
+            else:
+                seq = sequence
+
+
         allocation = emp_allocate.objects.filter(
             emp_code=emp_code,
             machine_id=machine_id,
@@ -753,14 +769,14 @@ class EmpAllocateAPIView(APIView):
             date=today  # use correct field
         ).first() # get latest allocation if multiple exist
 
-        # if allocation:
-        #     allocation.status = status
-        #     allocation.save()
-        #     return Response({"message": "Status updated"})
+        
         if allocation:
-            # Update case-layum sequence-ah save pannanum
+           
             allocation.status = status
-            allocation.seq = sequence if sequence else None # Empty string-ah irundha NULL-ah save aagum
+
+            allocation.jobno = jobno
+            allocation.top_bottom = top_bottom
+            allocation.seq = seq
             allocation.save()
             return Response({"message": "Status and Sequence updated"})
         else:
@@ -771,7 +787,10 @@ class EmpAllocateAPIView(APIView):
                 line=line,
                 status=status,
                 date=today,
-                seq=sequence if sequence else None,
+                jobno=jobno,
+                top_bottom=top_bottom,
+                seq=seq
+
             )
             return Response({"message": "Employee allocated"})
 
@@ -790,153 +809,6 @@ def get_process_sequence(request):
     return Response(serializer.data)
 
 
-# @api_view(['GET'])
-# def get_machine_employee(request, identity):
-#     print("identity",identity)
-#     try:
-#         identity = identity.rstrip('/')
-#         machine = machine_details.objects.get(Identity__iexact=identity)
-
-#         today = now().date()
-#         last_entry = emp_allocate.objects.filter(machine=machine, date=today).order_by('-id').first()
-
-#         emp_code = None
-#         emp_name = None
-#         photo_url = "https://www.example.com/default-profile.png"
-
-#         if last_entry:
-#             emp_code = last_entry.emp_code
-#             employee = Empwisesal.objects.using('main').filter(status='working', code=emp_code).first()
-#             if employee:
-#                 emp_name = employee.name
-#                 if employee.photo:
-#                     filename = employee.photo.split('\\')[-1]
-#                     staff_url = settings.STAFF_IMAGES_URL.rstrip('/')
-#                     photo_url = f"https://hfapi.herofashion.com/{staff_url}/{filename}"
-
-#         # Fetch matching processes from VueProcessSequence
-#         jobno = request.query_params.get('jobno')
-#         topbottom_des = request.query_params.get('topbottom_des')
-
-#         processes = []
-#         if jobno and topbottom_des:
-#             queryset = VueProcessSequence.objects.using('demo').filter(
-#                 jobno=jobno,
-#                 topbottom_des=topbottom_des,
-#                 mc=machine.mcgrp
-#             ).order_by('sl')
-            
-#             processes = [
-#                 {
-#                     "sl": p.sl,
-#                     "sl1": p.sl1,
-#                     "prsid": p.prsid,
-#                     "process_des": p.process_des,
-#                     "mc": p.mc
-#                 } for p in queryset
-#             ]
-
-#         return Response({
-#             "machine_identity": machine.Identity,
-#             "machine_id": machine.id,
-#             "mcgrp": machine.mcgrp,
-#             "emp_code": emp_code,
-#             "employee_name": emp_name,
-#             "emp_photo": photo_url,
-#             "has_data": True if last_entry else False,
-#             "processes": processes
-#         })
-
-#     except machine_details.DoesNotExist:
-#         return Response({
-#             "error": "Machine not found",
-#             "has_data": False,
-#             "processes": []
-#         }, status=404)
-
-
-# @api_view(['GET'])
-# def get_machine_employee(request, identity):
-#     print("identity",identity)
-#     try:
-#         unit = request.query_params.get('unit')
-#         line = request.query_params.get('line')
-#         print("unit==",unit, "line==",line)
-
-#         identity = identity.rstrip('/')
-#         machine = machine_details.objects.get(Identity__iexact=identity)
-#         # unit_data = Line.objects.filter(unit_id=unit,).values_list('line_number', flat=True).first()
-#         # print("unit_data",unit_data)
-#         today = now().date()
-#         last_entry = emp_allocate.objects.filter(machine=machine, date=today).order_by('-id').first()
-
-#         unit_data = Line.objects.filter(id=last_entry.line,line_number=line,unit_id=unit ).values_list('line_number', flat=True).first()
-
-#         print("last_entry",unit_data)
-
-#         emp_code = None
-#         emp_name = None
-#         photo_url = "https://www.example.com/default-profile.png"
-
-#         if last_entry:
-#             emp_code = last_entry.emp_code
-#             employee = Empwisesal.objects.using('main').filter(status='working', code=emp_code).first()
-#             if employee:
-#                 emp_name = employee.name
-#                 if employee.photo:
-#                     filename = employee.photo.split('\\')[-1]
-#                     staff_url = settings.STAFF_IMAGES_URL.rstrip('/')
-#                     photo_url = f"https://hfapi.herofashion.com/{staff_url}/{filename}"
-
-#         # Fetch matching processes from VueProcessSequence
-#         jobno = request.query_params.get('jobno')
-#         topbottom_des = request.query_params.get('topbottom_des')
-
-#         processes = []
-#         if jobno and topbottom_des:
-#             seq_match = list(
-#                 qc_piece_final.objects.filter(
-#                     jobno=jobno,
-#                     product=topbottom_des
-#                 ).values_list('seq', flat=True)
-#             )
-
-#             print("seq =", seq_match)
-#             queryset = VueProcessSequence.objects.using('demo').filter(
-#                 jobno=jobno,
-#                 topbottom_des=topbottom_des,
-#                 mc=machine.mcgrp
-#             ).order_by('sl')
-            
-#             processes = [
-#                 {
-#                     "sl": p.sl,
-#                     "sl1": p.sl1,
-#                     "prsid": p.prsid,
-#                     "process_des": p.process_des,
-#                     "mc": p.mc
-#                 } 
-#                 for p in queryset
-#                 if p.process_des not in seq_match
-#             ]
-
-#         return Response({
-#             "machine_identity": machine.Identity,
-#             "machine_id": machine.id,
-#             "mcgrp": machine.mcgrp,
-#             "emp_code": emp_code,
-#             "employee_name": emp_name,
-#             "emp_photo": photo_url,
-#             "has_data": True if last_entry else False,
-#             "processes": processes
-#         })
-
-#     except machine_details.DoesNotExist:
-#         return Response({
-#             "error": "Machine not found",
-#             "has_data": False,
-#             "processes": []
-#         }, status=404)
 
 
 @api_view(['GET'])

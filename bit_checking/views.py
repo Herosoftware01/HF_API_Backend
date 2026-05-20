@@ -3,10 +3,12 @@ from django.http import JsonResponse
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
-from .models import  Stickemp,VueMistakePartDetails, bit_checking_updates, BitcheckingPlyDetails, TrsCutstickerprodNew
+from .models import  Stickemp,VueMistakePartDetails, bit_checking_updates, BitcheckingPlyDetails, TrsCutstickerprodNew, bit_start_end_time
 from django.views.decorators.csrf import csrf_exempt
 import json
 from django.utils.dateparse import parse_datetime
+from django.utils import timezone
+
 
 def qr_api(request):
 
@@ -15,7 +17,7 @@ def qr_api(request):
     data = (
         TrsCutstickerprodNew.objects.using('demo')
         .filter(qrid=sl)
-        .values('qrid', 'pc', 'planno')
+        .values('qrid', 'pc', 'planno','tbid')
         .first()
     )
 
@@ -27,18 +29,23 @@ def qr_api(request):
 
     desc = list(
         VueMistakePartDetails.objects.using('demo')
-        .filter(planno=data['planno'])
+        .filter(planno=data['planno'], topbottom_id=data['tbid'])
         .values_list('det_part', flat=True)
     )
+
+    # ✅ START/END TABLE CHECK
+    start_entry = bit_start_end_time.objects.filter(
+        qrid=data['qrid']
+    ).first()
 
     saved_data = bit_checking_updates.objects.filter(
         scaner_id=data['qrid']
     )
 
 
-    if saved_data.exists():
+    if start_entry or saved_data.exists():
 
-        first = saved_data.first()
+        first = saved_data.first() if saved_data.exists() else None
 
         checked_data = {}
 
@@ -63,8 +70,9 @@ def qr_api(request):
             "pc": data['pc'],
 
             "employee": {
-                "code": first.emp_id
+                "code": first.emp_id if first else start_entry.empid
             },
+
 
             "descriptions": desc,
 
@@ -81,27 +89,11 @@ def qr_api(request):
         "descriptions": desc
     })
 
-# def emp_stick(request):
-#     queryset = Stickemp.objects.using('main').values()
-#     # Modify image paths
-#     for obj in queryset:
-#         raw_path = obj['photo'] if obj.get('photo') else None
-#         if raw_path:
-#             filename = raw_path.split('\\')[-1]
-#             obj['photo'] = f"http://10.1.21.153:7003/staff_images/{filename}"
-#         else:
-#             obj['photo'] = ""
-
-#     data = list(queryset)
-    
-#     return JsonResponse(data, safe=False)
-
 
 
 def emp_stick(request):
 
     from_date = parse_datetime("2026-05-18 08:28:55.931995")
-    
     existing_qr_ids = set(
         BitcheckingPlyDetails.objects.using('demo')
         .values_list('qr_id', flat=True)
@@ -238,6 +230,14 @@ def bitchecking_final_data(request):
                 }
             )
 
+            # UPDATE END TIME
+            bit_start_end_time.objects.filter(
+                qrid=scanner_id,
+                end__isnull=True
+            ).update(
+                end=timezone.now()
+            )
+
         return Response(
             {
                 "status": True,
@@ -312,6 +312,8 @@ def delete_checking(request):
             qr_id__in=scanner_ids
         ).delete()
 
+        bit_start_end_time.objects.filter(qrid__in=scanner_ids).delete()
+
         update_records.delete()
 
         return JsonResponse({
@@ -374,7 +376,7 @@ def delete_single_checking(request):
             "status": False,
             "message": str(e)
         })
-
+    
 
 
 def pending_scaner_ids(request):
@@ -388,27 +390,120 @@ def pending_scaner_ids(request):
         )
     )
 
-    queryset = bit_checking_updates.objects.filter(
-        date__gte=from_date
+    queryset = bit_start_end_time.objects.filter(
+        start__gte=from_date
     ).exclude(
-        scaner_id__in=existing_qr_ids
-    ).order_by('scaner_id', 'date')
+        qrid__in=existing_qr_ids
+    ).order_by('qrid', 'start')
 
     seen = set()
     unique_data = []
 
     for row in queryset:
-        if row.scaner_id not in seen:
-            seen.add(row.scaner_id)
+        if row.qrid not in seen:
+            seen.add(row.qrid)
+            has_update = bit_checking_updates.objects.filter(
+                scaner_id=row.qrid
+            ).exists()
             unique_data.append({
-                "scaner_id": row.scaner_id,
-                "emp_id": row.emp_id,
-                "date": row.date
+                "scaner_id": row.qrid,
+                "emp_id": row.empid,
+                "date": row.start,
+                "has_update": has_update
             })
 
     return JsonResponse({
         "status": "success",
         "count": len(unique_data),
         "data": unique_data
+    })
+
+
+from django.utils import timezone
+
+@csrf_exempt
+def qc_start(request):
+
+    if request.method == "POST":
+
+        data = json.loads(request.body)
+
+        qrid = data.get("qrid")
+        empid = data.get("empid")
+
+        already_exists = bit_start_end_time.objects.filter(
+            qrid=qrid
+        ).exists()
+
+        if already_exists:
+
+            return JsonResponse({
+                "status": False,
+                "message": "QRID already exists"
+            })
+
+        ist_time = timezone.now()
+
+        obj = bit_start_end_time.objects.create(
+            qrid=qrid,
+            empid=empid,
+            start=ist_time
+        )
+
+        return JsonResponse({
+            "status": True,
+            "id": obj.id
+        })
+
+    return JsonResponse({
+        "status": False
+    })
+
+
+
+
+@csrf_exempt
+def delete_pending_scanner(request):
+
+    if request.method == "POST":
+
+        try:
+
+            body = json.loads(request.body)
+
+            qrid = body.get("qrid")
+
+            if not qrid:
+                return JsonResponse({
+                    "status": False,
+                    "message": "QR ID missing"
+                })
+
+            deleted_count, _ = bit_start_end_time.objects.filter(
+                qrid=qrid
+            ).delete()
+
+            if deleted_count > 0:
+
+                return JsonResponse({
+                    "status": True,
+                    "message": "Deleted Successfully"
+                })
+
+            return JsonResponse({
+                "status": False,
+                "message": "No matching record found"
+            })
+
+        except Exception as e:
+
+            return JsonResponse({
+                "status": False,
+                "message": str(e)
+            })
+
+    return JsonResponse({
+        "status": False,
+        "message": "Invalid Request"
     })
 
