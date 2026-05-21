@@ -516,7 +516,7 @@ def empwisesal(request):
 @csrf_exempt
 def state(request):
     if request.method == 'GET':
-        data = Adreq.objects.using('mssql1').all()
+        data = Adreq.objects.using('mssql1').all().order_by('-entryno')
 
         # 🔍 Get query params
         empid = request.GET.get('empid')

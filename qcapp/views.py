@@ -7,7 +7,7 @@ from django.core.exceptions import ValidationError
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, permissions
-from .models import QcAdminMistake,cut_sample_data,cut_sample_data_final,VueUser,Unit,Needle_change,Line,roving_qc_mistake,qc_piece_final, MachineAllocation, machine_details, emp_allocate, Empwisesal, VueProcessSequence
+from .models import QcAdminMistake,Cont_employee,cut_sample_data,cut_sample_data_final,VueUser,Unit,Needle_change,Line,roving_qc_mistake,qc_piece_final, MachineAllocation, machine_details, emp_allocate, Empwisesal, VueProcessSequence
 from .serializers import QcAdminMistakeSerializer,UnitSerializer,MachineTrasnsferSerializer,MachineSerializer,LineSerializer, MachineAllocationSerializer, VueProcessSequenceSerializer
 from rest_framework.parsers import MultiPartParser, FormParser
 from collections import defaultdict
@@ -663,30 +663,43 @@ class MachineAllocationDetailAPIView(APIView):
 
 
 
+
 # class EmployeeAPIView(APIView):
 #     def get(self, request):
+#         employees = Empwisesal.objects.using('main').filter(status='working').values('code', 'name', 'photo', 'dept')
         
-#         employees = Empwisesal.objects.using('main').filter(status='working').values('code', 'name', 'photo','dept')
+#         staff_url = settings.STAFF_IMAGES_URL.rstrip('/')
 
-#         data = [
-#             {
+#         data = []
+#         for emp in employees:
+#             photo_url = None
+#             if emp.get('photo'):
+#                 filename = emp['photo'].split('\\')[-1]
+#                 photo_url = f"https://hfapi.herofashion.com/{staff_url}/{filename}"
+
+#             data.append({
 #                 "code": emp['code'],
 #                 "name": emp['name'],
 #                 "dept": emp['dept'],
-#             }
-#             for emp in employees
-#         ]
-      
+#                 "photo": photo_url,
+#             })
+
 #         return Response(data)
 
 
 class EmployeeAPIView(APIView):
     def get(self, request):
-        employees = Empwisesal.objects.using('main').filter(status='working').values('code', 'name', 'photo', 'dept')
-        
+
+        # 1. Main employees
+        employees = Empwisesal.objects.using('main').filter(
+            status='working'
+        ).values('code', 'name', 'photo', 'dept')
+
         staff_url = settings.STAFF_IMAGES_URL.rstrip('/')
 
         data = []
+
+        # Empwisesal data
         for emp in employees:
             photo_url = None
             if emp.get('photo'):
@@ -696,8 +709,22 @@ class EmployeeAPIView(APIView):
             data.append({
                 "code": emp['code'],
                 "name": emp['name'],
-                "dept": emp['dept'],
+                "dept": emp['dept'],   # already string in this table
                 "photo": photo_url,
+                "source": "empwisesal"
+            })
+
+        # 2. Contractor employees (Cont_employee + Mas_contractor)
+        contractors = Cont_employee.objects.select_related('con_id').all()
+
+        for emp in contractors:
+            contractor_name = emp.con_id.name if emp.con_id else ""
+            data.append({
+                "code": emp.code,
+                "name": f"{emp.name} ({contractor_name})",
+                "dept": emp.con_id.name if emp.con_id else None,  # Mas_contractor name
+                "photo": None,
+                "source": "contract_employee"
             })
 
         return Response(data)
