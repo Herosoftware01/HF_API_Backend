@@ -29,6 +29,7 @@ urlpatterns = [
     path('bit_checking/', include('bit_checking.urls')) ,
     path('advance/', include('advance.urls')),
     path('imp_reports/', include('imp_reports.urls')),
+    path('chat/', include('chat.urls')),
    
 
 ] 

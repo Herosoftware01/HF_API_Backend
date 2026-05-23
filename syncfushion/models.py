@@ -138,3 +138,16 @@ class SyncfusionGantt(models.Model):
 
     def __str__(self):
         return f"{self.taskid} - {self.taskname}"
+    
+class BlockEditor(models.Model):
+    id = models.BigAutoField(primary_key=True)
+    blocks = models.JSONField(default=list, help_text="JSON blocks from block editor")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'syncfusion_blockeditor'
+        ordering = ['-updated_at']
+
+    def __str__(self):
+        return f"Block Template - {self.id}"

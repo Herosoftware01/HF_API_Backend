@@ -2,21 +2,7 @@ from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from .models import *
 from rest_framework import generics, permissions
-# from rest_framework_recursive.fields import RecursiveField
 
-
-# class MyTokenSerializer(TokenObtainPairSerializer):
-#     @classmethod
-#     def get_token(cls, user):
-#         token = super().get_token(user)
-#         token["role"] = user.role.name if user.role else None
-#         return token
-
-
-
-# ------------------------------
-# Custom Token Serializer
-# ------------------------------
 class MyTokenSerializer(TokenObtainPairSerializer):
     @classmethod
     def get_token(cls, user):
@@ -45,58 +31,6 @@ class RoleSerializer(serializers.ModelSerializer):
     class Meta:
         model = Role
         fields = ["id", "name"]   
-
-
-# class UserSerializer(serializers.ModelSerializer):
-
-#     role_id = serializers.PrimaryKeyRelatedField(
-#         queryset=Role.objects.all(),
-#         source="role",
-#         write_only=True,
-#         required=False
-#     )
-
-#     role = serializers.SerializerMethodField(read_only=True)
-
-#     password = serializers.CharField(write_only=True, required=False)
-
-#     class Meta:
-#         model = User
-#         fields = [
-#             "id",
-#             "username",
-#             "email",
-#             "role",
-#             "role_id",
-#             "is_active",
-#             "date_joined",
-#             "password",
-#         ]
-
-#     def get_role(self, obj):
-#         return obj.role.name if obj.role else None
-
-#     def create(self, validated_data):
-#         password = validated_data.pop("password", None)
-#         user = User(**validated_data)
-
-#         if password:
-#             user.set_password(password)
-
-#         user.save()
-#         return user
-
-#     def update(self, instance, validated_data):
-#         password = validated_data.pop("password", None)
-
-#         for attr, value in validated_data.items():
-#             setattr(instance, attr, value)
-
-#         if password:
-#             instance.set_password(password)
-
-#         instance.save()
-#         return instance
 
 
 

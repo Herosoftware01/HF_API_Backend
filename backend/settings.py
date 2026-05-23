@@ -33,9 +33,30 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "https://hf.herofashion.com",
     "https://web.herofashion.com",
+    "https://hf.herofashion.com",
+    "https://hfapi.herofashion.com",
     "https://dev.herofashion.com",
-    "http://10.1.21.13:3000"
+    "http://10.1.21.13:3000",
 ]
+
+CSRF_TRUSTED_ORIGINS = [
+    "http://10.1.21.158:3000/",
+    "http://localhost:3000",
+    "https://hf.herofashion.com",
+    "https://hfapi.herofashion.com",
+    "https://web.herofashion.com",
+    "https://dev.herofashion.com",
+    "http://10.1.21.13:3000",
+    
+]
+# settings.py
+
+CSRF_COOKIE_SAMESITE = 'None'
+CSRF_COOKIE_SECURE = True
+
+SESSION_COOKIE_SAMESITE = 'None'
+SESSION_COOKIE_SECURE = True
+
 # Application definition
 
 INSTALLED_APPS = [
@@ -55,8 +76,10 @@ INSTALLED_APPS = [
     'reports',
     'bit_checking',
     'imp_reports',
+    'chat',
 ]
 
+X_FRAME_OPTIONS = 'ALLOWALL'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
@@ -80,6 +103,12 @@ REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ),
+}
+
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels.layers.InMemoryChannelLayer',
+    },
 }
 
 from datetime import timedelta
@@ -282,3 +311,9 @@ BOLD_REPORTS = {
     "USER_EMAIL": "admin@veahtech.com",
     "EMBED_SECRET_KEY": "RMkS8LRS119c632BGyGeScftReTRIRI",
 }
+
+
+LOGIN_URL = '/chat/login/'
+LOGIN_REDIRECT_URL = '/chat/'
+LOGOUT_REDIRECT_URL = '/chat/login/'
+ASGI_APPLICATION = 'backend.asgi.application'

@@ -1,0 +1,65 @@
+{% extends 'chat/base.html' %}
+{% block title %}Profile — ChatApp{% endblock %}
+{% block body %}
+<div style="min-height:100vh;background:#f0f2f5;display:flex;align-items:center;justify-content:center;padding:20px">
+  <div style="background:#fff;border-radius:16px;padding:36px;width:100%;max-width:480px;border:1px solid #e9edef">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px">
+      <a href="/" class="icon-btn"><i class="ti ti-arrow-left" style="font-size:20px"></i></a>
+      <h1 style="font-size:20px;font-weight:600">{% if is_own %}My Profile{% else %}{{ target_user.username }}'s Profile{% endif %}</h1>
+    </div>
+
+    <div style="text-align:center;margin-bottom:28px">
+      <div style="position:relative;display:inline-block">
+        {% if target_user.profile.avatar %}
+          <img src="{{ target_user.profile.avatar.url }}" style="width:96px;height:96px;border-radius:50%;object-fit:cover;border:3px solid #25D366"/>
+        {% else %}
+          <div style="width:96px;height:96px;border-radius:50%;background:#eeedfe;color:#534ab7;display:flex;align-items:center;justify-content:center;font-size:36px;font-weight:500;margin:0 auto;border:3px solid #25D366">{{ target_user.username|first|upper }}</div>
+        {% endif %}
+        {% if target_user.profile.is_online %}
+          <span style="position:absolute;bottom:4px;right:4px;width:14px;height:14px;background:#25D366;border-radius:50%;border:3px solid #fff"></span>
+        {% endif %}
+      </div>
+      <div style="font-size:20px;font-weight:600;margin-top:12px">{{ target_user.username }}</div>
+      {% if target_user.profile.bio %}<div style="font-size:14px;color:#667781;margin-top:4px">{{ target_user.profile.bio }}</div>{% endif %}
+      <div style="font-size:13px;margin-top:6px">
+        {% if target_user.profile.is_online %}<span style="color:#25D366">Online</span>{% else %}<span style="color:#667781">Offline</span>{% endif %}
+      </div>
+    </div>
+
+    {% if is_own %}
+    <form method="post" enctype="multipart/form-data">
+      {% csrf_token %}
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="form-group">
+          <label>First name</label>
+          <input name="first_name" class="form-control" value="{{ form.first_name.value|default:'' }}" placeholder="First name"/>
+        </div>
+        <div class="form-group">
+          <label>Last name</label>
+          <input name="last_name" class="form-control" value="{{ form.last_name.value|default:'' }}" placeholder="Last name"/>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Email</label>
+        <input name="email" type="email" class="form-control" value="{{ form.email.value|default:'' }}" placeholder="Email"/>
+      </div>
+      <div class="form-group">
+        <label>Bio</label>
+        <input name="bio" class="form-control" value="{{ form.bio.value|default:'' }}" placeholder="About me..."/>
+      </div>
+      <div class="form-group">
+        <label>Profile photo</label>
+        <input name="avatar" type="file" accept="image/*" class="form-control" style="padding:6px"/>
+      </div>
+      <button type="submit" class="btn btn-green" style="width:100%;padding:11px">Save Changes</button>
+    </form>
+    {% else %}
+    <div style="margin-top:8px">
+      <a href="{% url 'start_direct' target_user.id %}" class="btn btn-green" style="display:block;text-align:center;padding:11px">
+        <i class="ti ti-message" style="margin-right:6px"></i>Send Message
+      </a>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

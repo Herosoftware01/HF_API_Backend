@@ -7,7 +7,7 @@ from .models import GridSetting,TrsMaildtls
 from django.http import JsonResponse
 from rest_framework import status
 from rest_framework import viewsets
-from .models import GridSetting,DiWasg,DiWasg_img,TrsMaildtls, SyncfushionKanban, SyncfusionGantt
+from .models import GridSetting,DiWasg,DiWasg_img,TrsMaildtls, SyncfushionKanban, SyncfusionGantt, BlockEditor
 from .serializers import GridSettingSerializer,TrsMaildtlsSerializer
 from rest_framework.permissions import IsAuthenticated  # optional
 import json
@@ -468,6 +468,69 @@ def gantt_detail(request, id):
 
     elif request.method == "DELETE":
 
+        obj.delete()
+        return JsonResponse({
+            "message": "Deleted Successfully"
+        })
+    
+
+@csrf_exempt
+def block_list(request):
+
+    if request.method == "GET":
+        data = list(
+            BlockEditor.objects.using('mssql1').values())
+        return JsonResponse(data, safe=False)
+
+    elif request.method == "POST":
+        try:
+            body = json.loads(request.body)
+            obj = BlockEditor.objects.using('mssql1').create(
+                blocks=body.get("blocks", [])
+            )
+            return JsonResponse({
+                "message": "Created Successfully",
+                "id": obj.id
+            })
+
+        except Exception as e:
+            return JsonResponse({ "error": str(e) }, status=400)
+
+@csrf_exempt
+def block_detail(request, id):
+
+    try:
+        obj = BlockEditor.objects.using('mssql1').get(id=id)
+
+    except BlockEditor.DoesNotExist:
+        return JsonResponse({
+            "error": "Data Not Found"
+        }, status=404)
+
+    if request.method == "GET":
+        data = {
+            "id": obj.id,
+            "blocks": obj.blocks,
+            "created_at": obj.created_at,
+            "updated_at": obj.updated_at,
+        }
+        return JsonResponse(data)
+
+    elif request.method == "PUT":
+        try:
+            body = json.loads(request.body)
+            obj.blocks = body.get("blocks", obj.blocks)
+            obj.save(using='mssql1')
+            return JsonResponse({
+                "message": "Updated Successfully"
+            })
+
+        except Exception as e:
+            return JsonResponse({
+                "error": str(e)
+            }, status=400)
+
+    elif request.method == "DELETE":
         obj.delete()
         return JsonResponse({
             "message": "Deleted Successfully"
