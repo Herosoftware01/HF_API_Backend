@@ -7,7 +7,7 @@ from .models import GridSetting,TrsMaildtls
 from django.http import JsonResponse
 from rest_framework import status
 from rest_framework import viewsets
-from .models import GridSetting,DiWasg,DiWasg_img,TrsMaildtls, SyncfushionKanban
+from .models import GridSetting,DiWasg,DiWasg_img,TrsMaildtls, SyncfushionKanban, SyncfusionGantt
 from .serializers import GridSettingSerializer,TrsMaildtlsSerializer
 from rest_framework.permissions import IsAuthenticated  # optional
 import json
@@ -35,10 +35,6 @@ from .services.boldreports_service import (
     get_reports_list,
     export_report
 )
-
-    
-
-
 
 @api_view(['GET'])
 def token_api(request):
@@ -372,3 +368,107 @@ def tasks_delete(request, id):
 
         SyncfushionKanban.objects.using('mssql1').filter(Id=id).delete()
         return JsonResponse({ "message": "Deleted" })
+    
+from django.core.files.storage import FileSystemStorage   
+@csrf_exempt
+def upload_image(request):
+    if request.method == "POST":
+        image = request.FILES.get("image")
+        if not image:
+            return JsonResponse({
+                "status": False,
+                "message": "No image uploaded"
+            })
+        upload_path = r"\\adminserver\File Sharing\AAAA Hero\Images"
+        fs = FileSystemStorage(location=upload_path)
+        filename = fs.save(image.name, image)
+        saved_path = os.path.join(upload_path, filename)
+        return JsonResponse({
+            "status": True,
+            "filename": filename,
+            "saved_path": saved_path
+        })
+
+@csrf_exempt
+def gantt_list(request):
+
+    if request.method == "GET":
+        data = list(
+            SyncfusionGantt.objects.using('mssql1').values())
+        return JsonResponse(data, safe=False)
+
+    elif request.method == "POST":
+        body = json.loads(request.body)
+        obj = SyncfusionGantt.objects.using('mssql1').create(
+            taskid=body.get("taskid"),
+            taskname=body.get("taskname"),
+            startdate=body.get("startdate"),
+            enddate=body.get("enddate"),
+            progress=body.get("progress"),
+            status=body.get("status"),
+            priority=body.get("priority"),
+            assignee=body.get("assignee"),
+            resourcesimage=body.get("resourcesimage"),
+            department=body.get("department"),
+            predecessor=body.get("predecessor"),
+            parentid=body.get("parentid"),
+        )
+        return JsonResponse({
+            "message": "Created Successfully",
+            "taskid": obj.taskid
+        })
+
+@csrf_exempt
+def gantt_detail(request, id):
+    try:
+        obj = SyncfusionGantt.objects.using('mssql1').get(taskid=id)
+    except SyncfusionGantt.DoesNotExist:
+        return JsonResponse({
+            "error": "Data Not Found"
+        }, status=404)
+
+    if request.method == "GET":
+
+        data = {
+            "taskid": obj.taskid,
+            "taskname": obj.taskname,
+            "startdate": obj.startdate,
+            "enddate": obj.enddate,
+            "progress": obj.progress,
+            "status": obj.status,
+            "priority": obj.priority,
+            "assignee": obj.assignee,
+            "resourcesimage": obj.resourcesimage,
+            "department": obj.department,
+            "predecessor": obj.predecessor,
+            "parentid": obj.parentid,
+        }
+
+        return JsonResponse(data)
+
+    elif request.method == "PUT":
+        body = json.loads(request.body)
+
+        obj.taskname = body.get("taskname", obj.taskname)
+        obj.startdate = body.get("startdate", obj.startdate)
+        obj.enddate = body.get("enddate", obj.enddate)
+        obj.progress = body.get("progress", obj.progress)
+        obj.status = body.get("status", obj.status)
+        obj.priority = body.get("priority", obj.priority)
+        obj.assignee = body.get("assignee", obj.assignee)
+        obj.resourcesimage = body.get("resourcesimage", obj.resourcesimage)
+        obj.department = body.get("department", obj.department)
+        obj.predecessor = body.get("predecessor", obj.predecessor)
+        obj.parentid = body.get("parentid", obj.parentid)
+
+        obj.save(using='mssql1')
+        return JsonResponse({
+            "message": "Updated Successfully"
+        })
+
+    elif request.method == "DELETE":
+
+        obj.delete()
+        return JsonResponse({
+            "message": "Deleted Successfully"
+        })
