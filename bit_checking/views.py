@@ -123,7 +123,7 @@ def emp_stick(request):
 
         if raw_path:
             filename = raw_path.split('\\')[-1]
-            obj['photo'] = f"http://10.1.21.153:7003/staff_images/{filename}"
+            obj['photo'] = f"https://hfapi.herofashion.com/staff_images/{filename}"
         else:
             obj['photo'] = ""
 
