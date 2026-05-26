@@ -125,6 +125,22 @@ class FinalPlans(models.Model):
         managed = False
         db_table = 'final_plans'
 
+class LaySpreadingLayemployee(models.Model):
+    id = models.BigAutoField(primary_key=True)
+    emp1 = models.CharField(max_length=100, db_collation='Latin1_General_CI_AI')
+    emp2 = models.CharField(max_length=100, db_collation='Latin1_General_CI_AI')
+    emp3 = models.CharField(max_length=100, db_collation='Latin1_General_CI_AI')
+    emp4 = models.CharField(max_length=100, db_collation='Latin1_General_CI_AI')
+    emp5 = models.CharField(max_length=100, db_collation='Latin1_General_CI_AI')
+    emp6 = models.CharField(max_length=100, db_collation='Latin1_General_CI_AI')
+    table = models.IntegerField()
+    date = models.DateField()
+
+    class Meta:
+        managed = False
+        db_table = 'lay_spreading_layemployee'
+
+
 
 class MasterFinalMistake(models.Model):
     id = models.BigAutoField(primary_key=True)
