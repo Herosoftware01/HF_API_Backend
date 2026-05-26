@@ -2409,6 +2409,13 @@ def labour_attendance_api(request):
             code=att.code
         ).first()
 
+        # PHOTO URL
+        photo_url = None
+
+        if att.empimage:
+            filename = os.path.basename(str(att.empimage))
+            photo_url = f"https://hfapi.herofashion.com/staff_images/{filename}"
+
         data.append({
 
             # HrLabourattendence ALL COLUMNS
@@ -2423,7 +2430,7 @@ def labour_attendance_api(request):
             "shift_contract": att.shift_contract,
             "hostel": att.hostel,
             "gender": att.gender,
-            "empimage": att.empimage,
+            "photo_url": photo_url,
             "status": att.status,
             "date": att.date,
             "intime": att.intime,
