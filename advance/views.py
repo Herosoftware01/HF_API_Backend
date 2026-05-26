@@ -161,17 +161,7 @@ def request_advance(request):
             smon  = data.get('smon')
             syear = data.get('syear')
 
-            exists = Adreq.objects.using('mssql1').filter(
-                empid=empid,
-                smon=smon,
-                syear=syear
-            ).exists()
-
-            if exists:
-                return JsonResponse(
-                    {"error": "Already submitted"},
-                    status=400
-                )
+            # The validation check that blocked multiple submissions has been removed here.
 
             last = Adreq.objects.using('mssql1').aggregate(Max('entryno'))['entryno__max'] or 0
 
@@ -218,6 +208,9 @@ def request_advance(request):
             except Exception as mail_error:
                 print("MAIL ERROR:", str(mail_error))
 
+                # Note: If email fails, the advance record is still created in the DB above.
+                # Returning a 500 here might confuse the frontend since the save was actually successful.
+                # You might want to return 200 with a warning message instead in production.
                 return JsonResponse({"error": str(mail_error)}, status=500)
 
         except Exception as e:
@@ -492,7 +485,7 @@ def empwisesal(request):
             # Photo URL
             if rec.photo:
                 filename = os.path.basename(rec.photo)
-                photo_url = f"https://app.herofashion.com/staff_images/{filename}"
+                photo_url = f"https://hfapi.herofashion.com/staff_images/{filename}"
             else:
                 photo_url = None
 
@@ -505,6 +498,9 @@ def empwisesal(request):
                 "dept": rec.dept,
                 "salary": float(rec.salary) if rec.salary else None,
                 "wrkunit": rec.wrkunit,
+                "mobile": rec.mobile,
+                "accountdetails": rec.accountdetails,
+                "ifscno": rec.ifscno,
                 "designation": designation,   # ✅ replaced
                 "monthlysalary": rec.monthlysalary,
                 "photo": photo_url
