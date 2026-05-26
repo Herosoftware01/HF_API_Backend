@@ -5,7 +5,7 @@ import os
 import json
 from datetime import datetime
 from .models import LaySp, MasterFinalMistake, UnitBundlereport, FinalPlans,Corarlck1,CoraRollcheck,AttUnt,EmbAbsetnt,Holiday,LabAtt,RptCutting,VueOrdersinhand
-from .models import BillAge,BillMdapprove,BillPass,Leavempabsent,LaySpreadingLayemployee
+from .models import BillAge,BillMdapprove,BillPass,Leavempabsent,LaySpreadingLayemployee,HrLabourattendence,Employeeworking
 from django.db.models import F, Q , IntegerField,DateField,Case, When, Value,CharField
 from django.db import connections
 from django.db.models import OuterRef, Subquery
@@ -2395,3 +2395,53 @@ def pay_bill_details(request):
     return JsonResponse({
         "bills": list(bills.values())
     }, safe=False)
+
+
+def labour_attendance_api(request):
+
+    attendance_data = HrLabourattendence.objects.using('demo1').all()[:100]
+
+    data = []
+
+    for att in attendance_data:
+
+        emp = Employeeworking.objects.using('main').filter(
+            code=att.code
+        ).first()
+
+        data.append({
+
+            # HrLabourattendence ALL COLUMNS
+
+            "unit": att.unit,
+            "code": att.code,
+            "name": att.name,
+            "joindt": att.joindt,
+            "dept": att.dept,
+            "cat": att.cat,
+            "subcat": att.subcat,
+            "shift_contract": att.shift_contract,
+            "hostel": att.hostel,
+            "gender": att.gender,
+            "empimage": att.empimage,
+            "status": att.status,
+            "date": att.date,
+            "intime": att.intime,
+            "attendence_status": att.attendence_status,
+            "photo": att.photo,
+            "status1": att.status1,
+
+            # Employeeworking ALL COLUMNS
+
+            
+
+            "code": emp.code if emp else None,
+            "name": emp.name if emp else None,
+            "workunit": emp.workunit if emp else None,
+            "category": emp.category if emp else None,
+            "type": emp.type if emp else None,
+            
+
+        })
+
+    return JsonResponse(data, safe=False)

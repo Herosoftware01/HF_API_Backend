@@ -28,6 +28,7 @@ urlpatterns = [
     path('work_report/', views.workforce_trends_api, name='workforce_trends_api'),
     path('work_report1/', views.workforce_unit_trends_api, name='workforce_unit_trends_api'), 
     path('empleave/', views.empatlev, name='empleave'), 
+    path('emp_pre_abe/', views.labour_attendance_api, name='labour_attendance_api'),
 
 
 

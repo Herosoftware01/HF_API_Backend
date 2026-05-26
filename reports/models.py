@@ -568,3 +568,138 @@ class BillMdapprove(models.Model):
 
 
 
+class HrLabourattendence(models.Model):
+
+    unit = models.CharField(
+        db_column='Unit',
+        max_length=50,
+        blank=True,
+        null=True
+    )
+
+    code = models.IntegerField(primary_key=True)
+
+    name = models.CharField(
+        max_length=100,
+        blank=True,
+        null=True
+    )
+
+    joindt = models.DateTimeField(
+        db_column='JoinDt',
+        blank=True,
+        null=True
+    )
+
+    dept = models.CharField(
+        db_column='DEPT',
+        max_length=50
+    )
+
+    cat = models.CharField(
+        db_column='CAT',
+        max_length=50
+    )
+
+    subcat = models.CharField(
+        db_column='SUBCAT',
+        max_length=50
+    )
+
+    shift_contract = models.CharField(
+        db_column='Shift_Contract',
+        max_length=1,
+        blank=True,
+        null=True
+    )
+
+    hostel = models.CharField(
+        db_column='Hostel',
+        max_length=10
+    )
+
+    gender = models.CharField(
+        db_column='Gender',
+        max_length=6
+    )
+
+    empimage = models.CharField(
+        db_column='EmpImage',
+        max_length=8000,
+        blank=True,
+        null=True
+    )
+
+    status = models.CharField(
+        db_column='Status',
+        max_length=7
+    )
+
+    date = models.CharField(
+        db_column='Date',
+        max_length=4000,
+        blank=True,
+        null=True
+    )
+
+    intime = models.CharField(
+        db_column='InTime',
+        max_length=4000,
+        blank=True,
+        null=True
+    )
+
+    attendence_status = models.CharField(
+        db_column='Attendence Status',
+        max_length=14
+    )
+
+    photo = models.CharField(
+        max_length=400,
+        blank=True,
+        null=True
+    )
+
+    status1 = models.IntegerField()
+
+    class Meta:
+        managed = False
+        db_table = 'hr_Labourattendence'
+
+
+# =========================
+# DATABASE : demo
+# TABLE : EmployeeWorking
+# =========================
+
+class Employeeworking(models.Model):
+
+    code = models.IntegerField(primary_key=True)
+
+    name = models.CharField(
+        max_length=100,
+        blank=True,
+        null=True
+    )
+
+    workunit = models.CharField(
+        db_column='WorkUnit',
+        max_length=70,
+        blank=True,
+        null=True
+    )
+
+    category = models.CharField(
+        db_column='Category',
+        max_length=70,
+        blank=True,
+        null=True
+    )
+
+    type = models.CharField(
+        max_length=6
+    )
+
+    class Meta:
+        managed = False
+        db_table = 'EmployeeWorking'
