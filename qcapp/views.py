@@ -491,7 +491,6 @@ def get_last_bundle(request):
         "piece_no": piece,
         "checked_pieces": piece,
         "is_completed": is_completed,
-
         #  extra only for roving
         **roving_data
     })
