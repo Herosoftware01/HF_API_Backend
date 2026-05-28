@@ -676,7 +676,7 @@ def present_details(request):
 
             if emp["emppic"]:
                 filename = os.path.basename(str(emp["emppic"]))
-                photo_url = f"https://hf.herofashion.com/staff_images/{filename}"
+                photo_url = f"https://hfapi.herofashion.com/staff_images/{filename}"
 
             data.append({
                 "code": emp["code_emb_attendance_fact"],
@@ -721,7 +721,7 @@ def abs_details(request):
 
             if emp.photo:
                 filename = os.path.basename(str(emp.photo))
-                photo_url = f"https://hf.herofashion.com/staff_images/{filename}"
+                photo_url = f"https://hfapi.herofashion.com/staff_images/{filename}"
 
             data.append({
                 "date": emp.dt.strftime("%Y-%m-%d") if emp.dt else "",
@@ -1376,7 +1376,7 @@ def staff_pre(request):
                 try:
                     # Fix: Safely handle image path
                     filename = os.path.basename(str(emp['img']))
-                    photo_url = f"https://app.herofashion.com/staff_images/{filename}"
+                    photo_url = f"https://hfapi.herofashion.com/staff_images/{filename}"
                 except Exception:
                     photo_url = None
 
@@ -1430,7 +1430,7 @@ def staff_abe(request):
             if emp['photo']:
                
                     filename = os.path.basename(str(emp['photo']))
-                    photo_url = f"https://app.herofashion.com/staff_images/{filename}"
+                    photo_url = f"https://hfapi.herofashion.com/staff_images/{filename}"
             else:
                 photo_url = None
 
@@ -2399,7 +2399,7 @@ def pay_bill_details(request):
 
 def labour_attendance_api(request):
 
-    attendance_data = HrLabourattendence.objects.using('demo1').all()[:100]
+    attendance_data = HrLabourattendence.objects.using('demo1').all()
 
     data = []
 
@@ -2447,6 +2447,7 @@ def labour_attendance_api(request):
             "workunit": emp.workunit if emp else None,
             "category": emp.category if emp else None,
             "type": emp.type if emp else None,
+            
             
 
         })

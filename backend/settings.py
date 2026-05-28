@@ -37,6 +37,8 @@ CORS_ALLOWED_ORIGINS = [
     "https://hfapi.herofashion.com",
     "https://dev.herofashion.com",
     "http://10.1.21.13:3000",
+    "https://hfempdtls.netlify.app",
+    
 ]
 
 CSRF_TRUSTED_ORIGINS = [
@@ -47,6 +49,7 @@ CSRF_TRUSTED_ORIGINS = [
     "https://web.herofashion.com",
     "https://dev.herofashion.com",
     "http://10.1.21.13:3000",
+    "https://hfempdtls.netlify.app",
     
 ]
 # settings.py
