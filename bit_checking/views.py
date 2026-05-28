@@ -94,7 +94,6 @@ def qr_api(request):
 def emp_stick(request):
 
     from_date = parse_datetime("2026-05-18 08:28:55.931995")
-
     existing_qr_ids = set(
         BitcheckingPlyDetails.objects.using('demo')
         .values_list('qr_id', flat=True)
@@ -124,13 +123,14 @@ def emp_stick(request):
 
         if raw_path:
             filename = raw_path.split('\\')[-1]
-            obj['photo'] = f"http://10.1.21.153:7003/staff_images/{filename}"
+            obj['photo'] = f"https://hfapi.herofashion.com/staff_images/{filename}"
         else:
             obj['photo'] = ""
 
         data.append(obj)
 
     return JsonResponse(data, safe=False)
+
 
 
 @api_view(['POST'])
@@ -220,13 +220,13 @@ def bitchecking_final_data(request):
                     "emp_id": emp_id,
                     "total_pcs": total_qty,
 
-                    "ok_pcs": item.get("ok_pcs"),
-                    "mistake_pcs": item.get("mistake_count"),
-                    "mistake_ply": item.get("mistake_pcs"),
+                    "ok_pcs": item.get("ok_pcs") or 0,
+                    "mistake_pcs": item.get("mistake_count") or 0,
+                    "mistake_ply": item.get("mistake_pcs") or 0,
 
-                    "result": item.get("total_select_pcs"),
-                    "final_tpcs": item.get("final_tpcs"),
-                    "out_ply": item.get("out_pcs"),
+                    "result": item.get("total_select_pcs") or 0,
+                    "final_tpcs": item.get("final_tpcs") or 0,
+                    "out_ply": item.get("out_pcs") or 0,
                 }
             )
 

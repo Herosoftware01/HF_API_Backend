@@ -1,5 +1,5 @@
 from django.http import JsonResponse
-from .models import LaySp, MasterFinalMistake, UnitBundlereport, FinalPlans,Corarlck1,CoraRollcheck,BuntrackReport,LaySpreadingLayemployee,VueAdGrid1
+from .models import LaySp, MasterFinalMistake, UnitBundlereport, FinalPlans,Corarlck1,CoraRollcheck,BuntrackReport,LaySpreadingLayemployee,VueAdGrid1,VueStPunch
 from .models import QcappQcPieceFinal
 from django.db.models import Q
 from django.views.decorators.csrf import csrf_exempt
@@ -9,10 +9,10 @@ from django.db.models import OuterRef, Subquery
 from collections import Counter
 from datetime import date
 from django.utils.dateparse import parse_date
-
 from django.db.models import OuterRef, Subquery
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
+import os 
 
 @csrf_exempt
 def get_lay_sp_data(request): 
@@ -87,7 +87,7 @@ def get_unit_bundle_report_data(request):
     queryset = UnitBundlereport.objects.using("app").all()
 
     # Default start from 2026-04-20 if no start_date provided
-    effective_from = parse_date(start_date) if start_date else date(2026, 5, 10)
+    effective_from = parse_date(start_date) if start_date else date(2026, 5, 24)
     queryset = queryset.filter(s_date__date__gte=effective_from)
 
     # end_date is optional, only apply if provided
@@ -202,7 +202,7 @@ def unit_bundle(request):
         queryset = queryset.filter(unitname__in=target_units)
 
     # Default start from 2026-04-20 if no from_date provided
-    effective_from = parse_date(from_date) if from_date else date(2026, 5, 10)
+    effective_from = parse_date(from_date) if from_date else date(2026, 5, 24)
     queryset = queryset.filter(r_dt__date__gte=effective_from)
 
     # to_date is optional, only apply if provided
@@ -233,3 +233,30 @@ def qcroving(request):
         data = QcappQcPieceFinal.objects.using('default').all().filter(qc_type='rowing_qc').values()
         data_list = list(data)
         return JsonResponse(data_list, safe=False)
+    
+def punchst(request):
+
+    if request.method == 'GET':
+        data = VueStPunch.objects.using('demo1').all().order_by('-date', 'code')
+        response = []
+
+        for item in data:
+
+            photo_url = None
+
+            if item.photo:
+                filename = os.path.basename(str(item.photo))
+                photo_url = f"https://hfapi.herofashion.com/staff_images/{filename}"
+
+            response.append({
+                "slno": item.slno,
+                "name": item.name,
+                "code": item.code,
+                "date": item.date.strftime('%Y-%m-%d') if item.date else None,
+                "cat": item.cat,
+                "photo": photo_url,
+                "intime": str(item.intime) if item.intime else None,
+                "outtime": str(item.outtime) if item.outtime else None,
+            })
+
+        return JsonResponse(response, safe=False)

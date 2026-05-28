@@ -670,20 +670,27 @@ class MachineAllocationDetailAPIView(APIView):
 
 
 
+
 # class EmployeeAPIView(APIView):
 #     def get(self, request):
+#         employees = Empwisesal.objects.using('main').filter(status='working').values('code', 'name', 'photo', 'dept')
         
-#         employees = Empwisesal.objects.using('main').filter(status='working').values('code', 'name', 'photo','dept')
+#         staff_url = settings.STAFF_IMAGES_URL.rstrip('/')
 
-#         data = [
-#             {
+#         data = []
+#         for emp in employees:
+#             photo_url = None
+#             if emp.get('photo'):
+#                 filename = emp['photo'].split('\\')[-1]
+#                 photo_url = f"https://hfapi.herofashion.com/{staff_url}/{filename}"
+
+#             data.append({
 #                 "code": emp['code'],
 #                 "name": emp['name'],
 #                 "dept": emp['dept'],
-#             }
-#             for emp in employees
-#         ]
-      
+#                 "photo": photo_url,
+#             })
+
 #         return Response(data)
 
 

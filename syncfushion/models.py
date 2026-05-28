@@ -117,3 +117,37 @@ class SyncfushionKanban(models.Model):
     class Meta:
         managed = False
         db_table = 'syncfushion_kanban'
+
+class SyncfusionGantt(models.Model):
+    taskid = models.IntegerField(db_column='TaskId', primary_key=True) 
+    taskname = models.CharField(db_column='TaskName', max_length=255, blank=True, null=True) 
+    startdate = models.DateField(db_column='StartDate', blank=True, null=True) 
+    enddate = models.DateField(db_column='EndDate', blank=True, null=True) 
+    progress = models.IntegerField(db_column='Progress', blank=True, null=True) 
+    status = models.CharField(db_column='Status', max_length=100, blank=True, null=True) 
+    priority = models.CharField(db_column='Priority', max_length=50, blank=True, null=True) 
+    assignee = models.CharField(db_column='Assignee', max_length=150, blank=True, null=True) 
+    resourcesimage = models.TextField(db_column='resourcesImage', blank=True, null=True) 
+    department = models.CharField(db_column='Department', max_length=100, blank=True, null=True) 
+    predecessor = models.CharField(db_column='Predecessor', max_length=50, blank=True, null=True) 
+    parentid = models.IntegerField(db_column='ParentId', blank=True, null=True) 
+
+    class Meta:
+        managed = False
+        db_table = 'syncfusion_gantt'
+
+    def __str__(self):
+        return f"{self.taskid} - {self.taskname}"
+    
+class BlockEditor(models.Model):
+    id = models.BigAutoField(primary_key=True)
+    blocks = models.JSONField(default=list, help_text="JSON blocks from block editor")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'syncfusion_blockeditor'
+        ordering = ['-updated_at']
+
+    def __str__(self):
+        return f"Block Template - {self.id}"

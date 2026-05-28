@@ -1,0 +1,18 @@
+{% extends 'chat/base.html' %}
+{% block title %}ChatApp{% endblock %}
+{% block body %}
+<h2 class="sr-only">Chat application home — select a conversation or start a new one</h2>
+<div class="app-layout">
+  {% include 'chat/sidebar.html' %}
+  <div class="main-panel">
+    <div class="empty-panel">
+      <i class="ti ti-message-circle"></i>
+      <p style="font-size:18px;font-weight:500;color:#111">ChatApp</p>
+      <p>Select a conversation or start a new one</p>
+      <div style="display:flex;gap:10px;margin-top:8px">
+        <a href="{% url 'create_group' %}" class="btn btn-green"><i class="ti ti-users" style="margin-right:6px"></i>New Group</a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

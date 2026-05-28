@@ -5,7 +5,7 @@ import os
 import json
 from datetime import datetime
 from .models import LaySp, MasterFinalMistake, UnitBundlereport, FinalPlans,Corarlck1,CoraRollcheck,AttUnt,EmbAbsetnt,Holiday,LabAtt,RptCutting,VueOrdersinhand
-from .models import BillAge,BillMdapprove,BillPass,Leavempabsent
+from .models import BillAge,BillMdapprove,BillPass,Leavempabsent,LaySpreadingLayemployee,HrLabourattendence,Employeeworking
 from django.db.models import F, Q , IntegerField,DateField,Case, When, Value,CharField
 from django.db import connections
 from django.db.models import OuterRef, Subquery
@@ -246,32 +246,47 @@ def holdwagepaid_api(request):
 
 
 @csrf_exempt
-def get_lay_sp_data(request):
+def get_lay_sp_data(request): 
     if request.method == 'GET':
-        # Subquery definition
+        # 1. Define the FinalPlans Subquery
+        # We use .strip() logic conceptually, but in SQL, ensure these match.
         final_plan_qs = FinalPlans.objects.using('app').filter(
             plan_no=OuterRef('plan_no'),
             job_no=OuterRef('job_no')
         )
 
+        # 2. Define the Employee/Table Subquery 
+        # Joining based on the table_id and date from the FinalPlans 
+        # (Since LaySp doesn't have table_id directly)
+        emp_qs = LaySpreadingLayemployee.objects.using('app').filter(
+            table=OuterRef('final_plans__table_id'),
+            date=OuterRef('date')
+        )
+
         data = (
             LaySp.objects.using('app')
             .annotate(
-                # Use double underscores to match your React component's logic
+                # Fetching fields from FinalPlans
                 final_plans__pcs=Subquery(final_plan_qs.values('pcs')[:1]),
-                final_plans__table_id=Subquery(final_plan_qs.values('table_id')[:1]),
                 final_plans__empid=Subquery(final_plan_qs.values('empid')[:1]),
                 final_plans__marker_no=Subquery(final_plan_qs.values('marker_no')[:1]),
                 final_plans__lot_no=Subquery(final_plan_qs.values('lot_no')[:1]),
                 final_plans__fabric_color=Subquery(final_plan_qs.values('fabric_color')[:1]),
+                final_plans__date_time_fp=Subquery(final_plan_qs.values('date_time')[:1]),
+                
+                # Fetching Employee Data using the annotated table_id
+                emp_name_1=Subquery(emp_qs.values('emp1')[:1]),
+                emp_name_2=Subquery(emp_qs.values('emp2')[:1]),
+                table_id=Subquery(emp_qs.values('table')[:1]),
             )
             .values(
                 'date', 'timer', 'plan_no', 'job_no', 'roll_no', 'f_dia',
                 'plan_ply', 'scl_wgt', 'plan_obwgt', 'req_wgt', 'actual_dia',
                 'actual_ply', 'actual_obwgt', 'end_bit', 'bal_wgt', 'debit_kg',
                 'roll_time', 'remarks', 'bit_wgt', 'date_time',
-                'final_plans__pcs', 'final_plans__table_id', 'final_plans__empid',
-                'final_plans__marker_no', 'final_plans__lot_no', 'final_plans__fabric_color','final_plans__date_time'
+                'final_plans__pcs', 'final_plans__empid',
+                'final_plans__marker_no', 'final_plans__lot_no', 'final_plans__fabric_color',
+                'final_plans__date_time_fp', 'emp_name_1', 'emp_name_2', 'table_id'
             )
         )
 
@@ -661,7 +676,7 @@ def present_details(request):
 
             if emp["emppic"]:
                 filename = os.path.basename(str(emp["emppic"]))
-                photo_url = f"https://hf.herofashion.com/staff_images/{filename}"
+                photo_url = f"https://hfapi.herofashion.com/staff_images/{filename}"
 
             data.append({
                 "code": emp["code_emb_attendance_fact"],
@@ -706,7 +721,7 @@ def abs_details(request):
 
             if emp.photo:
                 filename = os.path.basename(str(emp.photo))
-                photo_url = f"https://hf.herofashion.com/staff_images/{filename}"
+                photo_url = f"https://hfapi.herofashion.com/staff_images/{filename}"
 
             data.append({
                 "date": emp.dt.strftime("%Y-%m-%d") if emp.dt else "",
@@ -1361,7 +1376,7 @@ def staff_pre(request):
                 try:
                     # Fix: Safely handle image path
                     filename = os.path.basename(str(emp['img']))
-                    photo_url = f"https://app.herofashion.com/staff_images/{filename}"
+                    photo_url = f"https://hfapi.herofashion.com/staff_images/{filename}"
                 except Exception:
                     photo_url = None
 
@@ -1415,7 +1430,7 @@ def staff_abe(request):
             if emp['photo']:
                
                     filename = os.path.basename(str(emp['photo']))
-                    photo_url = f"https://app.herofashion.com/staff_images/{filename}"
+                    photo_url = f"https://hfapi.herofashion.com/staff_images/{filename}"
             else:
                 photo_url = None
 
@@ -2380,3 +2395,61 @@ def pay_bill_details(request):
     return JsonResponse({
         "bills": list(bills.values())
     }, safe=False)
+
+
+def labour_attendance_api(request):
+
+    attendance_data = HrLabourattendence.objects.using('demo1').all()
+
+    data = []
+
+    for att in attendance_data:
+
+        emp = Employeeworking.objects.using('main').filter(
+            code=att.code
+        ).first()
+
+        # PHOTO URL
+        photo_url = None
+
+        if att.empimage:
+            filename = os.path.basename(str(att.empimage))
+            photo_url = f"https://hfapi.herofashion.com/staff_images/{filename}"
+
+        data.append({
+
+            # HrLabourattendence ALL COLUMNS
+
+            "unit": att.unit,
+            "code": att.code,
+            "name": att.name,
+            "joindt": att.joindt,
+            "dept": att.dept,
+            "cat": att.cat,
+            "subcat": att.subcat,
+            "shift_contract": att.shift_contract,
+            "hostel": att.hostel,
+            "gender": att.gender,
+            "photo_url": photo_url,
+            "status": att.status,
+            "date": att.date,
+            "intime": att.intime,
+            "attendence_status": att.attendence_status,
+            "photo": att.photo,
+            "status1": att.status1,
+
+            # Employeeworking ALL COLUMNS
+
+            
+
+            "code": emp.code if emp else None,
+            "name": emp.name if emp else None,
+            "workunit": emp.workunit if emp else None,
+            "category": emp.category if emp else None,
+            "type": emp.type if emp else None,
+            
+            
+
+        })
+
+    return JsonResponse(data, safe=False)

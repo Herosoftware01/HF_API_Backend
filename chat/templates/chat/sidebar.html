@@ -1,0 +1,122 @@
+{% load static %}
+<div class="sidebar">
+  <div class="sidebar-header">
+    <div class="sidebar-header-left">
+      {% if user.profile.avatar %}
+        <img src="{{ user.profile.avatar.url }}" class="avatar" width="36" height="36" style="border:2px solid #25D366"/>
+      {% else %}
+        <div class="avatar-placeholder" style="width:36px;height:36px;background:#e1f5ee;color:#0f6e56">{{ user.username|first|upper }}</div>
+      {% endif %}
+      <span class="sidebar-title">ChatApp</span>
+    </div>
+    <div class="header-actions">
+      <a href="{% url 'create_group' %}" class="icon-btn" title="New group"><i class="ti ti-users-plus"></i></a>
+      <a href="{% url 'profile' %}" class="icon-btn" title="Profile"><i class="ti ti-user-circle"></i></a>
+      <a href="{% url 'logout' %}" class="icon-btn" title="Logout"><i class="ti ti-logout"></i></a>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab-btn active" onclick="showTab('chats',this)">Chats</button>
+    <button class="tab-btn" onclick="showTab('people',this)">People</button>
+  </div>
+
+  <div id="tab-chats">
+    <div class="search-wrap">
+      <div class="search-inner">
+        <i class="ti ti-search"></i>
+        <input type="text" id="chatSearch" placeholder="Search chats..." oninput="filterChats(this.value)"/>
+      </div>
+    </div>
+    <div class="chat-list" id="chatList">
+      {% for rd in rooms_data %}
+      <a href="{% url 'room' rd.room.id %}" class="chat-item {% if request.resolver_match.kwargs.room_id == rd.room.id|stringformat:'s' %}active{% endif %}" data-name="{{ rd.display_name|lower }}">
+        <div class="online-wrap">
+          {% if rd.display_avatar %}
+            <img src="{{ rd.display_avatar }}" class="avatar" width="46" height="46"/>
+          {% else %}
+            <div class="avatar-placeholder" style="width:46px;height:46px;background:{% if rd.room.room_type == 'group' %}#e6f1fb{% else %}#eeedfe{% endif %};color:{% if rd.room.room_type == 'group' %}#185fa5{% else %}#534ab7{% endif %}">
+              {% if rd.room.room_type == 'group' %}<i class="ti ti-users" style="font-size:18px"></i>{% else %}{{ rd.display_name|first|upper }}{% endif %}
+            </div>
+          {% endif %}
+          {% if rd.room.room_type == 'direct' %}
+            {% with other=rd.room.get_other_user %}
+              {% if other and other.profile.is_online %}<span class="online-dot"></span>{% else %}<span class="offline-dot"></span>{% endif %}
+            {% endwith %}
+          {% endif %}
+        </div>
+        <div class="chat-item-info">
+          <div class="chat-name-row">
+            <span class="chat-name">{{ rd.display_name }}</span>
+            <span class="chat-time">{% if rd.last_msg %}{{ rd.last_msg.timestamp|time:"g:i A" }}{% endif %}</span>
+          </div>
+          <div class="chat-preview">
+            <span>
+              {% if rd.last_msg %}
+                {% if rd.last_msg.file %}<i class="ti ti-paperclip" style="font-size:12px"></i> {{ rd.last_msg.file_name|default:"File" }}{% else %}{{ rd.last_msg.content|truncatechars:36 }}{% endif %}
+              {% else %}No messages yet{% endif %}
+            </span>
+            {% if rd.unread > 0 %}<span class="unread-badge">{{ rd.unread }}</span>{% endif %}
+          </div>
+        </div>
+      </a>
+      {% empty %}
+      <div style="text-align:center;padding:40px 20px;color:#667781;font-size:13px">
+        <i class="ti ti-message-off" style="font-size:32px;opacity:.3;display:block;margin-bottom:8px"></i>
+        No conversations yet.<br/>Find people in the People tab.
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div id="tab-people" style="display:none">
+    <div class="search-wrap">
+      <div class="search-inner">
+        <i class="ti ti-search"></i>
+        <input type="text" id="peopleSearch" placeholder="Search people..." oninput="filterPeople(this.value)"/>
+      </div>
+    </div>
+    <div class="chat-list" id="peopleList">
+      {% for u in all_users %}
+      <div class="chat-item" data-name="{{ u.username|lower }}" onclick="window.location='{% url 'start_direct' u.id %}'">
+        <div class="online-wrap">
+          {% if u.profile.avatar %}
+            <img src="{{ u.profile.avatar.url }}" class="avatar" width="46" height="46"/>
+          {% else %}
+            <div class="avatar-placeholder" style="width:46px;height:46px;background:#eeedfe;color:#534ab7">{{ u.username|first|upper }}</div>
+          {% endif %}
+          {% if u.profile.is_online %}<span class="online-dot"></span>{% else %}<span class="offline-dot"></span>{% endif %}
+        </div>
+        <div class="chat-item-info">
+          <div class="chat-name-row">
+            <span class="chat-name">{{ u.username }}</span>
+            {% if u.profile.is_online %}<span style="font-size:11px;color:#25D366">online</span>{% endif %}
+          </div>
+          <div class="chat-preview"><span>{{ u.profile.bio|default:"No bio"|truncatechars:40 }}</span></div>
+        </div>
+      </div>
+      {% empty %}
+      <div style="text-align:center;padding:40px 20px;color:#667781">No other users yet.</div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<script>
+function showTab(tab, btn) {
+  document.getElementById('tab-chats').style.display = tab === 'chats' ? 'block' : 'none';
+  document.getElementById('tab-people').style.display = tab === 'people' ? 'block' : 'none';
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+function filterChats(q) {
+  document.querySelectorAll('#chatList .chat-item').forEach(el => {
+    el.style.display = el.dataset.name.includes(q.toLowerCase()) ? '' : 'none';
+  });
+}
+function filterPeople(q) {
+  document.querySelectorAll('#peopleList .chat-item').forEach(el => {
+    el.style.display = el.dataset.name.includes(q.toLowerCase()) ? '' : 'none';
+  });
+}
+</script>
