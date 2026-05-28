@@ -71,7 +71,6 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-
 CORS_ALLOW_ALL_ORIGINS = True
 
 AUTH_USER_MODEL = 'herofashion.User'
@@ -269,7 +268,6 @@ EMAIL_PORT = 587
 EMAIL_USE_TLS = True
 EMAIL_HOST_USER = 'hfautomation2026@gmail.com'
 EMAIL_HOST_PASSWORD = 'tmiy sjdd vbon omsd'   
-
 
 
 DEFAULT_FROM_EMAIL = EMAIL_HOST_USER

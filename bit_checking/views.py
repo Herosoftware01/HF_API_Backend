@@ -17,7 +17,7 @@ def qr_api(request):
     data = (
         TrsCutstickerprodNew.objects.using('demo')
         .filter(qrid=sl)
-        .values('qrid', 'pc', 'planno')
+        .values('qrid', 'pc', 'planno','tbid')
         .first()
     )
 
@@ -29,7 +29,7 @@ def qr_api(request):
 
     desc = list(
         VueMistakePartDetails.objects.using('demo')
-        .filter(planno=data['planno'])
+        .filter(planno=data['planno'], topbottom_id=data['tbid'])
         .values_list('det_part', flat=True)
     )
 
@@ -312,6 +312,8 @@ def delete_checking(request):
             qr_id__in=scanner_ids
         ).delete()
 
+        bit_start_end_time.objects.filter(qrid__in=scanner_ids).delete()
+
         update_records.delete()
 
         return JsonResponse({
@@ -400,10 +402,14 @@ def pending_scaner_ids(request):
     for row in queryset:
         if row.qrid not in seen:
             seen.add(row.qrid)
+            has_update = bit_checking_updates.objects.filter(
+                scaner_id=row.qrid
+            ).exists()
             unique_data.append({
                 "scaner_id": row.qrid,
                 "emp_id": row.empid,
-                "date": row.start
+                "date": row.start,
+                "has_update": has_update
             })
 
     return JsonResponse({
@@ -451,4 +457,50 @@ def qc_start(request):
 
     return JsonResponse({
         "status": False
+    })
+
+
+@csrf_exempt
+def delete_pending_scanner(request):
+
+    if request.method == "POST":
+
+        try:
+
+            body = json.loads(request.body)
+
+            qrid = body.get("qrid")
+
+            if not qrid:
+                return JsonResponse({
+                    "status": False,
+                    "message": "QR ID missing"
+                })
+
+            deleted_count, _ = bit_start_end_time.objects.filter(
+                qrid=qrid
+            ).delete()
+
+            if deleted_count > 0:
+
+                return JsonResponse({
+                    "status": True,
+                    "message": "Deleted Successfully"
+                })
+
+            return JsonResponse({
+                "status": False,
+                "message": "No matching record found"
+            })
+
+        except Exception as e:
+
+            return JsonResponse({
+                "status": False,
+                "message": str(e)
+            })
+
+    return JsonResponse({
+        "status": False,
+        "message": "Invalid Request"
     })
