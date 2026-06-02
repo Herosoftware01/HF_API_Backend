@@ -2447,6 +2447,8 @@ def labour_attendance_api(request):
             "workunit": emp.workunit if emp else None,
             "category": emp.category if emp else None,
             "type": emp.type if emp else None,
+
+            
             
 
         })
