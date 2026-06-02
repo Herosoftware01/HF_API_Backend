@@ -672,7 +672,7 @@ class HrLabourattendence(models.Model):
 # TABLE : EmployeeWorking
 # =========================
 
-class Employeeworking(models.Model):
+class Employeeworking1(models.Model):
 
     code = models.IntegerField(primary_key=True)
 

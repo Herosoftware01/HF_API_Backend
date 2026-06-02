@@ -5,7 +5,7 @@ import os
 import json
 from datetime import datetime
 from .models import LaySp, MasterFinalMistake, UnitBundlereport, FinalPlans,Corarlck1,CoraRollcheck,AttUnt,EmbAbsetnt,Holiday,LabAtt,RptCutting,VueOrdersinhand
-from .models import BillAge,BillMdapprove,BillPass,Leavempabsent,LaySpreadingLayemployee,HrLabourattendence,Employeeworking
+from .models import BillAge,BillMdapprove,BillPass,Leavempabsent,LaySpreadingLayemployee,HrLabourattendence,Employeeworking1
 from django.db.models import F, Q , IntegerField,DateField,Case, When, Value,CharField
 from django.db import connections
 from django.db.models import OuterRef, Subquery
@@ -2405,7 +2405,7 @@ def labour_attendance_api(request):
 
     for att in attendance_data:
 
-        emp = Employeeworking.objects.using('main').filter(
+        emp = Employeeworking1.objects.using('main').filter(
             code=att.code
         ).first()
 

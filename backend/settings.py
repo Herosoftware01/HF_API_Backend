@@ -38,27 +38,30 @@ CORS_ALLOWED_ORIGINS = [
     "https://dev.herofashion.com",
     "http://10.1.21.13:3000",
     "https://hfempdtls.netlify.app",
+    "http://10.1.21.110:7003",
     
 ]
 
 CSRF_TRUSTED_ORIGINS = [
     "http://10.1.21.158:3000/",
     "http://localhost:3000",
+    "http://10.1.21.110:7003",
     "https://hf.herofashion.com",
     "https://hfapi.herofashion.com",
     "https://web.herofashion.com",
     "https://dev.herofashion.com",
     "http://10.1.21.13:3000",
     "https://hfempdtls.netlify.app",
+    "http://10.1.21.110:7003",
     
 ]
 # settings.py
 
-CSRF_COOKIE_SAMESITE = 'None'
-CSRF_COOKIE_SECURE = True
+CSRF_COOKIE_SAMESITE = 'Lax' if DEBUG else 'None'
+CSRF_COOKIE_SECURE = not DEBUG
 
-SESSION_COOKIE_SAMESITE = 'None'
-SESSION_COOKIE_SECURE = True
+SESSION_COOKIE_SAMESITE = 'Lax' if DEBUG else 'None'
+SESSION_COOKIE_SECURE = not DEBUG
 
 # Application definition
 
@@ -85,6 +88,11 @@ INSTALLED_APPS = [
 X_FRAME_OPTIONS = 'ALLOWALL'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+if DEBUG:
+    SECURE_CROSS_ORIGIN_OPENER_POLICY = None
+else:
+    SECURE_CROSS_ORIGIN_OPENER_POLICY = "same-origin"
 
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',

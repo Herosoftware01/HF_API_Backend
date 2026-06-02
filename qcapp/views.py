@@ -12,7 +12,6 @@ from .serializers import QcAdminMistakeSerializer,UnitSerializer,MachineTrasnsfe
 from rest_framework.parsers import MultiPartParser, FormParser
 from collections import defaultdict
 from django.shortcuts import get_object_or_404
-
 from datetime import date
 from django.utils.timezone import now
 from django.conf import settings
@@ -816,7 +815,6 @@ class EmpAllocateAPIView(APIView):
 
             else:
                 seq = sequence
-
 
         allocation = emp_allocate.objects.filter(
             emp_code=emp_code,

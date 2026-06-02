@@ -37,6 +37,7 @@ class Stickemp(models.Model):
 
 class VueMistakePartDetails(models.Model):
     rownum = models.BigIntegerField(db_column='RowNum', primary_key=True)  # Field name made lowercase.
+    qrid = models.IntegerField(db_column='QrID')
     planno = models.IntegerField(db_column='Planno')  # Field name made lowercase.
     jobno = models.CharField(max_length=50)
     markerno = models.IntegerField(db_column='Markerno')  # Field name made lowercase.
@@ -61,6 +62,7 @@ class bit_checking_updates(models.Model):
     date = models.DateTimeField(auto_now_add=True)
     plan_no = models.IntegerField()
     total_select_pcs = models.TextField()
+    entry_mood=models.CharField(max_length=50, blank=True, null=True)
 
 
 

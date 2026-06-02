@@ -290,54 +290,51 @@ class VueUser(models.Model):
 
 class Mas_contractor(models.Model):
     name = models.CharField(max_length=100)
-    code = models.CharField(max_length=50, blank=True, unique=True)
+    code = models.CharField(max_length=4, unique=True, blank=True)
 
     def __str__(self):
         return self.name
 
     def save(self, *args, **kwargs):
         if not self.code:
-            prefix = self.name[:2].lower()
+            last = Mas_contractor.objects.order_by('-id').first()
 
-            # same prefix உள்ள last record எடுக்க
-            last = Mas_contractor.objects.filter(
-                code__startswith=prefix
-            ).order_by('-code').first()
-
-            if last:
-                last_number = int(last.code[-4:])
+            if last and last.code:
+                last_number = int(last.code)
                 new_number = last_number + 1
             else:
                 new_number = 1
 
-            self.code = f"{prefix}{new_number:04d}"
+            self.code = f"{new_number:04d}"
 
         super().save(*args, **kwargs)
 
 
 class Cont_employee(models.Model):
     name = models.CharField(max_length=100)
-    code = models.CharField(max_length=50, blank=True, unique=True)
     con_id = models.ForeignKey(Mas_contractor, on_delete=models.CASCADE)
+    code = models.CharField(max_length=4, unique=True, blank=True)
 
     def __str__(self):
         return f"{self.name} ({self.code})"
 
     def save(self, *args, **kwargs):
         if not self.code:
-            prefix = self.name[:2].lower()
+            contractor_code = self.con_id.code  # e.g. 1234
+
+            prefix = contractor_code[-2:]  # last 2 digits -> "34"
 
             last = Cont_employee.objects.filter(
-                code__startswith=prefix
-            ).order_by('-code').first()
+                con_id=self.con_id
+            ).order_by('-id').first()
 
-            if last:
-                last_number = int(last.code[-4:])
-                new_number = last_number + 1
+            if last and last.code:
+                last_seq = int(last.code[-2:])  # last 2 digits sequence
+                new_seq = last_seq + 1
             else:
-                new_number = 1
+                new_seq = 1
 
-            self.code = f"{prefix}{new_number:04d}"
+            self.code = f"{prefix}{new_seq:02d}"  # 3401, 3402...
 
         super().save(*args, **kwargs)
 
