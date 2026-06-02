@@ -8,25 +8,27 @@
 from django.db import models
 
 
-class HrLabourattendence(models.Model):
-    unit = models.CharField(db_column='Unit', max_length=50, blank=True, null=True)  # Field name made lowercase.
-    code = models.IntegerField()
-    name = models.CharField(max_length=100, blank=True, null=True)
-    joindt = models.DateTimeField(db_column='JoinDt', blank=True, null=True)  # Field name made lowercase.
-    dept = models.CharField(db_column='DEPT', max_length=50)  # Field name made lowercase.
-    cat = models.CharField(db_column='CAT', max_length=50)  # Field name made lowercase.
-    subcat = models.CharField(db_column='SUBCAT', max_length=50)  # Field name made lowercase.
-    shift_contract = models.CharField(db_column='Shift_Contract', max_length=1, blank=True, null=True)  # Field name made lowercase.
-    hostel = models.CharField(db_column='Hostel', max_length=10)  # Field name made lowercase.
-    gender = models.CharField(db_column='Gender', max_length=6)  # Field name made lowercase.
-    empimage = models.CharField(db_column='EmpImage', max_length=8000, blank=True, null=True)  # Field name made lowercase.
-    status = models.CharField(db_column='Status', max_length=7)  # Field name made lowercase.
-    date = models.CharField(db_column='Date', max_length=4000, blank=True, null=True)  # Field name made lowercase.
-    intime = models.CharField(db_column='InTime', max_length=4000, blank=True, null=True)  # Field name made lowercase.
-    attendence_status = models.CharField(db_column='Attendence Status', max_length=14)  # Field name made lowercase. Field renamed to remove unsuitable characters.
-    photo = models.CharField(max_length=400, blank=True, null=True)
-    status1 = models.IntegerField()
+class TmpPrdprn(models.Model):
+    ip = models.CharField(max_length=50, db_collation='SQL_Latin1_General_CP1_CI_AS')
+    unit = models.CharField(db_column='Unit', max_length=50, db_collation='SQL_Latin1_General_CP1_CI_AS')  # Field name made lowercase.
+    jobno = models.CharField(db_column='Jobno', max_length=50, db_collation='SQL_Latin1_General_CP1_CI_AS')  # Field name made lowercase.
+    tb = models.CharField(db_column='Tb', max_length=50, db_collation='SQL_Latin1_General_CP1_CI_AS')  # Field name made lowercase.
+    clr = models.CharField(max_length=50, db_collation='SQL_Latin1_General_CP1_CI_AS')
+    bc = models.IntegerField()
+    sew = models.IntegerField()
+    che = models.IntegerField()
+    irn = models.IntegerField()
+    pack = models.IntegerField()
+    oth = models.IntegerField()
+    mist = models.IntegerField()
+    trstype = models.CharField(max_length=80, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)
+    ordqty = models.IntegerField(blank=True, null=True)
+    fc = models.IntegerField(blank=True, null=True)
+    allotqty = models.IntegerField(blank=True, null=True)
+    cutqtyqty = models.IntegerField(blank=True, null=True)
+    rejqty = models.IntegerField(blank=True, null=True)
+    singer = models.IntegerField(blank=True, null=True)
 
     class Meta:
         managed = False
-        db_table = 'hr_Labourattendence'
+        db_table = '_tmp_prdprn'
