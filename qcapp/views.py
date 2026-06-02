@@ -283,6 +283,72 @@ def save_piece(request):
 
 
 
+# @api_view(["POST"])
+# def save_final_piece(request):
+#     try:
+#         bundle_no = request.data.get("bundle_no")
+#         bundle_id = request.data.get("bundle_id")
+#         jobno = request.data.get("jobno")
+#         product = request.data.get("product")
+#         color = request.data.get("color")
+#         size = request.data.get("size")
+#         unit = request.data.get("unit")
+#         line = request.data.get("line")
+#         machine_id = request.data.get("machineId")
+#         user_id = request.data.get("userId", None)
+#         seq = request.data.get("seq")
+#         qc_type = request.data.get("qc_type")
+#         total_pieces = int(request.data.get("total_pieces", 0))
+#         checked_piece = int(request.data.get("checked_piece", 0))
+#         force_save = request.data.get("force_save", False)
+
+#         if not bundle_id:
+#             return Response({"error": "bundle_id is required"}, status=400)
+
+#         if total_pieces == 0:
+#             return Response({"error": "total_pieces cannot be 0"}, status=400)
+
+#         if checked_piece < total_pieces and not force_save:
+#             return Response(
+#                 {
+#                     "error": "All pieces not checked. Enable force save to continue.",
+#                     "checked_piece": checked_piece,
+#                     "total_pieces": total_pieces,
+#                 },
+#                 status=status.HTTP_400_BAD_REQUEST,
+#             )
+
+#         qc_piece_final.objects.create(
+#             bundle_no=bundle_no,
+#             bundle_id=bundle_id,
+#             jobno=jobno,
+#             product=product,
+#             color=color,
+#             size=size,
+#             line=line,
+#             unit=unit,
+#             qc_type=qc_type,
+#             total_pieces=total_pieces,
+#             checked_piece=checked_piece,
+#             force_save=force_save,
+#             user_id=user_id,
+#             seq=seq,
+#             machine_id=machine_id
+#         )
+
+#         return Response(
+#             {
+#                 "message": "Saved successfully",
+#                 "checked_piece": checked_piece,
+#                 "total_pieces": total_pieces,
+#                 "force_save": force_save,
+#             },
+#             status=status.HTTP_201_CREATED,
+#         )
+
+#     except Exception as e:
+#         return Response({"error": str(e)}, status=500)
+
 @api_view(["POST"])
 def save_final_piece(request):
     try:
@@ -303,10 +369,16 @@ def save_final_piece(request):
         force_save = request.data.get("force_save", False)
 
         if not bundle_id:
-            return Response({"error": "bundle_id is required"}, status=400)
+            return Response(
+                {"error": "bundle_id is required"},
+                status=400
+            )
 
         if total_pieces == 0:
-            return Response({"error": "total_pieces cannot be 0"}, status=400)
+            return Response(
+                {"error": "total_pieces cannot be 0"},
+                status=400
+            )
 
         if checked_piece < total_pieces and not force_save:
             return Response(
@@ -318,37 +390,42 @@ def save_final_piece(request):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        qc_piece_final.objects.create(
-            bundle_no=bundle_no,
+        # ✅ UPDATE if exists else CREATE
+        obj, created = qc_piece_final.objects.update_or_create(
             bundle_id=bundle_id,
-            jobno=jobno,
-            product=product,
-            color=color,
-            size=size,
-            line=line,
-            unit=unit,
             qc_type=qc_type,
-            total_pieces=total_pieces,
-            checked_piece=checked_piece,
-            force_save=force_save,
-            user_id=user_id,
             seq=seq,
-            machine_id=machine_id
+
+            defaults={
+                "bundle_no": bundle_no,
+                "jobno": jobno,
+                "product": product,
+                "color": color,
+                "size": size,
+                "line": line,
+                "unit": unit,
+                "total_pieces": total_pieces,
+                "checked_piece": checked_piece,
+                "force_save": force_save,
+                "user_id": user_id,
+                "machine_id": machine_id,
+            }
         )
 
         return Response(
             {
-                "message": "Saved successfully",
+                "message": "Updated successfully" if not created else "Saved successfully",
                 "checked_piece": checked_piece,
                 "total_pieces": total_pieces,
                 "force_save": force_save,
+                "created": created
             },
-            status=status.HTTP_201_CREATED,
+            status=status.HTTP_200_OK,
         )
 
     except Exception as e:
         return Response({"error": str(e)}, status=500)
-    
+
 
 @api_view(["GET"])
 def get_last_bundle(request):
@@ -358,12 +435,16 @@ def get_last_bundle(request):
     line = request.GET.get("line")
     qc_type = request.GET.get("qc_type")
     seq = request.GET.get("seq")
+    bundle_id = request.GET.get("bundle_id")
+    # bundle_id = request.GET.get("bundle_id")
 
     last = qc_piece_data.objects.filter(
         unit=unit,
         line=line,
         qc_type=qc_type,
-        seq__iexact=seq
+        seq__iexact=seq,
+        bundle_id=bundle_id
+        
     ).order_by("-id").first()
 
     if not last:
@@ -410,85 +491,10 @@ def get_last_bundle(request):
         "piece_no": piece,
         "checked_pieces": piece,
         "is_completed": is_completed,
-
         #  extra only for roving
         **roving_data
     })
 
-
-
-# @api_view(["GET"])
-# def get_last_bundle(request):
-#     from .models import qc_piece_data, qc_piece_final, roving_qc_mistake
-
-#     unit = request.GET.get("unit")
-#     line = request.GET.get("line")
-#     qc_type = request.GET.get("qc_type")
-#     seq = request.GET.get("seq")
-
-#     # completed bundle ids
-#     completed_bundle_ids = qc_piece_final.objects.filter(
-#         unit=unit,
-#         line=line,
-#         qc_type=qc_type,
-#         seq__iexact=seq
-#     ).values_list("bundle_id", flat=True)
-
-#     # get latest non-completed bundle
-#     last = qc_piece_data.objects.filter(
-#         unit=unit,
-#         line=line,
-#         qc_type=qc_type,
-#         seq__iexact=seq
-#     ).exclude(
-#         bundle_id__in=completed_bundle_ids
-#     ).order_by("-id").first()
-
-#     if not last:
-#         return Response({"error": "No pending bundle found"}, status=404)
-
-#     bundle_id = last.bundle_id
-#     piece = last.piece_no
-
-#     roving_data = {}
-
-#     if qc_type and qc_type.strip().lower() == "rowing_qc":
-#         mistakes = roving_qc_mistake.objects.filter(
-#             qc_piece__bundle_id=last.bundle_id,
-#             seq__iexact=seq
-#         )
-
-#         roving_data = {
-#             "machine_id": mistakes.first().machine_id if mistakes.exists() else None,
-#             "operation": mistakes.first().operation if mistakes.exists() else None,
-#             "operator": mistakes.first().emb_id if mistakes.exists() else None,
-#             "user_id": last.user_id,
-#             "roving_mistakes": [
-#                 {
-#                     "machine_id": m.machine_id,
-#                     "operation": m.operation,
-#                     "emb_id": m.emb_id,
-#                     "shade_var": m.shade_var,
-#                     "num_sticker": m.num_sticker,
-#                     "remark": m.remark
-#                 }
-#                 for m in mistakes
-#             ]
-#         }
-
-#     return Response({
-#         "bundle_id": bundle_id,
-#         "bundle_no": last.bundle_no,
-#         "jobno": last.jobno,
-#         "product": last.product,
-#         "color": last.color,
-#         "size": last.size,
-#         "total_pieces": last.total_pieces,
-#         "piece_no": piece,
-#         "checked_pieces": piece,
-
-#         **roving_data
-#     })
 
 
 @api_view(["GET"])
@@ -687,6 +693,29 @@ class MachineAllocationDetailAPIView(APIView):
 #         return Response(data)
 
 
+# class EmployeeAPIView(APIView):
+#     def get(self, request):
+#         employees = Empwisesal.objects.using('main').filter(status='working').values('code', 'name', 'photo', 'dept')
+        
+#         staff_url = settings.STAFF_IMAGES_URL.rstrip('/')
+
+#         data = []
+#         for emp in employees:
+#             photo_url = None
+#             if emp.get('photo'):
+#                 filename = emp['photo'].split('\\')[-1]
+#                 photo_url = f"https://hfapi.herofashion.com/{staff_url}/{filename}"
+
+#             data.append({
+#                 "code": emp['code'],
+#                 "name": emp['name'],
+#                 "dept": emp['dept'],
+#                 "photo": photo_url,
+#             })
+
+#         return Response(data)
+
+
 class EmployeeAPIView(APIView):
     def get(self, request):
 
@@ -797,8 +826,7 @@ class EmpAllocateAPIView(APIView):
         ).first() # get latest allocation if multiple exist
 
         
-        if allocation:
-           
+        if allocation: 
             allocation.status = status
 
             allocation.jobno = jobno

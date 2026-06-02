@@ -460,8 +460,6 @@ def qc_start(request):
     })
 
 
-
-
 @csrf_exempt
 def delete_pending_scanner(request):
 
@@ -506,4 +504,3 @@ def delete_pending_scanner(request):
         "status": False,
         "message": "Invalid Request"
     })
-

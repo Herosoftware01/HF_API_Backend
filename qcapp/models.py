@@ -260,7 +260,6 @@ class emp_allocate(models.Model):
     seq = models.CharField(max_length=100, null=True, blank=True)
     jobno = models.CharField(max_length=100, null=True, blank=True)
     top_bottom = models.CharField(max_length=100, null=True, blank=True)
-    
 
 class VueProcessSequence(models.Model):
     jobno = models.CharField(db_column='JOBNO', max_length=50)  # Field name made lowercase.

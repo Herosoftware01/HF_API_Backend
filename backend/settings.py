@@ -37,6 +37,8 @@ CORS_ALLOWED_ORIGINS = [
     "https://hfapi.herofashion.com",
     "https://dev.herofashion.com",
     "http://10.1.21.13:3000",
+    "https://hfempdtls.netlify.app",
+    
 ]
 
 CSRF_TRUSTED_ORIGINS = [
@@ -47,6 +49,7 @@ CSRF_TRUSTED_ORIGINS = [
     "https://web.herofashion.com",
     "https://dev.herofashion.com",
     "http://10.1.21.13:3000",
+    "https://hfempdtls.netlify.app",
     
 ]
 # settings.py
@@ -93,7 +96,6 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
-
 
 CORS_ALLOW_ALL_ORIGINS = True
 
@@ -298,7 +300,6 @@ EMAIL_PORT = 587
 EMAIL_USE_TLS = True
 EMAIL_HOST_USER = 'hfautomation2026@gmail.com'
 EMAIL_HOST_PASSWORD = 'uoea lfup fncv uxyv'   
-
 
 
 DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
