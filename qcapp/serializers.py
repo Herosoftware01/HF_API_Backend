@@ -4,7 +4,7 @@ from datetime import date
 from django.utils import timezone
 from django.db.models import Sum
 
-from .models import QcAdminMistake,Needle_change,Unit, Line, MachineAllocation, machine_details, emp_allocate,Empwisesal,VueProcessSequence
+from .models import QcAdminMistake,Cont_employee,Needle_change,Unit, Line, MachineAllocation, machine_details, emp_allocate,Empwisesal,VueProcessSequence
 
 
 class QcAdminMistakeSerializer(serializers.ModelSerializer):
@@ -76,7 +76,15 @@ class MachineAllocationSerializer(serializers.ModelSerializer):
         
         # Get employee details from Empwisesal table
         emp_details = Empwisesal.objects.using('main').filter(code=latest_emp.emp_code).first()
-        
+
+        if emp_details:
+            name = emp_details.name
+            # photo = emp_details.photo
+        else:
+            cont_emp = Cont_employee.objects.filter(code=latest_emp.emp_code).first()
+            name = cont_emp.name if cont_emp else "Unknown"
+            # photo = None
+
         if emp_details and emp_details.photo:
             filename = emp_details.photo.split('\\')[-1]
             # Ensure no double slashes
@@ -84,12 +92,12 @@ class MachineAllocationSerializer(serializers.ModelSerializer):
             photo_url = f"https://hfapi.herofashion.com/{staff_url}/{filename}"
         else:
             # Default profile picture if none exists
-            photo_url = "https://www.example.com/default-profile.png"
+            photo_url = "https://hfapi.herofashion.com/media/noimage.png"
 
         return [
             {
                 "emp_code": latest_emp.emp_code,
-                "name": emp_details.name,
+                "name": str(name),
                 "status": latest_emp.status,
                 "photo":photo_url
             }

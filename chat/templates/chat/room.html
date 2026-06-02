@@ -41,6 +41,21 @@ img.attachment-img{max-width:220px;border-radius:8px;display:block;cursor:pointe
 .file-preview-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:1000;align-items:center;justify-content:center}
 .file-preview-overlay.open{display:flex}
 .file-preview-overlay img{max-width:90vw;max-height:90vh;border-radius:8px}
+html,body{width:100%;height:100%;overflow:hidden}
+.app-layout{width:100%;height:100dvh;max-height:100dvh;overflow:hidden}
+.main-panel{min-width:0;min-height:0}
+.messages-area{min-height:0}
+@media (max-width: 768px){
+  .sidebar{width:100%;max-width:300px}
+  .panel-info{display:none!important}
+  .msg-row{max-width:86%}
+  .chat-header{padding:10px 12px}
+  .input-row{padding:8px 10px;gap:8px}
+}
+@media (max-width: 560px){
+  .sidebar{display:none}
+  .msg-row{max-width:92%}
+}
 </style>
 {% endblock %}
 {% block body %}
@@ -136,17 +151,18 @@ img.attachment-img{max-width:220px;border-radius:8px;display:block;cursor:pointe
       <div class="typing-bar" id="typingBar"></div>
 
       <!-- Input -->
-      <div class="input-row">
+      <form class="input-row" id="messageForm" method="post" action="{% url 'send_message' room.id %}" onsubmit="sendMessage(event)">
+        {% csrf_token %}
         <button class="attach-btn" onclick="document.getElementById('fileInput').click()" title="Attach file">
           <i class="ti ti-paperclip"></i>
         </button>
         <input type="file" id="fileInput" style="display:none" onchange="uploadFile(this)"/>
-        <textarea class="msg-input" id="msgInput" placeholder="Type a message…" rows="1"
+        <textarea class="msg-input" id="msgInput" name="content" placeholder="Type a message…" rows="1"
           onkeydown="handleKey(event)" oninput="handleTyping()"></textarea>
-        <button class="send-btn" onclick="sendMessage()" aria-label="Send">
+        <button class="send-btn" type="submit" aria-label="Send">
           <i class="ti ti-send"></i>
         </button>
-      </div>
+      </form>
     </div>
 
     <!-- Info panel -->
@@ -215,19 +231,33 @@ img.attachment-img{max-width:220px;border-radius:8px;display:block;cursor:pointe
 const ROOM_ID = {{ room.id }};
 const USER_ID = {{ user.id }};
 const USERNAME = "{{ user.username }}";
-const IS_GROUP = {{ room.room_type|yesno:"true,false" }};
+const IS_GROUP = {% if room.room_type == 'group' %}true{% else %}false{% endif %};
 const CSRF = "{{ csrf_token }}";
+const MESSAGES_URL = new URL("{% url 'messages_api' room.id %}", window.location.origin).toString();
+const SEND_URL = new URL("{% url 'send_message' room.id %}", window.location.origin).toString();
+const UPLOAD_URL = new URL("{% url 'upload_file' room.id %}", window.location.origin).toString();
 
 const msgArea = document.getElementById('messageArea');
 const msgInput = document.getElementById('msgInput');
+const messageForm = document.getElementById('messageForm');
 const typingBar = document.getElementById('typingBar');
 
 msgArea.scrollTop = msgArea.scrollHeight;
 
-const ws = new WebSocket(`wss://${window.location.host}/ws/chat/${ROOM_ID}/`);
+const wsProtocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+let ws = null;
 let typingTimer;
 let isTyping = false;
+let pollingFailures = 0;
+let pollingTimer = null;
+let lastMessageId = Math.max(
+  0,
+  ...Array.from(document.querySelectorAll('[id^="msg-"]'))
+    .map(el => Number(el.id.replace('msg-', '')))
+    .filter(Boolean)
+);
 
+if (ws) {
 ws.onmessage = function(e) {
   console.log("MESSAGE RECEIVED", e.data);
   const data = JSON.parse(e.data);
@@ -243,7 +273,15 @@ ws.onmessage = function(e) {
   }
 };
 
+ws.onclose = function() {
+  typingBar.textContent = '';
+};
+}
+
+
 function appendMessage(data) {
+  if (document.getElementById('msg-' + data.message_id)) return;
+
   const isSent = data.sender_id == USER_ID;
   const row = document.createElement('div');
   row.className = 'msg-row ' + (isSent ? 'sent' : 'recv');
@@ -281,19 +319,97 @@ function appendMessage(data) {
   if (emptyMsg) emptyMsg.closest('div').remove();
   msgArea.appendChild(row);
   msgArea.scrollTop = msgArea.scrollHeight;
+  lastMessageId = Math.max(lastMessageId, Number(data.message_id) || 0);
 }
 
-function sendMessage() {
+async function pollMessages() {
+  try {
+    const res = await fetch(`${MESSAGES_URL}?after=${lastMessageId}`, {
+      credentials:'include',
+      headers:{'X-Requested-With':'XMLHttpRequest'},
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+    const data = await res.json();
+    (data.messages || []).forEach(appendMessage);
+    pollingFailures = 0;
+    if (!isTyping) typingBar.textContent = '';
+  } catch (err) {
+    pollingFailures += 1;
+    if (pollingFailures === 1) console.error('Message polling failed', err);
+    if (pollingFailures >= 3) {
+      typingBar.textContent = 'Connection issue. Refresh chat.';
+      clearInterval(pollingTimer);
+    }
+  }
+}
+
+pollMessages();
+pollingTimer = setInterval(pollMessages, 2000);
+
+async function sendMessage(event) {
+  if (event) event.preventDefault();
+
   const text = msgInput.value.trim();
   if (!text) return;
-  ws.send(JSON.stringify({type: 'chat_message', message: text}));
-  msgInput.value = '';
-  msgInput.style.height = 'auto';
-  sendTyping(false);
+
+  const fd = new FormData();
+  fd.append('content', text);
+  fd.append('csrfmiddlewaretoken', CSRF);
+
+  try {
+    const res = await fetch(SEND_URL, {
+      method:'POST',
+      body:fd,
+      credentials:'include',
+      headers:{
+        'X-CSRFToken': CSRF,
+        'X-Requested-With':'XMLHttpRequest',
+      },
+    });
+
+    if (res.redirected || res.url.includes('/login/')) {
+      messageForm.submit();
+      return;
+    }
+
+    const contentType = res.headers.get('content-type') || '';
+    if (!contentType.includes('application/json')) {
+      messageForm.submit();
+      return;
+    }
+
+    const data = await res.json();
+    if (!res.ok) {
+      alert(data.error || `Message send failed (${res.status})`);
+      return;
+    }
+
+    msgInput.value = '';
+    msgInput.style.height = 'auto';
+    sendTyping(false);
+
+    appendMessage({
+      type:'chat_message',
+      message_id:data.message_id || data.id,
+      message:data.message || data.content,
+      sender_id:data.sender_id || USER_ID,
+      sender_name:data.sender_name || data.sender || USERNAME,
+      avatar:data.avatar || null,
+      timestamp:data.timestamp || data.time,
+      file:data.file || null,
+      file_name:data.file_name || '',
+      file_type:data.file_type || '',
+    });
+    pollMessages();
+  } catch (err) {
+    console.error('Message send failed', err);
+    messageForm.submit();
+  }
 }
 
 function handleKey(e) {
-  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(e); }
 }
 
 function handleTyping() {
@@ -305,7 +421,7 @@ function handleTyping() {
 }
 
 function sendTyping(status) {
-  if (ws.readyState === WebSocket.OPEN)
+  if (ws && ws.readyState === WebSocket.OPEN)
     ws.send(JSON.stringify({type: 'typing', is_typing: status}));
 }
 
@@ -317,16 +433,28 @@ async function uploadFile(input) {
   fd.append('csrfmiddlewaretoken', CSRF);
   const caption = msgInput.value.trim();
   if (caption) { fd.append('caption', caption); msgInput.value = ''; }
-  const res = await fetch(`/chat/${ROOM_ID}/upload/`, {method:'POST', body:fd});
-  const data = await res.json();
-  if (!res.ok) return alert('Upload failed');
-  appendMessage({
-    type:'chat_message', message_id:data.message_id, message:data.content,
-    sender_id:data.sender_id, sender_name:data.sender_name,
-    avatar:data.avatar, timestamp:data.timestamp,
-    file:data.file, file_name:data.file_name, file_type:data.file_type,
-  });
-  input.value = '';
+  try {
+    const res = await fetch(UPLOAD_URL, {
+      method:'POST',
+      body:fd,
+      credentials:'same-origin',
+      headers:{'X-CSRFToken': CSRF},
+    });
+    const contentType = res.headers.get('content-type') || '';
+    const data = contentType.includes('application/json') ? await res.json() : {};
+    if (!res.ok) return alert(data.error || `Upload failed (${res.status})`);
+
+    appendMessage({
+      type:'chat_message', message_id:data.message_id, message:data.content,
+      sender_id:data.sender_id, sender_name:data.sender_name,
+      avatar:data.avatar, timestamp:data.timestamp,
+      file:data.file, file_name:data.file_name, file_type:data.file_type,
+    });
+    input.value = '';
+  } catch (err) {
+    alert('Upload failed. Please reload chat and try again.');
+    console.error('Upload failed', err);
+  }
 }
 
 function togglePanel() {

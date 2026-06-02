@@ -7,6 +7,7 @@ from django.http import JsonResponse
 from django.db.models import Q, Max, Prefetch
 from django.utils import timezone
 from django.views.decorators.http import require_POST
+from django.views.decorators.csrf import csrf_exempt, ensure_csrf_cookie
 from django.contrib.auth import get_user_model
 User = get_user_model()
 import json
@@ -29,6 +30,7 @@ def register_view(request):
     return render(request, 'chat/register.html', {'form': form})
 
 
+@ensure_csrf_cookie
 def login_view(request):
     if request.user.is_authenticated:
         return redirect('home')
@@ -142,6 +144,7 @@ def create_group(request):
     return render(request, 'chat/create_group.html', {'form': form})
 
 
+@csrf_exempt
 @login_required
 @require_POST
 def upload_file(request, room_id):
@@ -202,6 +205,43 @@ def user_status_api(request):
     profiles = Profile.objects.filter(user_id__in=user_ids).values('user_id', 'is_online', 'last_seen')
     return JsonResponse({str(p['user_id']): {'is_online': p['is_online']} for p in profiles})
 
+
+@login_required
+def messages_api(request, room_id):
+    room = get_object_or_404(Room, id=room_id)
+
+    if request.user not in room.members.all():
+        return JsonResponse({'error': 'Not allowed'}, status=403)
+
+    after_id = request.GET.get('after')
+    messages = room.messages.select_related('sender', 'sender__profile').order_by('id')
+
+    if after_id and after_id.isdigit():
+        messages = messages.filter(id__gt=int(after_id))
+    else:
+        messages = messages.order_by('-id')[:50]
+        messages = sorted(messages, key=lambda msg: msg.id)
+
+    room.messages.filter(is_read=False).exclude(sender=request.user).update(is_read=True)
+
+    data = []
+    for msg in messages:
+        profile = getattr(msg.sender, 'profile', None)
+        data.append({
+            'message_id': msg.id,
+            'message': msg.content,
+            'sender_id': msg.sender_id,
+            'sender_name': msg.sender.username,
+            'avatar': profile.avatar.url if profile and profile.avatar else None,
+            'timestamp': msg.timestamp.strftime('%I:%M %p'),
+            'file': msg.file.url if msg.file else None,
+            'file_name': msg.file_name,
+            'file_type': msg.file_type,
+        })
+
+    return JsonResponse({'messages': data})
+
+@csrf_exempt
 @login_required
 @require_POST
 def send_message(request, room_id):
@@ -220,12 +260,27 @@ def send_message(request, room_id):
             sender=request.user,
             content=content
         )
-       
+
+        if request.headers.get('x-requested-with') != 'XMLHttpRequest':
+            return redirect('room', room_id=room.id)
+
         return JsonResponse({
             'id': msg.id,
+            'message_id': msg.id,
             'sender': msg.sender.username,
+            'sender_id': msg.sender_id,
+            'sender_name': msg.sender.username,
             'content': msg.content,
-            'time': msg.timestamp.strftime('%I:%M %p')
+            'message': msg.content,
+            'time': msg.timestamp.strftime('%I:%M %p'),
+            'timestamp': msg.timestamp.strftime('%I:%M %p'),
+            'avatar': None,
+            'file': None,
+            'file_name': '',
+            'file_type': '',
         })
+
+    if request.headers.get('x-requested-with') != 'XMLHttpRequest':
+        return redirect('room', room_id=room.id)
 
     return JsonResponse({'error': 'Empty message'}, status=400)

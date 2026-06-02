@@ -1,9 +1,8 @@
-from django.http import JsonResponse, HttpResponse
+from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.db.models import Max
 import json
-from .models import IncdebUsers, Adreq, Empwisesal,Employeeworking,HrWrkdtlsnew
-from .models import IncdebUsers, Adreq, Empwisesal,Employeeworking,RptCut002
+from .models import IncdebUsers, Adreq, Empwisesal,Employeeworking,HrWrkdtlsnew,RptCut002
 from django.db import connections
 import os
 from django.core.mail import send_mail
@@ -141,7 +140,7 @@ def request_advance(request):
         smon  = request.GET.get('smon')
         syear = request.GET.get('syear')
 
-        qs = Adreq.objects.using('mssql1').all()
+        qs = Adreq.objects.using('demo').all()
 
         if empid:
             qs = qs.filter(empid=empid)
@@ -163,9 +162,9 @@ def request_advance(request):
 
             # The validation check that blocked multiple submissions has been removed here.
 
-            last = Adreq.objects.using('mssql1').aggregate(Max('entryno'))['entryno__max'] or 0
+            last = Adreq.objects.using('demo').aggregate(Max('entryno'))['entryno__max'] or 0
 
-            obj = Adreq.objects.using('mssql1').create(
+            obj = Adreq.objects.using('demo').create(
                 entryno=last + 1,
                 dt=data.get('dt'),
                 empid=empid,
@@ -195,7 +194,7 @@ def request_advance(request):
                     subject,
                     message,
                     settings.EMAIL_HOST_USER,   # from email
-                    ['kirsh650@email.com'],     # 👈 change to real email
+                    ['hfautomation2026@email.com',"hr@herofashion.com","hrm@herofashion.com","accounts@herofashion.com","design@herofashion.com"],     # 👈 change to real email
                     fail_silently=False,
                 )
 
@@ -223,7 +222,7 @@ def request_advance(request):
             data = json.loads(request.body)
             obj_id = data.get('id')
 
-            obj = Adreq.objects.using('mssql1').get(entryno=obj_id)  # ✅ FIXED
+            obj = Adreq.objects.using('demo').get(entryno=obj_id)  # ✅ FIXED
             obj.delete()
 
             return JsonResponse({"message": "Deleted"}, status=200)
@@ -284,7 +283,7 @@ def send_advance_mail(request):
             entryno = data.get('entryno')
 
             # OPTIMIZED DB QUERY
-            obj = Adreq.objects.using('mssql1').only('empid', 'amt', 'remarks').get(entryno=entryno)
+            obj = Adreq.objects.using('demo').only('empid', 'amt', 'remarks').get(entryno=entryno)
 
             # API CACHE
             api_url = "https://app.herofashion.com/incentive/api/emp/"
@@ -301,7 +300,7 @@ def send_advance_mail(request):
                 "🧾 New Advance Request Submitted",
                 "",
                 settings.EMAIL_HOST_USER,
-                ['kirsh650@gmail.com'],
+                ['hfautomation2026@gmail.com',"hr@herofashion.com","hrm@herofashion.com","accounts@herofashion.com","design@herofashion.com"],
             )
 
             # IMAGE ATTACH (optional)
@@ -358,7 +357,7 @@ def send_approval_mail(request):
             status = data.get('status')
 
             # FAST DB
-            obj = Adreq.objects.using('mssql1').only('empid', 'amt', 'remarks').get(entryno=entryno)
+            obj = Adreq.objects.using('demo').only('empid', 'amt', 'remarks').get(entryno=entryno)
 
             # CACHE API
             api_url = "https://app.herofashion.com/incentive/api/emp/"
@@ -389,7 +388,7 @@ def send_approval_mail(request):
                 subject,
                 text_content,
                 settings.EMAIL_HOST_USER,
-                ['kirsh650@gmail.com'],
+                ['hfautomation2026@gmail.com',"hr@herofashion.com","hrm@herofashion.com","accounts@herofashion.com","design@herofashion.com"],
             )
 
             email.attach_alternative(html_content, "text/html")
@@ -411,10 +410,12 @@ def ad_approve(request):
             data = json.loads(request.body)
             obj_id = data.get('id')
 
-            obj = Adreq.objects.using('mssql1').get(entryno=obj_id)
+            obj = Adreq.objects.using('demo').get(entryno=obj_id)
             obj.status = data.get('status')
             obj.status_dt = data.get('status_dt')
             obj.save()
+
+            
 
             return JsonResponse({"message": "Updated"}, status=200)
 
@@ -512,7 +513,7 @@ def empwisesal(request):
 @csrf_exempt
 def state(request):
     if request.method == 'GET':
-        data = Adreq.objects.using('mssql1').all().order_by('-entryno')
+        data = Adreq.objects.using('demo').all().order_by('-entryno')
 
         # 🔍 Get query params
         empid = request.GET.get('empid')
@@ -539,6 +540,10 @@ def state(request):
                 data = data.filter(dt__range=[from_date, to_date])
             except ValueError:
                 return JsonResponse({"error": "Invalid date format. Use YYYY-MM-DD"}, status=400)
+        
+
+        current_year = datetime.now().year
+        data = data.filter(dt__year=current_year)
 
         # 🔄 Convert queryset to list
         result = list(data.values())

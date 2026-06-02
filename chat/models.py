@@ -85,7 +85,7 @@ class Message(models.Model):
     content = models.TextField(blank=True)
     file = models.FileField(upload_to='attachments/', blank=True, null=True)
     file_name = models.CharField(max_length=255, blank=True)
-    file_type = models.CharField(max_length=50, blank=True)
+    file_type = models.CharField(max_length=255, blank=True)
     timestamp = models.DateTimeField(auto_now_add=True)
     is_read = models.BooleanField(default=False)
 

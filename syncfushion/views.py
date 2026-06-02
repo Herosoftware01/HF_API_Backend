@@ -388,6 +388,20 @@ def upload_image(request):
             "filename": filename,
             "saved_path": saved_path
         })
+    
+from django.http import FileResponse
+import os
+@csrf_exempt
+def get_image(request, filename):
+    path = os.path.join(
+        r"\\adminserver\File Sharing\AAAA Hero\Images",
+        filename
+    )
+
+    if os.path.exists(path):
+        return FileResponse(open(path, "rb"))
+
+    return JsonResponse({"error": "Image not found"}, status=404)    
 
 @csrf_exempt
 def gantt_list(request):
@@ -535,3 +549,35 @@ def block_detail(request, id):
         return JsonResponse({
             "message": "Deleted Successfully"
         })
+
+
+from django.db import connections
+def load_tmpwrk(request):
+    with connections['demo'].cursor() as cursor:
+        cursor.execute("EXEC Proc_Load_Tmpwrk")
+
+        columns = [col[0] for col in cursor.description]
+        rows = cursor.fetchall()
+
+    data = [dict(zip(columns, row)) for row in rows]
+
+    # Convert image paths to URLs
+    for obj in data:
+
+        # ordimg
+        raw_path = obj.get('ordimg')
+        if raw_path:
+            filename = raw_path.split('\\')[-1]
+            obj['ordimg'] = f"https://app.herofashion.com/order_image/{filename}"
+        else:
+            obj['ordimg'] = ""
+
+        # tbimg
+        raw_path = obj.get('tbimg')
+        if raw_path:
+            filename = raw_path.split('\\')[-1]
+            obj['tbimg'] = f"https://app.herofashion.com/order_image/{filename}"
+        else:
+            obj['tbimg'] = ""
+
+    return JsonResponse(data, safe=False)

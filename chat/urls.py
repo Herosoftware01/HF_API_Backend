@@ -14,6 +14,7 @@ urlpatterns = [
     path('profile/', views.profile_view, name='profile'),
     path('profile/<str:username>/', views.profile_view, name='user_profile'),
     path('api/status/', views.user_status_api, name='user_status'),
+    path('messages/<int:room_id>/', views.messages_api, name='messages_api'),
     path('send/<int:room_id>/', views.send_message, name='send_message'),
 
     

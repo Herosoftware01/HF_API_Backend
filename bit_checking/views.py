@@ -8,8 +8,96 @@ from django.views.decorators.csrf import csrf_exempt
 import json
 from django.utils.dateparse import parse_datetime
 from django.utils import timezone
+from django.db import connections
 
 
+# def qr_api(request):
+
+#     sl = request.GET.get('qr_id')
+
+#     data = (
+#         TrsCutstickerprodNew.objects.using('demo')
+#         .filter(qrid=sl)
+#         .values('qrid', 'pc', 'planno','tbid')
+#         .first()
+#     )
+
+#     if not data:
+#         return JsonResponse({
+#             "status": False,
+#             "message": "Data not found"
+#         })
+
+#     # desc = list(
+#     #     VueMistakePartDetails.objects.using('demo')
+#     #     .filter(planno=data['planno'], topbottom_id=data['tbid'])
+#     #     .values_list('det_part', flat=True)
+#     # )
+
+#     desc = list(
+#         VueMistakePartDetails.objects.using('demo')
+#         .filter(qrid=sl)
+#         .values_list('det_part', flat=True)
+#     )
+
+#     # ✅ START/END TABLE CHECK
+#     start_entry = bit_start_end_time.objects.filter(
+#         qrid=data['qrid']
+#     ).first()
+
+#     saved_data = bit_checking_updates.objects.filter(
+#         scaner_id=data['qrid']
+#     )
+
+
+#     if start_entry or saved_data.exists():
+
+#         first = saved_data.first() if saved_data.exists() else None
+
+#         checked_data = {}
+
+#         saved_desc = []
+
+#         for item in saved_data:
+
+#             saved_desc.append(item.descriptions)
+
+#             checked_data[item.descriptions] = [
+#                 int(x)
+#                 for x in item.mistake_pcs.split(',')
+#                 if x.strip()
+#             ]
+
+#         return JsonResponse({
+#             "status": True,
+#             "already_saved": True,
+
+#             "sl": data['qrid'],
+#             "plan_no": data['planno'],
+#             "pc": data['pc'],
+
+#             "employee": {
+#                 "code": first.emp_id if first else start_entry.empid
+#             },
+
+
+#             "descriptions": desc,
+
+#             "checked_data": checked_data
+#         })
+
+#     return JsonResponse({
+#         "status": True,
+#         "already_saved": False,
+
+#         "sl": data['qrid'],
+#         "plan_no": data['planno'],
+#         "pc": data['pc'],
+#         "descriptions": desc
+#     })
+
+
+@api_view(["GET"])
 def qr_api(request):
 
     sl = request.GET.get('qr_id')
@@ -17,7 +105,7 @@ def qr_api(request):
     data = (
         TrsCutstickerprodNew.objects.using('demo')
         .filter(qrid=sl)
-        .values('qrid', 'pc', 'planno','tbid')
+        .values('qrid', 'pc', 'planno', 'tbid')
         .first()
     )
 
@@ -29,11 +117,11 @@ def qr_api(request):
 
     desc = list(
         VueMistakePartDetails.objects.using('demo')
-        .filter(planno=data['planno'], topbottom_id=data['tbid'])
+        .filter(qrid=sl)
         .values_list('det_part', flat=True)
     )
 
-    # ✅ START/END TABLE CHECK
+    # START / END CHECK
     start_entry = bit_start_end_time.objects.filter(
         qrid=data['qrid']
     ).first()
@@ -42,24 +130,36 @@ def qr_api(request):
         scaner_id=data['qrid']
     )
 
-
+    # =========================
+    # ALREADY SAVED CASE
+    # =========================
     if start_entry or saved_data.exists():
 
         first = saved_data.first() if saved_data.exists() else None
 
         checked_data = {}
-
+        count_data = {}
         saved_desc = []
+
+        entry_mode = None
 
         for item in saved_data:
 
             saved_desc.append(item.descriptions)
 
+            # checked pcs
             checked_data[item.descriptions] = [
                 int(x)
-                for x in item.mistake_pcs.split(',')
-                if x.strip()
+                for x in str(item.mistake_pcs).split(',')
+                if x.strip().isdigit()
             ]
+
+            # count restore (for + / - mode)
+            count_data[item.descriptions] = item.out_pcs_count or 0
+
+            # entry mode (same for all rows)
+            if not entry_mode:
+                entry_mode = item.entry_mood
 
         return JsonResponse({
             "status": True,
@@ -73,12 +173,15 @@ def qr_api(request):
                 "code": first.emp_id if first else start_entry.empid
             },
 
-
             "descriptions": desc,
-
-            "checked_data": checked_data
+            "checked_data": checked_data,
+            "count_data": count_data,
+            "entry_mood": entry_mode
         })
 
+    # =========================
+    # FRESH SCAN CASE
+    # =========================
     return JsonResponse({
         "status": True,
         "already_saved": False,
@@ -86,9 +189,12 @@ def qr_api(request):
         "sl": data['qrid'],
         "plan_no": data['planno'],
         "pc": data['pc'],
-        "descriptions": desc
-    })
+        "descriptions": desc,
 
+        "checked_data": {},
+        "count_data": {},
+        "entry_mood": None
+    })
 
 
 def emp_stick(request):
@@ -163,7 +269,8 @@ def save_checking(request):
         ok_pcs=data.get('ok_pcs') or 0,
         total_qty=data.get('total_qty') or 0,
         plan_no=plan_no,
-        total_select_pcs=data.get('total_select_pcs') or 0
+        total_select_pcs=data.get('total_select_pcs') or 0,
+        entry_mood=data.get('entry_mood', '')
     )
 
     return Response({
@@ -311,6 +418,13 @@ def delete_checking(request):
         BitcheckingPlyDetails.objects.using('demo').filter(
             qr_id__in=scanner_ids
         ).delete()
+
+        with connections['demo'].cursor() as cursor:
+            for qr in scanner_ids:
+                cursor.execute(
+                    "EXEC sp_Delete_BitcheckProd @qrid = %s",
+                    [qr]
+                )
 
         bit_start_end_time.objects.filter(qrid__in=scanner_ids).delete()
 

@@ -9,7 +9,7 @@ from.views import diwasg_list, diwasg_detail
 from . import views
 router = DefaultRouter()
 router.register(r'grid-settings', GridSettingViewSet, basename='grid-settings')
-from .views import tasks_create, tasks_list, tasks_single, tasks_update, tasks_delete, upload_image, gantt_list, gantt_detail, block_list, block_detail
+from .views import tasks_create, tasks_list, tasks_single, tasks_update, tasks_delete, upload_image, get_image, gantt_list, gantt_detail, block_list, block_detail
 
 urlpatterns = [
     path('api/', include(router.urls)),
@@ -40,8 +40,10 @@ urlpatterns = [
     path('task_delete/<int:id>/',tasks_delete), # delete method (delete the tasks)
 
     path('upload-image/', upload_image),
+    path("image/<str:filename>/", get_image),    
     path('gantt/', gantt_list),
     path('gantt/<int:id>/', gantt_detail),
     path('blocks/', block_list),
     path('blocks/<int:id>/', block_detail),
+    path('stock_dtls/', views.load_tmpwrk),
 ]

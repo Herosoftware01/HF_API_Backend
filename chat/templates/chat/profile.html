@@ -4,7 +4,7 @@
 <div style="min-height:100vh;background:#f0f2f5;display:flex;align-items:center;justify-content:center;padding:20px">
   <div style="background:#fff;border-radius:16px;padding:36px;width:100%;max-width:480px;border:1px solid #e9edef">
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px">
-      <a href="/" class="icon-btn"><i class="ti ti-arrow-left" style="font-size:20px"></i></a>
+      <a href="{% url 'home' %}" class="icon-btn"><i class="ti ti-arrow-left" style="font-size:20px"></i></a>
       <h1 style="font-size:20px;font-weight:600">{% if is_own %}My Profile{% else %}{{ target_user.username }}'s Profile{% endif %}</h1>
     </div>
 
