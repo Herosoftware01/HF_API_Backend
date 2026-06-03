@@ -706,7 +706,7 @@ class Employeeworking1(models.Model):
 
 
 class TmpPrdprn(models.Model):
-    ip = models.CharField(max_length=50, db_collation='SQL_Latin1_General_CP1_CI_AS')
+    ip = models.CharField(max_length=50, db_collation='SQL_Latin1_General_CP1_CI_AS',primary_key=True)
     unit = models.CharField(db_column='Unit', max_length=50, db_collation='SQL_Latin1_General_CP1_CI_AS')  # Field name made lowercase.
     jobno = models.CharField(db_column='Jobno', max_length=50, db_collation='SQL_Latin1_General_CP1_CI_AS')  # Field name made lowercase.
     tb = models.CharField(db_column='Tb', max_length=50, db_collation='SQL_Latin1_General_CP1_CI_AS')  # Field name made lowercase.

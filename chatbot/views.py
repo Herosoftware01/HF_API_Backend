@@ -7,7 +7,7 @@ from asgiref.sync import async_to_sync
 
 from .serializers import ChatRequestSerializer
 from .services import ai_service
-from .services.mcp_client import call_mcp_tool
+# from .services.mcp_client import call_mcp_tool
 
 def index(request):
     """Serve the frontend chat UI."""
