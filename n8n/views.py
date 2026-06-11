@@ -6,7 +6,7 @@ import json
 import os
 
 
-def ws_attandence(request):
+def ws_attendance(request):
     if request.method == 'GET':
         data = TxNotification.objects.using('mssql1').all()
 
