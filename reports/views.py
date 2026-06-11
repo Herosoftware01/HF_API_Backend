@@ -5,7 +5,7 @@ import os
 import json
 from datetime import datetime
 from .models import LaySp, MasterFinalMistake, UnitBundlereport, FinalPlans,Corarlck1,CoraRollcheck,AttUnt,EmbAbsetnt,Holiday,LabAtt,RptCutting,VueOrdersinhand
-from .models import BillAge,BillMdapprove,BillPass,Leavempabsent,LaySpreadingLayemployee,HrLabourattendence,Employeeworking1,TmpPrdprn
+from .models import BillAge,BillMdapprove,BillPass,Leavempabsent,LaySpreadingLayemployee,HrLabourattendence,Employeeworking1,TmpPrdprn,BitcheckHour,StickerHour
 from django.db.models import F, Q , IntegerField,DateField,Case, When, Value,CharField
 from django.db import connections
 from django.db.models import OuterRef, Subquery
@@ -2486,3 +2486,35 @@ def prodpn(request):
         })
 
     return JsonResponse(response_data, safe=False)
+
+
+def bitcheckhour(request):
+    data = BitcheckHour.objects.using('demo').all()
+
+    start_date = request.GET.get('startDate')
+    end_date = request.GET.get('endDate')
+
+    if start_date and end_date:
+        data = data.filter(
+            dt__range=[start_date, end_date]
+        )
+    else:
+        data = data.filter(dt=date.today())
+
+    return JsonResponse(list(data.values()), safe=False)
+
+
+def stickerHour(request):
+    data = StickerHour.objects.using('demo').all()
+
+    start_date = request.GET.get('startDate')
+    end_date = request.GET.get('endDate')
+
+    if start_date and end_date:
+        data = data.filter(
+            dt__range=[start_date, end_date]
+        )
+    else:
+        data = data.filter(dt=date.today())
+
+    return JsonResponse(list(data.values()), safe=False)

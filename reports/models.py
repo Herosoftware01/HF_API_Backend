@@ -729,3 +729,52 @@ class TmpPrdprn(models.Model):
     class Meta:
         managed = False
         db_table = '_tmp_prdprn'
+
+
+class BitcheckHour(models.Model):
+    name = models.CharField(max_length=100, blank=True, null=True)
+    empid = models.IntegerField(primary_key=True) 
+    dt = models.DateField(blank=True, null=True)
+    v_pc = models.IntegerField(blank=True, null=True)
+    vi_pc = models.IntegerField(blank=True, null=True)
+    i_pc = models.IntegerField(blank=True, null=True)
+    ii_pc = models.IntegerField(blank=True, null=True)
+    iii_pc = models.IntegerField(blank=True, null=True)
+    iv_pc = models.IntegerField(blank=True, null=True)
+    v_pan = models.IntegerField(blank=True, null=True)
+    vi_pan = models.IntegerField(blank=True, null=True)
+    i_pan = models.IntegerField(blank=True, null=True)
+    ii_pan = models.IntegerField(blank=True, null=True)
+    iii_pan = models.IntegerField(blank=True, null=True)
+    iv_pan = models.IntegerField(blank=True, null=True)
+    s_hift = models.DecimalField(max_digits=38, decimal_places=2)
+    amt = models.DecimalField(max_digits=38, decimal_places=4, blank=True, null=True)
+
+    class Meta:
+        managed = False
+        db_table = 'view_bitcheck_hour'
+
+
+
+class StickerHour(models.Model):
+    name = models.CharField(max_length=100, blank=True, null=True)
+    empid = models.IntegerField(primary_key=True)
+    dt = models.DateField(blank=True, null=True)
+    v_pc = models.IntegerField(blank=True, null=True)
+    vi_pc = models.IntegerField(blank=True, null=True)
+    i_pc = models.IntegerField(blank=True, null=True)
+    ii_pc = models.IntegerField(blank=True, null=True)
+    iii_pc = models.IntegerField(blank=True, null=True)
+    iv_pc = models.IntegerField(blank=True, null=True)
+    v_pan = models.IntegerField(blank=True, null=True)
+    vi_pan = models.IntegerField(blank=True, null=True)
+    i_pan = models.IntegerField(blank=True, null=True)
+    ii_pan = models.IntegerField(blank=True, null=True)
+    iii_pan = models.IntegerField(blank=True, null=True)
+    iv_pan = models.IntegerField(blank=True, null=True)
+    s_hift = models.DecimalField(max_digits=38, decimal_places=2)
+    amt = models.DecimalField(max_digits=38, decimal_places=4, blank=True, null=True)
+
+    class Meta:
+        managed = False
+        db_table = 'view_sticker_hour'

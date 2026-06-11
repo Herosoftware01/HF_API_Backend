@@ -8,27 +8,25 @@
 from django.db import models
 
 
-class TmpPrdprn(models.Model):
-    ip = models.CharField(max_length=50, db_collation='SQL_Latin1_General_CP1_CI_AS')
-    unit = models.CharField(db_column='Unit', max_length=50, db_collation='SQL_Latin1_General_CP1_CI_AS')  # Field name made lowercase.
-    jobno = models.CharField(db_column='Jobno', max_length=50, db_collation='SQL_Latin1_General_CP1_CI_AS')  # Field name made lowercase.
-    tb = models.CharField(db_column='Tb', max_length=50, db_collation='SQL_Latin1_General_CP1_CI_AS')  # Field name made lowercase.
-    clr = models.CharField(max_length=50, db_collation='SQL_Latin1_General_CP1_CI_AS')
-    bc = models.IntegerField()
-    sew = models.IntegerField()
-    che = models.IntegerField()
-    irn = models.IntegerField()
-    pack = models.IntegerField()
-    oth = models.IntegerField()
-    mist = models.IntegerField()
-    trstype = models.CharField(max_length=80, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)
-    ordqty = models.IntegerField(blank=True, null=True)
-    fc = models.IntegerField(blank=True, null=True)
-    allotqty = models.IntegerField(blank=True, null=True)
-    cutqtyqty = models.IntegerField(blank=True, null=True)
-    rejqty = models.IntegerField(blank=True, null=True)
-    singer = models.IntegerField(blank=True, null=True)
+class ViewStickerHour(models.Model):
+    name = models.CharField(max_length=100, blank=True, null=True)
+    empid = models.IntegerField()
+    dt = models.DateField(blank=True, null=True)
+    v_pc = models.IntegerField(blank=True, null=True)
+    vi_pc = models.IntegerField(blank=True, null=True)
+    i_pc = models.IntegerField(blank=True, null=True)
+    ii_pc = models.IntegerField(blank=True, null=True)
+    iii_pc = models.IntegerField(blank=True, null=True)
+    iv_pc = models.IntegerField(blank=True, null=True)
+    v_pan = models.IntegerField(blank=True, null=True)
+    vi_pan = models.IntegerField(blank=True, null=True)
+    i_pan = models.IntegerField(blank=True, null=True)
+    ii_pan = models.IntegerField(blank=True, null=True)
+    iii_pan = models.IntegerField(blank=True, null=True)
+    iv_pan = models.IntegerField(blank=True, null=True)
+    s_hift = models.DecimalField(max_digits=38, decimal_places=2)
+    amt = models.DecimalField(max_digits=38, decimal_places=4, blank=True, null=True)
 
     class Meta:
         managed = False
-        db_table = '_tmp_prdprn'
+        db_table = 'view_sticker_hour'

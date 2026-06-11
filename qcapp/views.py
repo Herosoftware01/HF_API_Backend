@@ -19,13 +19,31 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 import json
 from django.db import connection
+from django.db.models import Case, When, Value, IntegerField
 
 
 class QcAdminMistakeAPIView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
+    # def get(self, request):
+    #     mistakes = QcAdminMistake.objects.all()
+    #     serializer = QcAdminMistakeSerializer(mistakes, many=True)
+    #     return Response(serializer.data)
+
     def get(self, request):
-        mistakes = QcAdminMistake.objects.all()
+        priority_order = Case(
+            When(name="Needle Holes", then=Value(1)),
+            When(name="Skip Stitch", then=Value(2)),
+            When(name="Loose Stitch", then=Value(3)),
+            When(name="Broken Stitch", then=Value(4)),
+            default=Value(5),
+            output_field=IntegerField(),
+        )
+
+        mistakes = QcAdminMistake.objects.annotate(
+            priority=priority_order
+        ).order_by('priority', 'id')
+
         serializer = QcAdminMistakeSerializer(mistakes, many=True)
         return Response(serializer.data)
 
