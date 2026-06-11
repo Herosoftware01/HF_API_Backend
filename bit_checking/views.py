@@ -127,9 +127,8 @@ def qr_api(request):
     ).first()
 
     saved_data = bit_checking_updates.objects.filter(
-        scaner_id=data['qrid']
+        scaner_id=sl
     )
-
     # =========================
     # ALREADY SAVED CASE
     # =========================
@@ -151,7 +150,7 @@ def qr_api(request):
             checked_data[item.descriptions] = [
                 int(x)
                 for x in str(item.mistake_pcs).split(',')
-                if x.strip().isdigit()
+                if x.strip().isdigit() and int(x) > 0
             ]
 
             # count restore (for + / - mode)
@@ -250,7 +249,8 @@ def save_checking(request):
     # prevent duplicate save
     exists = bit_checking_updates.objects.filter(
         plan_no=plan_no,
-        descriptions=desc
+        descriptions=desc,
+        scaner_id=data.get('scaner_id')
     ).exists()
 
     if exists:
