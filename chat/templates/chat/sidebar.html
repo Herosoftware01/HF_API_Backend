@@ -1,0 +1,556 @@
+{% load static %}
+
+<!-- Mobile Menu Button -->
+<button class="mobile-menu-btn" onclick="toggleSidebar()">
+  <i class="ti ti-menu-2"></i>
+</button>
+
+<div class="sidebar" id="sidebar">
+
+  <!-- Sidebar Header -->
+  <div class="sidebar-header">
+    <div class="sidebar-header-left">
+
+      {% if user.profile.avatar %}
+        <img src="{{ user.profile.avatar.url }}"
+             class="avatar"
+             width="36"
+             height="36"
+             style="border:2px solid #25D366"/>
+      {% else %}
+        <div class="avatar-placeholder"
+             style="width:36px;height:36px;background:#e1f5ee;color:#0f6e56;border:2px solid #25D366">
+          {{ user.username|first|upper }}
+        </div>
+      {% endif %}
+
+      <span class="sidebar-title">ChatApp</span>
+    </div>
+
+    <div class="header-actions">
+      <a href="{% url 'create_group' %}" class="icon-btn" title="New group">
+        <i class="ti ti-users-plus"></i>
+      </a>
+
+      <a href="{% url 'profile' %}" class="icon-btn" title="Profile">
+        <i class="ti ti-user-circle"></i>
+      </a>
+
+      <a href="{% url 'logout' %}" class="icon-btn" title="Logout">
+        <i class="ti ti-logout"></i>
+      </a>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <button class="tab-btn active" onclick="showTab('chats',this)">
+      Chats
+    </button>
+
+    <button class="tab-btn" onclick="showTab('people',this)">
+      People
+    </button>
+  </div>
+
+  <!-- Chats Tab -->
+  <div id="tab-chats">
+
+    <div class="search-wrap">
+      <div class="search-inner">
+        <i class="ti ti-search"></i>
+
+        <input type="text"
+               id="chatSearch"
+               placeholder="Search chats..."
+               oninput="filterChats(this.value)"/>
+      </div>
+    </div>
+
+    <div class="chat-list" id="chatList">
+
+      {% for rd in rooms_data %}
+
+      <a href="{% url 'room' rd.room.id %}"
+         class="chat-item {% if request.resolver_match.kwargs.room_id == rd.room.id|stringformat:'s' %}active{% endif %}"
+         data-name="{{ rd.display_name|lower }}">
+
+        <div class="online-wrap">
+
+          <!-- Real-time updates direct handling borders -->
+          {% if rd.room.room_type == 'direct' and rd.room.get_other_user.profile.is_online %}
+            {% if rd.display_avatar %}
+              <img src="{{ rd.display_avatar }}"
+                   class="avatar online-border"
+                   width="46"
+                   height="46"/>
+            {% else %}
+              <div class="avatar-placeholder online-border"
+                   style="width:46px;height:46px;
+                   background:#eeedfe;
+                   color:#534ab7">
+                {{ rd.display_name|first|upper }}
+              </div>
+            {% endif %}
+          {% else %}
+            <!-- Default handling for group/offline chats -->
+            {% if rd.display_avatar %}
+              <img src="{{ rd.display_avatar }}"
+                   class="avatar"
+                   width="46"
+                   height="46"/>
+            {% else %}
+              <div class="avatar-placeholder"
+                   style="width:46px;height:46px;
+                   background:{% if rd.room.room_type == 'group' %}#e6f1fb{% else %}#eeedfe{% endif %};
+                   color:{% if rd.room.room_type == 'group' %}#185fa5{% else %}#534ab7{% endif %}">
+
+                {% if rd.room.room_type == 'group' %}
+                  <i class="ti ti-users" style="font-size:18px"></i>
+                {% else %}
+                  {{ rd.display_name|first|upper }}
+                {% endif %}
+              </div>
+            {% endif %}
+          {% endif %}
+
+          {% if rd.room.room_type == 'direct' %}
+            {% with other=rd.room.get_other_user %}
+              {% if other and other.profile.is_online %}
+                <span class="online-dot"></span>
+              {% else %}
+                <span class="offline-dot"></span>
+              {% endif %}
+            {% endwith %}
+          {% endif %}
+        </div>
+
+        <div class="chat-item-info">
+
+          <div class="chat-name-row">
+            <span class="chat-name">{{ rd.display_name }}</span>
+
+            <span class="chat-time">
+              {% if rd.last_msg %}
+                {{ rd.last_msg.timestamp|time:"g:i A" }}
+              {% endif %}
+            </span>
+          </div>
+
+          <div class="chat-preview">
+
+            <span>
+              {% if rd.last_msg %}
+
+                {% if rd.last_msg.file %}
+                  <i class="ti ti-paperclip" style="font-size:12px"></i>
+                  {{ rd.last_msg.file_name|default:"File" }}
+                {% else %}
+                  {{ rd.last_msg.content|truncatechars:36 }}
+                {% endif %}
+
+              {% else %}
+                No messages yet
+              {% endif %}
+            </span>
+
+            {% if rd.unread > 0 %}
+              <span class="unread-badge">{{ rd.unread }}</span>
+            {% endif %}
+
+          </div>
+
+        </div>
+      </a>
+
+      {% empty %}
+
+      <div style="text-align:center;padding:40px 20px;color:#667781;font-size:13px">
+        <i class="ti ti-message-off"
+           style="font-size:32px;opacity:.3;display:block;margin-bottom:8px"></i>
+
+        No conversations yet.<br/>
+        Find people in the People tab.
+      </div>
+
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- People Tab -->
+  <div id="tab-people" style="display:none">
+
+    <div class="search-wrap">
+      <div class="search-inner">
+        <i class="ti ti-search"></i>
+
+        <input type="text"
+               id="peopleSearch"
+               placeholder="Search people..."
+               oninput="filterPeople(this.value)"/>
+      </div>
+    </div>
+
+    <div class="chat-list" id="peopleList">
+
+      {% for u in all_users %}
+
+      <!-- JS triggers query using template user format standard strings -->
+      <div class="chat-item"
+           data-name="{{ u.username|lower }}"
+           onclick="window.location='{% url 'start_direct' u.id %}'">
+
+        <div class="online-wrap">
+
+          {% if u.profile.is_online %}
+            <!-- Green Border for Online Users -->
+            {% if u.profile.avatar %}
+              <img src="{{ u.profile.avatar.url }}"
+                   class="avatar online-border"
+                   width="46"
+                   height="46"/>
+            {% else %}
+              <div class="avatar-placeholder online-border"
+                   style="width:46px;height:46px;background:#eeedfe;color:#534ab7;">
+                {{ u.username|first|upper }}
+              </div>
+            {% endif %}
+            <span class="online-dot"></span>
+          {% else %}
+            <!-- Standard View for Offline Users -->
+            {% if u.profile.avatar %}
+              <img src="{{ u.profile.avatar.url }}"
+                   class="avatar"
+                   width="46"
+                   height="46"/>
+            {% else %}
+              <div class="avatar-placeholder"
+                   style="width:46px;height:46px;background:#eeedfe;color:#534ab7;">
+                {{ u.username|first|upper }}
+              </div>
+            {% endif %}
+            <span class="offline-dot"></span>
+          {% endif %}
+        </div>
+
+        <div class="chat-item-info">
+
+          <div class="chat-name-row">
+            <span class="chat-name">{{ u.username }}</span>
+
+            {% if u.profile.is_online %}
+              <span class="online-txt-indicator" style="font-size:11px;color:#25D366">online</span>
+            {% endif %}
+          </div>
+
+          <div class="chat-preview">
+            <span>
+              {{ u.profile.bio|default:"No bio"|truncatechars:40 }}
+            </span>
+          </div>
+
+        </div>
+      </div>
+
+      {% empty %}
+
+      <div style="text-align:center;padding:40px 20px;color:#667781">
+        No other users yet.
+      </div>
+
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<!-- CSS -->
+<style>
+
+/* Sidebar Layout */
+.sidebar{
+  width:340px;
+  height:100vh;
+  background:#fff;
+  border-right:1px solid #e4e6eb;
+  overflow:hidden;
+  display:flex;
+  flex-direction:column;
+}
+
+/* Header */
+.sidebar-header{
+  padding:14px 16px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  border-bottom:1px solid #edf0f2;
+}
+
+.sidebar-header-left{
+  display:flex;
+  align-items:center;
+  gap:10px;
+}
+
+.sidebar-title{
+  font-size:18px;
+  font-weight:700;
+}
+
+/* Global Avatar Configurations with inside borders calculation fix */
+.avatar{
+  border-radius:50%;
+  object-fit:cover;
+  box-sizing: border-box;
+}
+
+.avatar-placeholder{
+  border-radius:50%;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-weight:700;
+  box-sizing: border-box;
+}
+
+/* Unified Green Border Utility */
+.avatar.online-border,
+.avatar-placeholder.online-border {
+  border: 2px solid #25D366 !important;
+}
+
+/* Header Actions */
+.header-actions{
+  display:flex;
+  gap:8px;
+}
+
+.icon-btn{
+  width:36px;
+  height:36px;
+  border-radius:10px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  text-decoration:none;
+  color:#555;
+  transition:.2s;
+}
+
+.icon-btn:hover{
+  background:#f1f3f5;
+}
+
+/* Tabs */
+.tabs{
+  display:flex;
+  padding:10px;
+  gap:8px;
+}
+
+.tab-btn{
+  flex:1;
+  border:none;
+  background:#f3f5f7;
+  padding:10px;
+  border-radius:10px;
+  cursor:pointer;
+  font-weight:600;
+}
+
+.tab-btn.active{
+  background:#25D366;
+  color:#fff;
+}
+
+/* Search Box Layout */
+.search-wrap{
+  padding:0 12px 12px;
+}
+
+.search-inner{
+  background:#f5f7f8;
+  border-radius:12px;
+  display:flex;
+  align-items:center;
+  gap:8px;
+  padding:10px 14px;
+}
+
+.search-inner input{
+  border:none;
+  background:none;
+  outline:none;
+  width:100%;
+}
+
+/* Chat Row Element Container */
+.chat-list{
+  overflow-y:auto;
+  flex:1;
+}
+
+.chat-item{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  padding:12px 14px;
+  text-decoration:none;
+  color:#111;
+  transition:.2s;
+  cursor:pointer;
+}
+
+.chat-item:hover{
+  background:#f7f9fa;
+}
+
+.chat-item.active{
+  background:#ebf7f1;
+}
+
+/* Status Indicator Dots positioning */
+.online-wrap{
+  position:relative;
+}
+
+.online-dot,
+.offline-dot{
+  width:10px;
+  height:10px;
+  border-radius:50%;
+  position:absolute;
+  bottom:2px;
+  right:2px;
+  border:2px solid #fff;
+}
+
+.online-dot{
+  background:#25D366;
+}
+
+.offline-dot{
+  background:#c4c7cb;
+}
+
+/* Meta info spacing styling */
+.chat-item-info{
+  flex:1;
+  min-width:0;
+}
+
+.chat-name-row{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  margin-bottom:4px;
+}
+
+.chat-name{
+  font-weight:600;
+}
+
+.chat-time{
+  font-size:11px;
+  color:#7d8b95;
+}
+
+.chat-preview{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  font-size:13px;
+  color:#667781;
+  gap:8px;
+}
+
+.unread-badge{
+  background:#25D366;
+  color:#fff;
+  font-size:11px;
+  min-width:20px;
+  height:20px;
+  padding:0 6px;
+  border-radius:999px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+
+/* Responsive View Actions Trigger */
+.mobile-menu-btn{
+  display:none;
+  position:fixed;
+  top:14px;
+  left:14px;
+  z-index:1200;
+  background:#25D366;
+  color:#fff;
+  border:none;
+  width:42px;
+  height:42px;
+  border-radius:10px;
+  font-size:22px;
+  cursor:pointer;
+  box-shadow:0 2px 10px rgba(0,0,0,.15);
+}
+
+@media (max-width:768px){
+  .mobile-menu-btn{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+
+  .sidebar{
+    position:fixed;
+    top:0;
+    left:-100%;
+    width:85%;
+    max-width:320px;
+    z-index:1100;
+    transition:.3s ease;
+    box-shadow:2px 0 20px rgba(0,0,0,.15);
+  }
+
+  .sidebar.open{
+    left:0;
+  }
+}
+</style>
+
+<!-- JS Script Logic -->
+<script>
+function showTab(tab, btn){
+  document.getElementById('tab-chats').style.display = tab === 'chats' ? 'block' : 'none';
+  document.getElementById('tab-people').style.display = tab === 'people' ? 'block' : 'none';
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.classList.remove('active');
+  });
+  btn.classList.add('active');
+}
+
+function filterChats(q){
+  document.querySelectorAll('#chatList .chat-item').forEach(el => {
+    el.style.display = el.dataset.name.includes(q.toLowerCase()) ? '' : 'none';
+  });
+}
+
+function filterPeople(q){
+  document.querySelectorAll('#peopleList .chat-item').forEach(el => {
+    el.style.display = el.dataset.name.includes(q.toLowerCase()) ? '' : 'none';
+  });
+}
+
+function toggleSidebar(){
+  document.getElementById('sidebar').classList.toggle('open');
+}
+
+document.querySelectorAll('.chat-item').forEach(item => {
+  item.addEventListener('click', () => {
+    if(window.innerWidth <= 768){
+      document.getElementById('sidebar').classList.remove('open');
+    }
+  });
+});
+</script>

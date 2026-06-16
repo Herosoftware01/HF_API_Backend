@@ -1,0 +1,46 @@
+{% extends 'chat/base.html' %}
+{% block title %}New Group — ChatApp{% endblock %}
+{% block body %}
+<div style="min-height:100vh;background:#f0f2f5;display:flex;align-items:center;justify-content:center;padding:20px">
+  <div style="background:#fff;border-radius:16px;padding:36px;width:100%;max-width:520px;border:1px solid #e9edef">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px">
+      <a href="{% url 'home' %}" class="icon-btn"><i class="ti ti-arrow-left" style="font-size:20px"></i></a>
+      <h1 style="font-size:20px;font-weight:600">Create a new group</h1>
+    </div>
+    <form method="post" enctype="multipart/form-data">
+      {% csrf_token %}
+      <div class="form-group">
+        <label>Group name</label>
+        <input name="name" class="form-control" placeholder="e.g. Team Alpha" required value="{{ form.name.value|default:'' }}"/>
+        {% if form.name.errors %}<div class="form-error">{{ form.name.errors.0 }}</div>{% endif %}
+      </div>
+      <div class="form-group">
+        <label>Description <span style="color:#667781;font-weight:400">(optional)</span></label>
+        <input name="description" class="form-control" placeholder="What's this group about?" value="{{ form.description.value|default:'' }}"/>
+      </div>
+      <div class="form-group">
+        <label>Group photo <span style="color:#667781;font-weight:400">(optional)</span></label>
+        <input name="avatar" type="file" accept="image/*" class="form-control" style="padding:6px"/>
+      </div>
+      <div class="form-group">
+        <label>Add members</label>
+        {% if form.members.errors %}<div class="form-error">{{ form.members.errors.0 }}</div>{% endif %}
+        <div style="border:1px solid #e9edef;border-radius:10px;max-height:220px;overflow-y:auto;padding:8px 12px">
+          {% for user in form.members %}
+          <label style="display:flex;align-items:center;gap:10px;padding:7px 0;cursor:pointer;border-bottom:1px solid #f5f6f6">
+            {{ user.tag }}
+            <span style="font-size:14px">{{ user.choice_label }}</span>
+          </label>
+          {% empty %}
+          <p style="color:#667781;font-size:13px;padding:8px 0">No other users available.</p>
+          {% endfor %}
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:8px">
+        <a href="{% url 'home' %}" class="btn btn-outline" style="flex:1;text-align:center">Cancel</a>
+        <button type="submit" class="btn btn-green" style="flex:1">Create Group</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
