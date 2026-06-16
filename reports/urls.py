@@ -12,7 +12,6 @@ urlpatterns = [
     path('mistake_summary/', views.mistake_summary, name='mistake_summary'),
     path('coraroll/', views.cora, name='coraroll'),
     path('cutdel/', views.cutdel, name='cutdel'),
-    path('prodpn/', views.prodpn, name='prodpn'),
     path('bitcheckhour/', views.bitcheckhour, name='bitcheckhour'),
     path('stickerhour/', views.stickerHour, name='stickerHour'),
 

@@ -86,7 +86,8 @@ INSTALLED_APPS = [
     'imp_reports',
     'chat',
     'chatbot',
-    'n8n'
+    'n8n',
+    'bundle_tracking',
 ]
 
 X_FRAME_OPTIONS = 'ALLOWALL'

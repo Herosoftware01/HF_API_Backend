@@ -5,7 +5,7 @@ import os
 import json
 from datetime import datetime
 from .models import LaySp, MasterFinalMistake, UnitBundlereport, FinalPlans,Corarlck1,CoraRollcheck,AttUnt,EmbAbsetnt,Holiday,LabAtt,RptCutting,VueOrdersinhand
-from .models import BillAge,BillMdapprove,BillPass,Leavempabsent,LaySpreadingLayemployee,HrLabourattendence,Employeeworking1,TmpPrdprn,BitcheckHour,StickerHour
+from .models import BillAge,BillMdapprove,BillPass,Leavempabsent,LaySpreadingLayemployee,HrLabourattendence,Employeeworking1,BitcheckHour,StickerHour
 from django.db.models import F, Q , IntegerField,DateField,Case, When, Value,CharField
 from django.db import connections
 from django.db.models import OuterRef, Subquery
@@ -2455,37 +2455,6 @@ def labour_attendance_api(request):
     return JsonResponse(data, safe=False)
 
 
-
-def prodpn(request):
-
-    data = TmpPrdprn.objects.using('demo').all()
-
-    print("Total records in TmpPrdprn:", data.count())  # Debug: Check total records
-
-    response_data = []
-
-    for rec in data:    
-        response_data.append({
-            "unit": rec.unit,
-            "jobno": rec.jobno,
-            "tb": rec.tb,
-            "color": rec.clr,
-            "ordqty": rec.ordqty,
-            "cutqtyqty": rec.cutqtyqty,
-            "allotqty": rec.allotqty,
-            "bc": rec.bc,
-            "oth": rec.oth,
-            "sew": rec.sew,
-            "singer": rec.singer,
-            "che": rec.che,
-            "fc": rec.fc,
-            "irn": rec.irn,
-            "pack": rec.pack,
-            "mist": rec.mist,
-            "rejqty": rec.rejqty,
-        })
-
-    return JsonResponse(response_data, safe=False)
 
 
 def bitcheckhour(request):

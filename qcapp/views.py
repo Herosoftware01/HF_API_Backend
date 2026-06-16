@@ -1378,3 +1378,64 @@ def get_cutting_measurements(request):
 
 
 
+def qc_reports(request):
+
+    if request.method == "GET":
+        data = qc_piece_data.objects.using('default').all().values()
+        data_list = list(data)
+        return JsonResponse(data_list, safe=False)
+
+
+
+
+def machine_allocation_api(request):
+    result = []
+
+    allocations = MachineAllocation.objects.select_related(
+        'machine',
+        'unit',
+        'line'
+    )
+
+    for allocation in allocations:
+
+        employees = list(
+            emp_allocate.objects.filter(
+                machine=allocation.machine
+            ).values(
+                'emp_code',
+                'date',
+                'unit',
+                'machine_id',
+                'line',
+                'status',
+                'seq',
+                'jobno',
+                'top_bottom'
+            )
+        )
+
+        result.append({
+            "machine": {
+                "id": allocation.machine.id,
+                "identity": allocation.machine.Identity,
+                "item": allocation.machine.Item,
+                "description": allocation.machine.Description,
+                "mcgrp": allocation.machine.mcgrp
+            },
+            "allocation": {
+                "unit_id": allocation.unit.id,
+                "unit_name": allocation.unit.name,
+                "line_id": allocation.line.id,
+                "line_number": allocation.line.line_number,
+                "machine_id": allocation.machine.id,
+                "allocated_at": allocation.allocated_at.strftime("%Y-%m-%d %H:%M:%S")
+            },
+            "employees": employees
+        })
+
+    return JsonResponse({
+        "status": True,
+        "count": len(result),
+        "data": result
+    })
