@@ -1389,35 +1389,56 @@ def qc_reports(request):
 
 
 def machine_allocation_api(request):
-    result = []
+
+    # Default = today
+    selected_date = request.GET.get("date")
+
+    if not selected_date:
+        selected_date = date.today().strftime("%Y-%m-%d")
 
     allocations = MachineAllocation.objects.select_related(
-        'machine',
-        'unit',
-        'line'
+        "machine",
+        "unit",
+        "line"
     )
+
+    # Load all employee allocations for selected date in one query
+    employee_rows = list(
+        emp_allocate.objects.filter(
+            date=selected_date
+        ).values(
+            "emp_code",
+            "date",
+            "unit",
+            "machine_id",
+            "line",
+            "status",
+            "seq",
+            "jobno",
+            "top_bottom"
+        )
+    )
+
+    # Group employees by machine_id
+    emp_map = {}
+
+    for emp in employee_rows:
+        machine_id = emp["machine_id"]
+
+        if machine_id not in emp_map:
+            emp_map[machine_id] = []
+
+        emp_map[machine_id].append(emp)
+
+    result = []
 
     for allocation in allocations:
 
-        employees = list(
-            emp_allocate.objects.filter(
-                machine=allocation.machine
-            ).values(
-                'emp_code',
-                'date',
-                'unit',
-                'machine_id',
-                'line',
-                'status',
-                'seq',
-                'jobno',
-                'top_bottom'
-            )
-        )
+        machine_id = allocation.machine.id
 
         result.append({
             "machine": {
-                "id": allocation.machine.id,
+                "id": machine_id,
                 "identity": allocation.machine.Identity,
                 "item": allocation.machine.Item,
                 "description": allocation.machine.Description,
@@ -1428,14 +1449,15 @@ def machine_allocation_api(request):
                 "unit_name": allocation.unit.name,
                 "line_id": allocation.line.id,
                 "line_number": allocation.line.line_number,
-                "machine_id": allocation.machine.id,
+                "machine_id": machine_id,
                 "allocated_at": allocation.allocated_at.strftime("%Y-%m-%d %H:%M:%S")
             },
-            "employees": employees
+            "employees": emp_map.get(machine_id, [])
         })
 
     return JsonResponse({
         "status": True,
+        "date": selected_date,
         "count": len(result),
         "data": result
     })
