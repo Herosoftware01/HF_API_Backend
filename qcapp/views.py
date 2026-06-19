@@ -1376,7 +1376,38 @@ def get_cutting_measurements(request):
         "data": result
     })
 
+def get_allocate_report(request):
 
+    unit_id = request.GET.get("unit")
+    line_id = request.GET.get("line")
+
+    s_data = emp_allocate.objects.filter(
+        unit=unit_id,
+        line=line_id,
+        date=date.today()
+    ).values(
+        "emp_code",
+        "seq",
+        "jobno",
+        "top_bottom"
+    )
+
+    data = []
+
+    for row in s_data:
+        emp = Empwisesal.objects.using('main').filter(
+            code=row["emp_code"]
+        ).first()
+
+        data.append({
+            "emp_code": row["emp_code"],
+            "seq": row["seq"],
+            "jobno": row["jobno"],
+            "top_bottom": row["top_bottom"],
+            "name": emp.name if emp else ""
+        })
+
+    return JsonResponse(data, safe=False)
 
 def qc_reports(request):
 
@@ -1386,9 +1417,10 @@ def qc_reports(request):
         return JsonResponse(data_list, safe=False)
 
 
-
-
 def machine_allocation_api(request):
+    # 1. Get the date from the frontend, default to today's date if not provided
+    selected_date = request.GET.get('date', date.today().strftime("%Y-%m-%d"))
+    
     result = []
 
     allocations = MachineAllocation.objects.select_related(
@@ -1398,10 +1430,11 @@ def machine_allocation_api(request):
     )
 
     for allocation in allocations:
-
+        # 2. Filter employees by BOTH the machine AND the selected date
         employees = list(
             emp_allocate.objects.filter(
-                machine=allocation.machine
+                machine=allocation.machine,
+                date=selected_date  # <--- THIS IS THE CRITICAL FIX
             ).values(
                 'emp_code',
                 'date',
@@ -1424,14 +1457,14 @@ def machine_allocation_api(request):
                 "mcgrp": allocation.machine.mcgrp
             },
             "allocation": {
-                "unit_id": allocation.unit.id,
-                "unit_name": allocation.unit.name,
-                "line_id": allocation.line.id,
-                "line_number": allocation.line.line_number,
+                "unit_id": allocation.unit.id if allocation.unit else None,
+                "unit_name": allocation.unit.name if allocation.unit else None,
+                "line_id": allocation.line.id if allocation.line else None,
+                "line_number": allocation.line.line_number if allocation.line else None,
                 "machine_id": allocation.machine.id,
-                "allocated_at": allocation.allocated_at.strftime("%Y-%m-%d %H:%M:%S")
+                "allocated_at": allocation.allocated_at.strftime("%Y-%m-%d %H:%M:%S") if allocation.allocated_at else None
             },
-            "employees": employees
+            "employees": employees # Now this ONLY contains today's operators
         })
 
     return JsonResponse({

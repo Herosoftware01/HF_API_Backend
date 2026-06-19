@@ -312,6 +312,30 @@ def bitchecking_final_data(request):
                 },
                 status=status.HTTP_400_BAD_REQUEST
             )
+        
+        raw_mode = payload.get("entry_mood")
+
+        # normalize
+        if raw_mode is not None:
+            raw_mode = str(raw_mode).strip().lower()
+
+        # treat invalid values
+        invalid_values = ["", "null", "undefined", "none"]
+
+        if not raw_mode or raw_mode in invalid_values:
+            existing_mode = (
+                BitcheckingPlyDetails.objects.using('demo')
+                .filter(qr_id=scanner_id)
+                .values_list('entry_mode', flat=True)
+                .first()
+            )
+
+            entry_mode = existing_mode if existing_mode else "empty"
+        else:
+            entry_mode = raw_mode 
+
+        # STORED PROCEDURE CALL
+        sticker_data = [] 
 
         for item in details:
 
@@ -334,6 +358,7 @@ def bitchecking_final_data(request):
                     "result": item.get("total_select_pcs") or 0,
                     "final_tpcs": item.get("final_tpcs") or 0,
                     "out_ply": item.get("out_pcs") or 0,
+                    "entry_mode": entry_mode
                 }
             )
 
@@ -345,8 +370,7 @@ def bitchecking_final_data(request):
                 end=timezone.now()
             )
 
-            # STORED PROCEDURE CALL
-            sticker_data = []
+    
 
             with connections["demo"].cursor() as cursor:
                 cursor.execute(
