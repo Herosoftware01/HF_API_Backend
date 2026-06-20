@@ -19,7 +19,9 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 import json
 from django.db import connection
+from datetime import datetime
 from django.db.models import Case, When, Value, IntegerField
+from django.utils import timezone
 
 
 class QcAdminMistakeAPIView(APIView):
@@ -815,7 +817,7 @@ class EmpAllocateAPIView(APIView):
                 status=400
             )
 
-        today = now().date()
+        # today = now().date()
         
         jobno = None
         top_bottom = None
@@ -832,13 +834,16 @@ class EmpAllocateAPIView(APIView):
 
             else:
                 seq = sequence
+        from django.utils import timezone
+
+        today = datetime.now().date()
 
         allocation = emp_allocate.objects.filter(
             emp_code=emp_code,
             machine_id=machine_id,
             unit=unit,
             line=line,
-            date=today  # use correct field
+            date__date=today  # use correct field
         ).first() # get latest allocation if multiple exist
 
         
@@ -857,13 +862,15 @@ class EmpAllocateAPIView(APIView):
                 unit=unit,
                 line=line,
                 status=status,
-                date=today,
+                date=timezone.now(),
                 jobno=jobno,
                 top_bottom=top_bottom,
                 seq=seq
 
             )
             return Response({"message": "Employee allocated"})
+
+
 
 
 
@@ -896,7 +903,8 @@ def get_machine_employee(request, identity):
         print("unit==", unit, "line==", line)
 
         identity = identity.rstrip('/')
-        today = now().date()
+        # today = now().date()
+        today = timezone.now().date()
 
         #  Step 1: Get line_id from Line table
         line_obj = Line.objects.filter(
@@ -914,7 +922,7 @@ def get_machine_employee(request, identity):
         #  Step 2: Match EVERYTHING in one query
         last_entry = emp_allocate.objects.select_related('machine').filter(
             machine__Identity__iexact=identity,
-            date=today,
+            date__date=today,
             unit=unit,
             line=line_obj.id   # FK match
         ).order_by('-id').first()
@@ -1083,11 +1091,12 @@ def machine_status_api(request):
     except machine_details.DoesNotExist:
         return JsonResponse({"error": "Machine not found"}, status=404)
 
-    today = date.today()
+    # today = date.today()
+    today = timezone.now().date()
 
     allocation = emp_allocate.objects.filter(
         machine=machine,
-        date=today
+        date__date=today
     ).order_by('-id').first()
 
     if not allocation:
@@ -1384,7 +1393,7 @@ def get_allocate_report(request):
     s_data = emp_allocate.objects.filter(
         unit=unit_id,
         line=line_id,
-        date=date.today()
+        date__date=date.today()
     ).values(
         "emp_code",
         "seq",
@@ -1419,7 +1428,13 @@ def qc_reports(request):
 
 def machine_allocation_api(request):
     # 1. Get the date from the frontend, default to today's date if not provided
-    selected_date = request.GET.get('date', date.today().strftime("%Y-%m-%d"))
+    # selected_date = request.GET.get('date', date.today().strftime("%Y-%m-%d %H:%M:%S"))
+    selected_date = request.GET.get('date')
+
+    if selected_date:
+        selected_date = datetime.strptime(selected_date, '%Y-%m-%d').date()
+    else:
+        selected_date = date.today()
     
     result = []
 
@@ -1434,7 +1449,7 @@ def machine_allocation_api(request):
         employees = list(
             emp_allocate.objects.filter(
                 machine=allocation.machine,
-                date=selected_date  # <--- THIS IS THE CRITICAL FIX
+                date__date=selected_date  # <--- THIS IS THE CRITICAL FIX
             ).values(
                 'emp_code',
                 'date',

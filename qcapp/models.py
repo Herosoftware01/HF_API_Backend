@@ -1,7 +1,7 @@
 from django.db import models
 from django.core.exceptions import ValidationError
 import datetime
-
+from django.utils import timezone
 
 class QcAdminMistake(models.Model):
     name = models.CharField(max_length=100)
@@ -244,7 +244,6 @@ class Empwisesal(models.Model):
         db_table = 'EmpwiseSal'
 
 
-
 class emp_allocate(models.Model):
     emp_code = models.CharField(max_length=50)
     machine = models.ForeignKey(
@@ -252,7 +251,8 @@ class emp_allocate(models.Model):
         on_delete=models.CASCADE,
         related_name="emp_allocations"
     )
-    date = models.DateField(auto_now_add=True)
+    
+    date = models.DateTimeField(default=timezone.now)
     unit = models.IntegerField()
     line = models.IntegerField()
     status = models.BooleanField(default=False)

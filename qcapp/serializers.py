@@ -63,7 +63,7 @@ class MachineAllocationSerializer(serializers.ModelSerializer):
             emp_allocate.objects
             .filter(
                 machine_id=obj.machine.id,
-                date=today,
+                date__date=today,
                 unit=obj.unit.id,     # 👈 important
                 line=obj.line.id      # 👈 important
             )
