@@ -1461,3 +1461,11 @@ def machine_allocation_api(request):
         "count": len(result),
         "data": result
     })
+
+
+def needle_report_api(request):
+
+    if request.method == "GET":
+        data = Needle_change.objects.using('default').all().values()
+        data_list = list(data)
+        return JsonResponse(data_list, safe=False)
