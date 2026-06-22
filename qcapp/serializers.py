@@ -63,7 +63,7 @@ class MachineAllocationSerializer(serializers.ModelSerializer):
             emp_allocate.objects
             .filter(
                 machine_id=obj.machine.id,
-                date=today,
+                date__date=today,
                 unit=obj.unit.id,     # 👈 important
                 line=obj.line.id      # 👈 important
             )
@@ -181,11 +181,12 @@ class MachineTrasnsferSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Selected line does not belong to the selected unit")
 
         # ✅ NEW CONDITION: employee allocation check
-        today = date.today()
+        # today = date.today()
+        today = timezone.now().date()
 
         emp_exists = emp_allocate.objects.filter(
             machine=machine,
-            date=today,
+            date__date=today,
             status=True   # status = 1 (allocated)
         ).exists()
 
