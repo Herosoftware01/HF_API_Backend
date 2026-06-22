@@ -8,6 +8,17 @@
 from django.db import models
 
 
+<<<<<<< HEAD
+class UnitUnituser(models.Model):
+    id = models.BigAutoField(primary_key=True)
+    unit_name = models.CharField(max_length=20, db_collation='Latin1_General_CI_AI')
+    user_id = models.CharField(max_length=10, db_collation='Latin1_General_CI_AI')
+    password = models.CharField(max_length=10, db_collation='Latin1_General_CI_AI')
+
+    class Meta:
+        managed = False
+        db_table = 'unit_unituser'
+=======
 class TxNotification(models.Model):
     emp_code = models.IntegerField(blank=True, null=True)
     name = models.CharField(max_length=50, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)
@@ -24,3 +35,4 @@ class TxNotification(models.Model):
     class Meta:
         managed = False
         db_table = 'tx_notification'
+>>>>>>> 203fc034225e175ae9a5f208e177c49a5b0bd0af

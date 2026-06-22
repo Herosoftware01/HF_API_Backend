@@ -19,9 +19,7 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 import json
 from django.db import connection
-from datetime import datetime
 from django.db.models import Case, When, Value, IntegerField
-from django.utils import timezone
 
 
 class QcAdminMistakeAPIView(APIView):
@@ -817,7 +815,7 @@ class EmpAllocateAPIView(APIView):
                 status=400
             )
 
-        # today = now().date()
+        today = now().date()
         
         jobno = None
         top_bottom = None
@@ -834,16 +832,13 @@ class EmpAllocateAPIView(APIView):
 
             else:
                 seq = sequence
-        from django.utils import timezone
-
-        today = datetime.now().date()
 
         allocation = emp_allocate.objects.filter(
             emp_code=emp_code,
             machine_id=machine_id,
             unit=unit,
             line=line,
-            date__date=today  # use correct field
+            date=today  # use correct field
         ).first() # get latest allocation if multiple exist
 
         
@@ -862,15 +857,13 @@ class EmpAllocateAPIView(APIView):
                 unit=unit,
                 line=line,
                 status=status,
-                date=timezone.now(),
+                date=today,
                 jobno=jobno,
                 top_bottom=top_bottom,
                 seq=seq
 
             )
             return Response({"message": "Employee allocated"})
-
-
 
 
 
@@ -903,8 +896,7 @@ def get_machine_employee(request, identity):
         print("unit==", unit, "line==", line)
 
         identity = identity.rstrip('/')
-        # today = now().date()
-        today = timezone.now().date()
+        today = now().date()
 
         #  Step 1: Get line_id from Line table
         line_obj = Line.objects.filter(
@@ -922,7 +914,7 @@ def get_machine_employee(request, identity):
         #  Step 2: Match EVERYTHING in one query
         last_entry = emp_allocate.objects.select_related('machine').filter(
             machine__Identity__iexact=identity,
-            date__date=today,
+            date=today,
             unit=unit,
             line=line_obj.id   # FK match
         ).order_by('-id').first()
@@ -1091,12 +1083,11 @@ def machine_status_api(request):
     except machine_details.DoesNotExist:
         return JsonResponse({"error": "Machine not found"}, status=404)
 
-    # today = date.today()
-    today = timezone.now().date()
+    today = date.today()
 
     allocation = emp_allocate.objects.filter(
         machine=machine,
-        date__date=today
+        date=today
     ).order_by('-id').first()
 
     if not allocation:
@@ -1385,38 +1376,7 @@ def get_cutting_measurements(request):
         "data": result
     })
 
-def get_allocate_report(request):
 
-    unit_id = request.GET.get("unit")
-    line_id = request.GET.get("line")
-
-    s_data = emp_allocate.objects.filter(
-        unit=unit_id,
-        line=line_id,
-        date__date=date.today()
-    ).values(
-        "emp_code",
-        "seq",
-        "jobno",
-        "top_bottom"
-    )
-
-    data = []
-
-    for row in s_data:
-        emp = Empwisesal.objects.using('main').filter(
-            code=row["emp_code"]
-        ).first()
-
-        data.append({
-            "emp_code": row["emp_code"],
-            "seq": row["seq"],
-            "jobno": row["jobno"],
-            "top_bottom": row["top_bottom"],
-            "name": emp.name if emp else ""
-        })
-
-    return JsonResponse(data, safe=False)
 
 def qc_reports(request):
 
@@ -1426,64 +1386,78 @@ def qc_reports(request):
         return JsonResponse(data_list, safe=False)
 
 
-def machine_allocation_api(request):
-    # 1. Get the date from the frontend, default to today's date if not provided
-    # selected_date = request.GET.get('date', date.today().strftime("%Y-%m-%d %H:%M:%S"))
-    selected_date = request.GET.get('date')
 
-    if selected_date:
-        selected_date = datetime.strptime(selected_date, '%Y-%m-%d').date()
-    else:
-        selected_date = date.today()
-    
-    result = []
+
+def machine_allocation_api(request):
+
+    # Default = today
+    selected_date = request.GET.get("date")
+
+    if not selected_date:
+        selected_date = date.today().strftime("%Y-%m-%d")
 
     allocations = MachineAllocation.objects.select_related(
-        'machine',
-        'unit',
-        'line'
+        "machine",
+        "unit",
+        "line"
     )
 
-    for allocation in allocations:
-        # 2. Filter employees by BOTH the machine AND the selected date
-        employees = list(
-            emp_allocate.objects.filter(
-                machine=allocation.machine,
-                date__date=selected_date  # <--- THIS IS THE CRITICAL FIX
-            ).values(
-                'emp_code',
-                'date',
-                'unit',
-                'machine_id',
-                'line',
-                'status',
-                'seq',
-                'jobno',
-                'top_bottom'
-            )
+    # Load all employee allocations for selected date in one query
+    employee_rows = list(
+        emp_allocate.objects.filter(
+            date=selected_date
+        ).values(
+            "emp_code",
+            "date",
+            "unit",
+            "machine_id",
+            "line",
+            "status",
+            "seq",
+            "jobno",
+            "top_bottom"
         )
+    )
+
+    # Group employees by machine_id
+    emp_map = {}
+
+    for emp in employee_rows:
+        machine_id = emp["machine_id"]
+
+        if machine_id not in emp_map:
+            emp_map[machine_id] = []
+
+        emp_map[machine_id].append(emp)
+
+    result = []
+
+    for allocation in allocations:
+
+        machine_id = allocation.machine.id
 
         result.append({
             "machine": {
-                "id": allocation.machine.id,
+                "id": machine_id,
                 "identity": allocation.machine.Identity,
                 "item": allocation.machine.Item,
                 "description": allocation.machine.Description,
                 "mcgrp": allocation.machine.mcgrp
             },
             "allocation": {
-                "unit_id": allocation.unit.id if allocation.unit else None,
-                "unit_name": allocation.unit.name if allocation.unit else None,
-                "line_id": allocation.line.id if allocation.line else None,
-                "line_number": allocation.line.line_number if allocation.line else None,
-                "machine_id": allocation.machine.id,
-                "allocated_at": allocation.allocated_at.strftime("%Y-%m-%d %H:%M:%S") if allocation.allocated_at else None
+                "unit_id": allocation.unit.id,
+                "unit_name": allocation.unit.name,
+                "line_id": allocation.line.id,
+                "line_number": allocation.line.line_number,
+                "machine_id": machine_id,
+                "allocated_at": allocation.allocated_at.strftime("%Y-%m-%d %H:%M:%S")
             },
-            "employees": employees # Now this ONLY contains today's operators
+            "employees": emp_map.get(machine_id, [])
         })
 
     return JsonResponse({
         "status": True,
+        "date": selected_date,
         "count": len(result),
         "data": result
     })

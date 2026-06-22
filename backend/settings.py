@@ -53,7 +53,6 @@ CSRF_TRUSTED_ORIGINS = [
     "http://10.1.21.13:3000",
     "https://hfempdtls.netlify.app",
     "http://10.1.21.110:7003",
-
     
 ]
 # settings.py

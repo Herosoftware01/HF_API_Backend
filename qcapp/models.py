@@ -251,8 +251,7 @@ class emp_allocate(models.Model):
         on_delete=models.CASCADE,
         related_name="emp_allocations"
     )
-    
-    date = models.DateTimeField(default=timezone.now)
+    date = models.DateField(auto_now_add=True)
     unit = models.IntegerField()
     line = models.IntegerField()
     status = models.BooleanField(default=False)
