@@ -14,6 +14,14 @@ import json
 
 from .models import Room, Message, Profile
 from .forms import RegisterForm, ProfileUpdateForm, CreateGroupForm
+from django.http import HttpResponse, JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+from PIL import Image
+import json
+import tempfile
+import subprocess
+import os
+import io
 
 
 def register_view(request):
@@ -284,3 +292,65 @@ def send_message(request, room_id):
         return redirect('room', room_id=room.id)
 
     return JsonResponse({'error': 'Empty message'}, status=400)
+
+
+
+
+
+
+@csrf_exempt
+def html_to_image(request):
+    try:
+        data = json.loads(request.body)
+        html_content = data.get("html")
+
+        if not html_content:
+            return JsonResponse(
+                {"error": "html field is required"},
+                status=400
+            )
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+
+            html_file = os.path.join(temp_dir, "input.html")
+            png_file = os.path.join(temp_dir, "output.png")
+
+            with open(html_file, "w", encoding="utf-8") as f:
+                f.write(html_content)
+
+            subprocess.run([
+                r"C:\Program Files\wkhtmltopdf\bin\wkhtmltoimage.exe",
+                "--quality", "100",
+                "--enable-local-file-access",
+                html_file,
+                png_file
+            ], check=True)
+
+            img = Image.open(png_file)
+
+            output = io.BytesIO()
+
+            img.save(
+                output,
+                format="PNG",
+                optimize=True,
+                compress_level=9
+            )
+
+            image_data = output.getvalue()
+
+            # Optional: reject if > 5 MB
+            size_mb = len(image_data) / (1024 * 1024)
+
+            if size_mb > 5:
+                return JsonResponse({
+                    "error": f"Image size is {size_mb:.2f} MB (> 5 MB)"
+                }, status=400)
+
+        return HttpResponse(
+            image_data,
+            content_type="image/png"
+        )
+
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)

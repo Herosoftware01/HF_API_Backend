@@ -8,7 +8,7 @@ import os
 
 def ws_attendance(request):
     if request.method == 'GET':
-        data = TxNotification.objects.using('mssql1').all()
+        data = TxNotification.objects.using('mssql1').exclude(wunit='Service')
 
         return JsonResponse({
             'status': 'success',

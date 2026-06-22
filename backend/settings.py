@@ -39,7 +39,6 @@ CORS_ALLOWED_ORIGINS = [
     "http://10.1.21.13:3000",
     "https://hfempdtls.netlify.app",
     "http://10.1.21.110:7003",
-    "http://10.1.21.13:3001",
     
 ]
 
@@ -54,7 +53,6 @@ CSRF_TRUSTED_ORIGINS = [
     "http://10.1.21.13:3000",
     "https://hfempdtls.netlify.app",
     "http://10.1.21.110:7003",
-    "http://10.1.21.13:3001",
     
 ]
 # settings.py
@@ -64,6 +62,9 @@ CSRF_COOKIE_SECURE = not DEBUG
 
 SESSION_COOKIE_SAMESITE = 'Lax' if DEBUG else 'None'
 SESSION_COOKIE_SECURE = not DEBUG
+
+
+APPEND_SLASH = False
 
 # Application definition
 

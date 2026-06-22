@@ -1,7 +1,7 @@
 from django.db import models
 from django.core.exceptions import ValidationError
 import datetime
-
+from django.utils import timezone
 
 class QcAdminMistake(models.Model):
     name = models.CharField(max_length=100)
@@ -242,7 +242,6 @@ class Empwisesal(models.Model):
     class Meta:
         managed = False
         db_table = 'EmpwiseSal'
-
 
 
 class emp_allocate(models.Model):

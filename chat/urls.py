@@ -16,6 +16,7 @@ urlpatterns = [
     path('api/status/', views.user_status_api, name='user_status'),
     path('messages/<int:room_id>/', views.messages_api, name='messages_api'),
     path('send/<int:room_id>/', views.send_message, name='send_message'),
+    path("html-to-image/", views.html_to_image, name="html_to_image"),
 
     
 ]

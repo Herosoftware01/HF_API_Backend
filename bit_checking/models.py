@@ -63,6 +63,7 @@ class bit_checking_updates(models.Model):
     plan_no = models.IntegerField()
     total_select_pcs = models.TextField()
     entry_mood=models.CharField(max_length=50, blank=True, null=True)
+    # r_p = models.BooleanField(default=False)
 
 
 
@@ -77,7 +78,9 @@ class BitcheckingPlyDetails(models.Model):
     out_ply = models.CharField(db_column='Out_ply', max_length=100, blank=True, null=True)
     ok_pcs = models.CharField(db_column='Ok_pcs', max_length=50, blank=True, null=True)
     mistake_pcs = models.CharField(db_column='Mistake_pcs', max_length=50, blank=True, null=True)
-    mistake_ply = models.CharField(db_column='Mistake_ply', max_length=100, blank=True, null=True)    
+    mistake_ply = models.CharField(db_column='Mistake_ply', max_length=100, blank=True, null=True) 
+    r_p = models.BooleanField(default=False)
+    entry_mode = models.CharField(max_length=20, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)   
 
     class Meta:
         managed = False
