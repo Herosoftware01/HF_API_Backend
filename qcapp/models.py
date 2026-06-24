@@ -257,9 +257,22 @@ class emp_allocate(models.Model):
     line = models.IntegerField()
     status = models.BooleanField(default=False)
     
+    seq = models.CharField(max_length=500, null=True, blank=True)
+    jobno = models.CharField(max_length=100, null=True, blank=True)
+    top_bottom = models.CharField(max_length=100, null=True, blank=True)
+
+
+class sequency_data(models.Model):
+    emp_allocate_id = models.ForeignKey(
+        emp_allocate,
+        on_delete=models.CASCADE,
+        related_name="sequences"
+    )
     seq = models.CharField(max_length=100, null=True, blank=True)
     jobno = models.CharField(max_length=100, null=True, blank=True)
     top_bottom = models.CharField(max_length=100, null=True, blank=True)
+    date = models.DateTimeField(default=timezone.now)
+
 
 class sequency_data(models.Model):
     emp_allocate_id = models.ForeignKey(
