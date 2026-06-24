@@ -261,6 +261,7 @@ class emp_allocate(models.Model):
     jobno = models.CharField(max_length=100, null=True, blank=True)
     top_bottom = models.CharField(max_length=100, null=True, blank=True)
 
+
 class sequency_data(models.Model):
     emp_allocate_id = models.ForeignKey(
         emp_allocate,

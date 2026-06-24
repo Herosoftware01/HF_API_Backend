@@ -654,6 +654,12 @@ class HrLabourattendence(models.Model):
         max_length=14
     )
 
+    mobile = models.CharField(
+        max_length=50,
+        blank=True,
+        null=True
+    )
+
     photo = models.CharField(
         max_length=400,
         blank=True,

@@ -2424,6 +2424,7 @@ def labour_attendance_api(request):
             "joindt": att.joindt,
             "dept": att.dept,
             "cat": att.cat,
+            "mobile": att.mobile,
             "subcat": att.subcat,
             "shift_contract": att.shift_contract,
             "hostel": att.hostel,

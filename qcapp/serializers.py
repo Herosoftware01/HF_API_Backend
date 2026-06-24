@@ -136,9 +136,10 @@ class MachineAllocationSerializer(serializers.ModelSerializer):
         return {
             "jobno": first_row.jobno,
             "top_bottom": first_row.top_bottom,
-            "sequence": " ~ ".join(
-                seq_records.values_list("seq", flat=True)
-            )
+            # "sequence": " ~ ".join(
+            #     seq_records.values_list("seq", flat=True)
+            # )
+            "sequence":latest_emp.seq
         }
 
 

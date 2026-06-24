@@ -819,76 +819,6 @@ class Employee_and_staffAPIView(APIView):
         return Response(data)
 
 
-# class EmpAllocateAPIView(APIView):
-#     def post(self, request):
-#         emp_code = request.data.get("emp_code")
-#         machine_id = request.data.get("machine_id")
-#         unit = request.data.get("unit")
-#         line = request.data.get("line")
-#         status = request.data.get("status", 1)  # default online
-#         sequence = request.data.get("sequence")
-        
-
-#         if not emp_code or not machine_id or not unit or not line:
-#             return Response(
-#                 {"error": "emp_code, machine_id, unit and line are required"},
-#                 status=400
-#             )
-
-#         # today = now().date()
-        
-#         jobno = None
-#         top_bottom = None
-#         seq = None
-
-#         if sequence:
-
-#             parts = sequence.split("~")
-
-#             if len(parts) >= 3:
-#                 jobno = parts[0]
-#                 top_bottom = parts[1]
-#                 seq = parts[2]
-
-#             else:
-#                 seq = sequence
-#         from django.utils import timezone
-
-#         today = datetime.now().date()
-
-#         allocation = emp_allocate.objects.filter(
-#             emp_code=emp_code,
-#             machine_id=machine_id,
-#             unit=unit,
-#             line=line,
-#             date__date=today  # use correct field
-#         ).first() # get latest allocation if multiple exist
-
-        
-#         if allocation: 
-#             allocation.status = status
-
-#             allocation.jobno = jobno
-#             allocation.top_bottom = top_bottom
-#             allocation.seq = seq
-#             allocation.save()
-#             return Response({"message": "Status and Sequence updated"})
-#         else:
-#             emp_allocate.objects.create(
-#                 emp_code=emp_code,
-#                 machine_id=machine_id,
-#                 unit=unit,
-#                 line=line,
-#                 status=status,
-#                 date=datetime.now(), 
-#                 jobno=jobno,
-#                 top_bottom=top_bottom,
-#                 seq=seq
-
-#             )
-#             return Response({"message": "Employee allocated"})
-
-
 
 # class EmpAllocateAPIView(APIView):
 #     def post(self, request):
@@ -977,6 +907,123 @@ class Employee_and_staffAPIView(APIView):
     
 
 
+# class EmpAllocateAPIView(APIView):
+
+#     def post(self, request):
+#         data = request.data
+
+#         print("data =", data)
+
+#         emp_data = data.get("emp_code")
+
+#         # -------------------------
+#         # READ DATA
+#         # -------------------------
+#         if isinstance(emp_data, dict):
+#             emp_code = emp_data.get("empCode")
+#             machine_id = emp_data.get("mId")
+#             jobno = emp_data.get("jobno")
+#             top_bottom = emp_data.get("top_bottom")
+#             sequence = emp_data.get("sequence")
+#         else:
+#             emp_code = emp_data
+#             machine_id = data.get("machine_id")
+#             jobno = data.get("jobno")
+#             top_bottom = data.get("top_bottom")
+#             sequence = data.get("sequence")
+
+#         unit = data.get("unit")
+#         line = data.get("line")
+#         status = data.get("status", 1)
+
+#         # -------------------------
+#         # BASIC VALIDATION
+#         # -------------------------
+#         if not emp_code or not machine_id:
+#             return Response(
+#                 {"error": "emp_code and machine_id are required"},
+#                 status=400
+#             )
+
+#         today = timezone.now().date()
+
+#         # -------------------------
+#         # FIND LATEST ALLOCATION
+#         # -------------------------
+#         allocation = (
+#             emp_allocate.objects
+#             .filter(
+#                 emp_code=emp_code,
+#                 machine_id=machine_id,
+#                 date__date=today
+#             )
+#             .order_by("-id")
+#             .first()
+#         )
+
+#         # -------------------------
+#         # ONLINE / OFFLINE UPDATE
+#         # -------------------------
+#         if allocation and sequence is None:
+#             allocation.status = bool(int(status))
+#             allocation.save(update_fields=["status"])
+
+#             return Response({
+#                 "message": "Status updated successfully",
+#                 "status": allocation.status
+#             })
+
+#         # -------------------------
+#         # CREATE NEW ALLOCATION
+#         # -------------------------
+#         if not allocation:
+
+#             if not unit or not line:
+#                 return Response(
+#                     {"error": "unit and line are required"},
+#                     status=400
+#                 )
+
+#             allocation = emp_allocate.objects.create(
+#                 emp_code=emp_code,
+#                 machine_id=machine_id,
+#                 unit=unit,
+#                 line=line,
+#                 status=bool(int(status)),
+#                 jobno=jobno,
+#                 top_bottom=top_bottom,
+#                 seq=sequence,
+#                 date=timezone.now()
+#             )
+
+#         # -------------------------
+#         # SAVE SEQUENCES
+#         # -------------------------
+#         steps = []
+
+#         if sequence:
+#             steps = [
+#                 s.strip()
+#                 for s in sequence.split(",")
+#                 if s.strip()
+#             ]
+
+#         for step in steps:
+#             sequency_data.objects.create(
+#                 emp_allocate_id=allocation,
+#                 seq=step,
+#                 jobno=jobno,
+#                 top_bottom=top_bottom,
+#                 date=timezone.now()
+#             )
+
+#         return Response({
+#             "message": "Saved successfully",
+#             "allocation_id": allocation.id,
+#             "steps_saved": len(steps)
+#         })
+    
+
 class EmpAllocateAPIView(APIView):
 
     def post(self, request):
@@ -1007,7 +1054,7 @@ class EmpAllocateAPIView(APIView):
         status = data.get("status", 1)
 
         # -------------------------
-        # BASIC VALIDATION
+        # VALIDATION
         # -------------------------
         if not emp_code or not machine_id:
             return Response(
@@ -1017,24 +1064,28 @@ class EmpAllocateAPIView(APIView):
 
         today = timezone.now().date()
 
-        # -------------------------
-        # FIND LATEST ALLOCATION
-        # -------------------------
-        allocation = (
-            emp_allocate.objects
-            .filter(
-                emp_code=emp_code,
-                machine_id=machine_id,
-                date__date=today
-            )
-            .order_by("-id")
-            .first()
-        )
+        # ==================================================
+        # STATUS UPDATE (ONLINE / OFFLINE)
+        # ==================================================
+        if "status" in data and sequence is None:
 
-        # -------------------------
-        # ONLINE / OFFLINE UPDATE
-        # -------------------------
-        if allocation and sequence is None:
+            allocation = (
+                emp_allocate.objects
+                .filter(
+                    emp_code=emp_code,
+                    machine_id=machine_id,
+                    date__date=today
+                )
+                .order_by("-id")
+                .first()
+            )
+
+            if not allocation:
+                return Response(
+                    {"error": "Allocation not found"},
+                    status=404
+                )
+
             allocation.status = bool(int(status))
             allocation.save(update_fields=["status"])
 
@@ -1043,28 +1094,64 @@ class EmpAllocateAPIView(APIView):
                 "status": allocation.status
             })
 
-        # -------------------------
-        # CREATE NEW ALLOCATION
-        # -------------------------
-        if not allocation:
+        # ==================================================
+        # NEW ALLOCATION
+        # ==================================================
 
-            if not unit or not line:
-                return Response(
-                    {"error": "unit and line are required"},
-                    status=400
-                )
-
-            allocation = emp_allocate.objects.create(
-                emp_code=emp_code,
-                machine_id=machine_id,
-                unit=unit,
-                line=line,
-                status=bool(int(status)),
-                jobno=jobno,
-                top_bottom=top_bottom,
-                seq=sequence,
-                date=timezone.now()
+        if not unit or not line:
+            return Response(
+                {"error": "unit and line are required"},
+                status=400
             )
+
+        # -------------------------
+        # EMPLOYEE ALREADY ONLINE ?
+        # -------------------------
+        employee_online = emp_allocate.objects.filter(
+            emp_code=emp_code,
+            date__date=today,
+            status=True
+        ).exists()
+
+        if employee_online:
+            return Response(
+                {
+                    "error": f"Employee {emp_code} already assigned and online"
+                },
+                status=400
+            )
+
+        # -------------------------
+        # MACHINE ALREADY ONLINE ?
+        # -------------------------
+        machine_online = emp_allocate.objects.filter(
+            machine_id=machine_id,
+            date__date=today,
+            status=True
+        ).exists()
+
+        if machine_online:
+            return Response(
+                {
+                    "error": f"Machine {machine_id} already allocated and online"
+                },
+                status=400
+            )
+
+        # -------------------------
+        # ALWAYS CREATE NEW ROW
+        # -------------------------
+        allocation = emp_allocate.objects.create(
+            emp_code=emp_code,
+            machine_id=machine_id,
+            unit=unit,
+            line=line,
+            status=True,
+            jobno=jobno,
+            top_bottom=top_bottom,
+            seq=sequence,
+            date=timezone.now()
+        )
 
         # -------------------------
         # SAVE SEQUENCES
@@ -1078,21 +1165,26 @@ class EmpAllocateAPIView(APIView):
                 if s.strip()
             ]
 
-        for step in steps:
-            sequency_data.objects.create(
+        sequence_objects = [
+            sequency_data(
                 emp_allocate_id=allocation,
                 seq=step,
                 jobno=jobno,
                 top_bottom=top_bottom,
                 date=timezone.now()
             )
+            for step in steps
+        ]
+
+        if sequence_objects:
+            sequency_data.objects.bulk_create(sequence_objects)
 
         return Response({
             "message": "Saved successfully",
             "allocation_id": allocation.id,
             "steps_saved": len(steps)
         })
-    
+
 
 
 @api_view(['GET'])
