@@ -69,6 +69,7 @@ APPEND_SLASH = False
 # Application definition
 
 INSTALLED_APPS = [
+    'daphne',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -86,6 +87,7 @@ INSTALLED_APPS = [
     'bit_checking',
     'imp_reports',
     'chat',
+    'chat_app',
     'chatbot',
     'n8n',
     'bundle_tracking',
@@ -123,10 +125,9 @@ REST_FRAMEWORK = {
 
 CHANNEL_LAYERS = {
     'default': {
-        'BACKEND': 'channels.layers.InMemoryChannelLayer',
+        'BACKEND': 'channels.layers.InMemoryChannelLayer', # ஒருவேளை ப்ரொடக்ஷன் போனால் 'channels_redis.core.RedisChannelLayer' ஆக மாற்றவும்
     },
 }
-
 from datetime import timedelta
 
 SIMPLE_JWT = {
@@ -288,6 +289,7 @@ USE_I18N = True
 USE_TZ = False
 
 
+
 STATIC_URL = '/static/'
 
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
@@ -328,7 +330,7 @@ BOLD_REPORTS = {
 }
 
 
-LOGIN_URL = '/chat/login/'
-LOGIN_REDIRECT_URL = '/chat/'
-LOGOUT_REDIRECT_URL = '/chat/login/'
+# LOGIN_URL = '/chat/login/'
+# LOGIN_REDIRECT_URL = '/chat/'
+# LOGOUT_REDIRECT_URL = '/chat/login/'
 ASGI_APPLICATION = 'backend.asgi.application'

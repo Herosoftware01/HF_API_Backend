@@ -31,6 +31,7 @@ urlpatterns = [
     path('imp_reports/', include('imp_reports.urls')),
     path('chat/', include('chat.urls')),
     path('chatbot/', include('chatbot.urls')),
+    path('api/chat_app/', include('chat_app.urls')),
     path('n8n/', include('n8n.urls')),
     path('bundle_tracking/', include('bundle_tracking.urls')),
 ] 

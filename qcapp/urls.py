@@ -42,6 +42,7 @@ urlpatterns = [
     path("get-existing-measurements/", views.get_existing_measurements),
     path("get_cutting_measurements/", views.get_cutting_measurements),
     path("qc_reports/", views.qc_reports, name='qc_reports'),
+    path("allocate-report/", views.get_allocate_report, name='qc_reports'),
   
 
 ]
