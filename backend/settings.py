@@ -27,7 +27,8 @@ SECRET_KEY = 'django-insecure--jpqy*__tak#1#7_0u^g5gt=n@rlpjvp5mstua5m^&i7+!8uad
 DEBUG = True
 # DEBUG = False
 
-ALLOWED_HOSTS = ['hfapi.herofashion.com','10.1.21.153','localhost','127.0.0.1','10.1.21.13','10.1.21.154','10.1.21.110']
+# ALLOWED_HOSTS = ['hfapi.herofashion.com','10.1.21.153','localhost','127.0.0.1','10.1.21.13','10.1.21.154','10.1.21.110']
+ALLOWED_HOSTS = ['*']
 
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
@@ -70,6 +71,7 @@ APPEND_SLASH = False
 # Application definition
 
 INSTALLED_APPS = [
+    'daphne',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -86,8 +88,10 @@ INSTALLED_APPS = [
     'reports',
     'bit_checking',
     'imp_reports',
-    'chat',
+    # 'chat',
+    'chat_app',
     'chatbot',
+    "channels",
     'n8n',
     'bundle_tracking',
 ]

@@ -4,7 +4,7 @@ from datetime import date
 from django.utils import timezone
 from django.db.models import Sum
 
-from .models import QcAdminMistake,Cont_employee,Needle_change,Unit, Line, MachineAllocation, machine_details, emp_allocate,Empwisesal,VueProcessSequence
+from .models import QcAdminMistake,sequency_data,Cont_employee,Needle_change,Unit, Line, MachineAllocation, machine_details, emp_allocate,Empwisesal,VueProcessSequence
 
 
 class QcAdminMistakeSerializer(serializers.ModelSerializer):
@@ -42,10 +42,11 @@ class MachineAllocationSerializer(serializers.ModelSerializer):
     employees = serializers.SerializerMethodField()
     needle_count = serializers.SerializerMethodField()
     needle_details = serializers.SerializerMethodField()
+    sequence_info = serializers.SerializerMethodField()
 
     class Meta:
         model = MachineAllocation
-        fields = ['id', 'machine', 'machine_id', 'unit', 'line', 'allocated_at', 'employees','needle_count','needle_details']  # ✅ include machine_id
+        fields = ['id', 'machine', 'machine_id', 'unit', 'line', 'allocated_at', 'employees','needle_count','needle_details','sequence_info']  # ✅ include machine_id
 
     def validate(self, data):
         if data.get('line') and data.get('unit') and data['line'].unit != data['unit']:
@@ -102,6 +103,46 @@ class MachineAllocationSerializer(serializers.ModelSerializer):
                 "photo":photo_url
             }
         ]
+    
+    def get_sequence_info(self, obj):
+        today = timezone.now().date()
+
+        latest_emp = (
+            emp_allocate.objects
+            .filter(
+                machine=obj.machine,
+                date__date=today,
+                unit=obj.unit.id,
+                line=obj.line.id
+            )
+            .order_by('-id')
+            .first()
+        )
+
+        if not latest_emp:
+            return None
+
+        seq_records = (
+            sequency_data.objects
+            .filter(emp_allocate_id=latest_emp)
+            .order_by("id")
+        )
+
+        if not seq_records.exists():
+            return None
+
+        first_row = seq_records.first()
+
+        return {
+            "jobno": first_row.jobno,
+            "top_bottom": first_row.top_bottom,
+            "sequence": " ~ ".join(
+                seq_records.values_list("seq", flat=True)
+            )
+        }
+
+
+
     # ✅ Needle count (TODAY SUM)
     def get_needle_count(self, obj):
         today = timezone.now().date()
@@ -140,6 +181,8 @@ class MachineAllocationSerializer(serializers.ModelSerializer):
             }
             for r in records
         ]
+    
+    
     
 
 class EmpAllocateSerializer(serializers.ModelSerializer):

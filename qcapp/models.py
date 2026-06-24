@@ -257,7 +257,7 @@ class emp_allocate(models.Model):
     line = models.IntegerField()
     status = models.BooleanField(default=False)
     
-    seq = models.CharField(max_length=100, null=True, blank=True)
+    seq = models.CharField(max_length=500, null=True, blank=True)
     jobno = models.CharField(max_length=100, null=True, blank=True)
     top_bottom = models.CharField(max_length=100, null=True, blank=True)
 
