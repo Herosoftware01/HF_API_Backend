@@ -63,6 +63,7 @@ class bit_checking_updates(models.Model):
     plan_no = models.IntegerField()
     total_select_pcs = models.TextField()
     entry_mood=models.CharField(max_length=50, blank=True, null=True)
+    types = models.CharField(max_length=50, db_collation='Latin1_General_CI_AI', blank=True, null=True)
     # r_p = models.BooleanField(default=False)
 
 
@@ -81,6 +82,7 @@ class BitcheckingPlyDetails(models.Model):
     mistake_ply = models.CharField(db_column='Mistake_ply', max_length=100, blank=True, null=True) 
     r_p = models.BooleanField(default=False)
     entry_mode = models.CharField(max_length=20, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)   
+    typ = models.CharField(db_column='TYP', max_length=20, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)
 
     class Meta:
         managed = False
@@ -105,6 +107,26 @@ class TrsCutstickerprodNew(models.Model):
     class Meta:
         managed = False
         db_table = 'Trs_CutStickerProd_New'
+
+
+class TrsCutstickerprodNew1(models.Model):
+    t = models.CharField(db_column='T', max_length=50)  # Field name made lowercase.
+    qrid = models.IntegerField(db_column='QRID', primary_key=True)  # Field name made lowercase.
+    planno = models.IntegerField()
+    jobno = models.CharField(db_column='JobNo', max_length=50)  # Field name made lowercase.
+    topbott_id = models.IntegerField(db_column='TopBott_ID')  # Field name made lowercase.
+    clrcombo = models.CharField(db_column='Clrcombo', max_length=80)  # Field name made lowercase.
+    lotno = models.CharField(db_column='LotNo', max_length=50)  # Field name made lowercase.
+    plansl = models.IntegerField(db_column='Plansl')  # Field name made lowercase.
+    sizeid = models.IntegerField(db_column='SizeID')  # Field name made lowercase.
+    ratio = models.IntegerField(db_column='Ratio')  # Field name made lowercase.
+    pc = models.IntegerField(db_column='Pc')  # Field name made lowercase.
+    porid = models.IntegerField(blank=True, null=True)
+    portion_des = models.CharField(db_column='PORTION_DES', max_length=50)  # Field name made lowercase.
+
+    class Meta:
+        managed = False
+        db_table = 'Trs_CutStickerProd_New1'
 
 
 class bit_start_end_time(models.Model):
