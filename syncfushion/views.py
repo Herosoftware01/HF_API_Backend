@@ -581,3 +581,171 @@ def load_tmpwrk(request):
             obj['tbimg'] = ""
 
     return JsonResponse(data, safe=False)
+
+
+
+
+##########################
+import io
+
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+
+from google.oauth2.credentials import Credentials
+from googleapiclient.discovery import build
+from googleapiclient.http import MediaIoBaseUpload
+
+FOLDER_ID = "1wveeF-CVW_FfJ5pCwXiMpdSrDi1F8043"
+
+
+@csrf_exempt
+def upload_to_drive(request):
+
+    if request.method != "POST":
+        return JsonResponse({"error": "POST only"}, status=405)
+
+    uploaded_file = request.FILES.get("file")
+
+    if not uploaded_file:
+        return JsonResponse({"error": "No file uploaded"}, status=400)
+
+    try:
+        creds = Credentials.from_authorized_user_file(
+            "token.json",
+            scopes=["https://www.googleapis.com/auth/drive"]
+        )
+
+        drive_service = build("drive", "v3", credentials=creds)
+
+        file_metadata = {
+            "name": uploaded_file.name,
+            "parents": [FOLDER_ID]
+        }
+
+        mimetype = uploaded_file.content_type or "application/octet-stream"
+
+        media = MediaIoBaseUpload(
+            uploaded_file.file,
+            mimetype=mimetype,
+            resumable=True
+        )
+
+        file = drive_service.files().create(
+            body=file_metadata,
+            media_body=media,
+            fields="id"
+        ).execute()
+
+        file_id = file["id"]
+
+        drive_service.permissions().create(
+            fileId=file_id,
+            body={
+                "role": "reader",
+                "type": "anyone"
+            }
+        ).execute()
+
+        return JsonResponse({
+            "success": True,
+            "file_id": file_id,
+            "file_url": f"https://drive.google.com/file/d/{file_id}/view"
+        })
+
+    except Exception as e:
+        return JsonResponse({
+            "success": False,
+            "error": str(e)
+        }, status=500)
+    
+    
+#######################################
+
+
+
+import io
+
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+
+from google.oauth2 import service_account
+from googleapiclient.discovery import build
+from googleapiclient.http import MediaIoBaseUpload
+
+
+SERVICE_ACCOUNT_FILE = "file-upload.json"
+
+FOLDER_ID = "1wveeF-CVW_FfJ5pCwXiMpdSrDi1F8043"
+
+SCOPES = ["https://www.googleapis.com/auth/drive"]
+
+
+@csrf_exempt
+def service_to_drive(request):
+
+    if request.method != "POST":
+        return JsonResponse({"error": "POST only"}, status=405)
+
+    uploaded_file = request.FILES.get("file")
+
+    if not uploaded_file:
+        return JsonResponse({"error": "No file provided"}, status=400)
+
+    try:
+        # 1. Authenticate service account
+        credentials = service_account.Credentials.from_service_account_file(
+            SERVICE_ACCOUNT_FILE,
+            scopes=SCOPES
+        )
+
+        # 2. Build Drive API client
+        drive_service = build("drive", "v3", credentials=credentials)
+
+        # 3. File metadata (IMPORTANT: folder ID)
+        file_metadata = {
+            "name": uploaded_file.name,
+            "parents": [FOLDER_ID]
+        }
+
+        # 4. Read file into memory
+        file_stream = io.BytesIO(uploaded_file.read())
+
+        media = MediaIoBaseUpload(
+            file_stream,
+            mimetype=uploaded_file.content_type or "application/octet-stream",
+            resumable=True
+        )
+
+        # 5. Upload file
+        file = drive_service.files().create(
+            body=file_metadata,
+            media_body=media,
+            fields="id"
+        ).execute()
+
+        file_id = file["id"]
+
+        # 6. Make file public (optional)
+        drive_service.permissions().create(
+            fileId=file_id,
+            body={
+                "type": "anyone",
+                "role": "reader"
+            }
+        ).execute()
+
+        # 7. Generate link
+        file_url = f"https://drive.google.com/file/d/{file_id}/view"
+
+        return JsonResponse({
+            "success": True,
+            "file_id": file_id,
+            "file_url": file_url
+        })
+
+    except Exception as e:
+        return JsonResponse({
+            "success": False,
+            "error": str(e)
+        }, status=500)
+
