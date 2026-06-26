@@ -11,18 +11,25 @@ from django.utils import timezone
 from django.db import connections
 
 
+def get_previous_entry_mode(qrid):
+    with connections['demo'].cursor() as cursor:
+        cursor.execute(
+            "EXEC sp_GetPreviousEntryMode @QR_ID=%s",
+            [qrid]
+        )
+
+        row = cursor.fetchone()
+
+        if row:
+            return row[0]
+        return None
 
 @api_view(["GET"])
 def qr_api(request):
 
     sl = request.GET.get('qr_id')
+    previous_entry_mode = get_previous_entry_mode(sl)
 
-    # data = (
-    #     TrsCutstickerprodNew.objects.using('demo')
-    #     .filter(qrid=sl)
-    #     .values('qrid', 'pc', 'planno', 'tbid')
-    #     .first()
-    # )
     data = (
         TrsCutstickerprodNew1.objects.using('demo')
         .filter(qrid=sl)
@@ -93,11 +100,11 @@ def qr_api(request):
             "employee": {
                 "code": first.emp_id if first else start_entry.empid
             },
-
             "descriptions": desc,
             "checked_data": checked_data,
             "count_data": count_data,
-            "entry_mood": entry_mode
+            "entry_mood": entry_mode,
+            "previous_entry_mode": previous_entry_mode,
         })
 
     # =========================
@@ -112,7 +119,7 @@ def qr_api(request):
         "pc": data['pc'],
         "t": data['t'],
         "descriptions": desc,
-
+        "previous_entry_mode": previous_entry_mode,
         "checked_data": {},
         "count_data": {},
         "entry_mood": None
@@ -393,16 +400,17 @@ def delete_checking(request):
             )
         )
 
+        with connections['demo'].cursor() as cursor:
+            for qr in scanner_ids:
+                print("Qr id :", qr)
+                cursor.execute(
+                    "EXEC sp_Delete_BitcheckProd @qr_id = %s",
+                    (qr,)
+                )
+
         BitcheckingPlyDetails.objects.using('demo').filter(
             qr_id__in=scanner_ids
         ).delete()
-
-        with connections['demo'].cursor() as cursor:
-            for qr in scanner_ids:
-                cursor.execute(
-                    "EXEC sp_Delete_BitcheckProd @qrid = %s",
-                    [qr]
-                )
 
         bit_start_end_time.objects.filter(qrid__in=scanner_ids).delete()
 
