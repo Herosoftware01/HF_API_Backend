@@ -3,7 +3,7 @@ from django.http import JsonResponse
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
-from .models import  Stickemp,VueMistakePartDetails, bit_checking_updates, BitcheckingPlyDetails, TrsCutstickerprodNew, bit_start_end_time
+from .models import  Stickemp,VueMistakePartDetails,TrsCutstickerprodNew1, bit_checking_updates, BitcheckingPlyDetails, TrsCutstickerprodNew, bit_start_end_time
 from django.views.decorators.csrf import csrf_exempt
 import json
 from django.utils.dateparse import parse_datetime
@@ -11,101 +11,29 @@ from django.utils import timezone
 from django.db import connections
 
 
-# def qr_api(request):
+def get_previous_entry_mode(qrid):
+    with connections['demo'].cursor() as cursor:
+        cursor.execute(
+            "EXEC sp_GetPreviousEntryMode @QR_ID=%s",
+            [qrid]
+        )
 
-#     sl = request.GET.get('qr_id')
+        row = cursor.fetchone()
 
-#     data = (
-#         TrsCutstickerprodNew.objects.using('demo')
-#         .filter(qrid=sl)
-#         .values('qrid', 'pc', 'planno','tbid')
-#         .first()
-#     )
-
-#     if not data:
-#         return JsonResponse({
-#             "status": False,
-#             "message": "Data not found"
-#         })
-
-#     # desc = list(
-#     #     VueMistakePartDetails.objects.using('demo')
-#     #     .filter(planno=data['planno'], topbottom_id=data['tbid'])
-#     #     .values_list('det_part', flat=True)
-#     # )
-
-#     desc = list(
-#         VueMistakePartDetails.objects.using('demo')
-#         .filter(qrid=sl)
-#         .values_list('det_part', flat=True)
-#     )
-
-#     # ✅ START/END TABLE CHECK
-#     start_entry = bit_start_end_time.objects.filter(
-#         qrid=data['qrid']
-#     ).first()
-
-#     saved_data = bit_checking_updates.objects.filter(
-#         scaner_id=data['qrid']
-#     )
-
-
-#     if start_entry or saved_data.exists():
-
-#         first = saved_data.first() if saved_data.exists() else None
-
-#         checked_data = {}
-
-#         saved_desc = []
-
-#         for item in saved_data:
-
-#             saved_desc.append(item.descriptions)
-
-#             checked_data[item.descriptions] = [
-#                 int(x)
-#                 for x in item.mistake_pcs.split(',')
-#                 if x.strip()
-#             ]
-
-#         return JsonResponse({
-#             "status": True,
-#             "already_saved": True,
-
-#             "sl": data['qrid'],
-#             "plan_no": data['planno'],
-#             "pc": data['pc'],
-
-#             "employee": {
-#                 "code": first.emp_id if first else start_entry.empid
-#             },
-
-
-#             "descriptions": desc,
-
-#             "checked_data": checked_data
-#         })
-
-#     return JsonResponse({
-#         "status": True,
-#         "already_saved": False,
-
-#         "sl": data['qrid'],
-#         "plan_no": data['planno'],
-#         "pc": data['pc'],
-#         "descriptions": desc
-#     })
-
+        if row:
+            return row[0]
+        return None
 
 @api_view(["GET"])
 def qr_api(request):
 
     sl = request.GET.get('qr_id')
+    previous_entry_mode = get_previous_entry_mode(sl)
 
     data = (
-        TrsCutstickerprodNew.objects.using('demo')
+        TrsCutstickerprodNew1.objects.using('demo')
         .filter(qrid=sl)
-        .values('qrid', 'pc', 'planno', 'tbid')
+        .values('qrid', 'pc', 'planno', 'topbott_id','t')
         .first()
     )
 
@@ -167,15 +95,16 @@ def qr_api(request):
             "sl": data['qrid'],
             "plan_no": data['planno'],
             "pc": data['pc'],
+            "t": data['t'],
 
             "employee": {
                 "code": first.emp_id if first else start_entry.empid
             },
-
             "descriptions": desc,
             "checked_data": checked_data,
             "count_data": count_data,
-            "entry_mood": entry_mode
+            "entry_mood": entry_mode,
+            "previous_entry_mode": previous_entry_mode,
         })
 
     # =========================
@@ -188,8 +117,9 @@ def qr_api(request):
         "sl": data['qrid'],
         "plan_no": data['planno'],
         "pc": data['pc'],
+        "t": data['t'],
         "descriptions": desc,
-
+        "previous_entry_mode": previous_entry_mode,
         "checked_data": {},
         "count_data": {},
         "entry_mood": None
@@ -270,7 +200,8 @@ def save_checking(request):
         total_qty=data.get('total_qty') or 0,
         plan_no=plan_no,
         total_select_pcs=data.get('total_select_pcs') or 0,
-        entry_mood=data.get('entry_mood', '')
+        entry_mood=data.get('entry_mood', ''),
+        types=data.get('types', '')
     )
 
     return Response({
@@ -358,6 +289,7 @@ def bitchecking_final_data(request):
                     "result": item.get("total_select_pcs") or 0,
                     "final_tpcs": item.get("final_tpcs") or 0,
                     "out_ply": item.get("out_pcs") or 0,
+                    "typ": item.get("types") or 0,
                     "entry_mode": entry_mode
                 }
             )
@@ -475,8 +407,8 @@ def delete_checking(request):
         with connections['demo'].cursor() as cursor:
             for qr in scanner_ids:
                 cursor.execute(
-                    "EXEC sp_Delete_BitcheckProd @qrid = %s",
-                    [qr]
+                    "EXEC sp_Delete_BitcheckProd @qr_id = %s",
+                    (qr,)
                 )
 
         bit_start_end_time.objects.filter(qrid__in=scanner_ids).delete()

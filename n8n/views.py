@@ -1,13 +1,14 @@
 from django.shortcuts import render
 from .models import TxNotification,TmpPrdprn
-from django.views.decorators.csrf import csrf_exempt
-import json
-import os
 from django.http import HttpResponse, JsonResponse
+from django.views.decorators.csrf import csrf_exempt
 from PIL import Image
+import json
 import tempfile
 import subprocess
+import os
 import io
+
 
 def ws_attendance(request):
     if request.method == 'GET':
@@ -54,8 +55,6 @@ def liveprdn(request):
         })
 
     return JsonResponse(response_data, safe=False)
-
-
 
 
 
