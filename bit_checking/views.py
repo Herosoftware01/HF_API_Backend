@@ -188,6 +188,11 @@ def save_checking(request):
             "status": False,
             "message": "Already saved"
         })
+    
+    entry_mode = str(data.get("entry_mood") or "").strip()
+
+    if entry_mode.lower() in ["", "null", "undefined", "none"]:
+        entry_mode = "empty"
 
     bit_checking_updates.objects.create(
         scaner_id=data.get('scaner_id'),
@@ -200,7 +205,7 @@ def save_checking(request):
         total_qty=data.get('total_qty') or 0,
         plan_no=plan_no,
         total_select_pcs=data.get('total_select_pcs') or 0,
-        entry_mood=data.get('entry_mood', ''),
+        entry_mood=entry_mode,
         types=data.get('types', '')
     )
 
@@ -293,6 +298,7 @@ def bitchecking_final_data(request):
                     "entry_mode": entry_mode
                 }
             )
+            print("data save success ===",scanner_id)
 
             # UPDATE END TIME
             bit_start_end_time.objects.filter(
@@ -375,17 +381,16 @@ def delete_checking(request):
         })
 
     try:
-        plan_no = request.GET.get("plan_no")
+        # plan_no = request.GET.get("plan_no")
+        qrid = request.GET.get("qrid")
 
-        if not plan_no:
+        if not qrid:
             return JsonResponse({
                 "status": False,
                 "message": "plan_no required"
             })
 
-        update_records = bit_checking_updates.objects.filter(
-            plan_no=plan_no
-        )
+        update_records = bit_checking_updates.objects.filter(scaner_id=qrid)
 
         if not update_records.exists():
             return JsonResponse({
