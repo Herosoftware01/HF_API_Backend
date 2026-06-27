@@ -11,24 +11,56 @@ from django.utils import timezone
 from django.db import connections
 
 
+# def get_previous_entry_mode(qrid):
+#     with connections['demo'].cursor() as cursor:
+#         cursor.execute(
+#             "EXEC sp_GetPreviousEntryMode @QR_ID=%s",
+#             [qrid]
+#         )
+
+#         row = cursor.fetchone()
+
+#         if row:
+#             return row[0]
+#         return None
+
+from django.db import connections, DatabaseError
+
 def get_previous_entry_mode(qrid):
-    with connections['demo'].cursor() as cursor:
-        cursor.execute(
-            "EXEC sp_GetPreviousEntryMode @QR_ID=%s",
-            [qrid]
-        )
+    try:
+        with connections['demo'].cursor() as cursor:
+            cursor.execute(
+                "EXEC sp_GetPreviousEntryMode @QR_ID=%s",
+                [qrid]
+            )
+            row = cursor.fetchone()
 
-        row = cursor.fetchone()
+            if not row:
+                return None, None
 
-        if row:
-            return row[0]
-        return None
+            entry_mode = row[0]
+            message = row[1] if len(row) > 1 else None
+
+            return entry_mode, message
+
+    except Exception as e:
+        return None, str(e)
+
 
 @api_view(["GET"])
 def qr_api(request):
 
     sl = request.GET.get('qr_id')
-    previous_entry_mode = get_previous_entry_mode(sl)
+    print("fgugo",sl)
+    # previous_entry_mode = get_previous_entry_mode(sl)
+    previous_entry_mode, prev_error = get_previous_entry_mode(sl)
+
+    if prev_error:
+        return JsonResponse({
+            "status": False,
+            "message": prev_error,   # show SQL error
+        })
+   
 
     data = (
         TrsCutstickerprodNew1.objects.using('demo')
@@ -36,6 +68,8 @@ def qr_api(request):
         .values('qrid', 'pc', 'planno', 'topbott_id','t')
         .first()
     )
+
+    print("qrid", data['qrid'])
 
     if not data:
         return JsonResponse({
@@ -105,6 +139,7 @@ def qr_api(request):
             "count_data": count_data,
             "entry_mood": entry_mode,
             "previous_entry_mode": previous_entry_mode,
+             "previous_entry_error": prev_error, 
         })
 
     # =========================
@@ -113,7 +148,7 @@ def qr_api(request):
     return JsonResponse({
         "status": True,
         "already_saved": False,
-
+          "previous_entry_error": prev_error, 
         "sl": data['qrid'],
         "plan_no": data['planno'],
         "pc": data['pc'],
@@ -301,37 +336,41 @@ def bitchecking_final_data(request):
             print("data save success ===",scanner_id)
 
             # UPDATE END TIME
-            bit_start_end_time.objects.filter(
-                qrid=scanner_id,
-                end__isnull=True
-            ).update(
-                end=timezone.now()
-            )
+
+        bit_start_end_time.objects.filter(
+            qrid=scanner_id,
+            end__isnull=True
+        ).update(
+            end=timezone.now()
+        )
 
     
 
-            with connections["demo"].cursor() as cursor:
-                cursor.execute(
-                    "EXEC sp_GetStickerDetails @sl=%s",
-                    [scanner_id]
-                )
+        with connections["demo"].cursor() as cursor:
+            cursor.execute(
+                "EXEC sp_GetStickerDetails @sl=%s",
+                [scanner_id]
+            )
 
-                columns = [col[0] for col in cursor.description]
+            columns = [col[0] for col in cursor.description]
 
-                rows = cursor.fetchall()
+            rows = cursor.fetchall()
 
-                for row in rows:
-                    sticker_data.append(dict(zip(columns, row)))
+            for row in rows:
+                sticker_data.append(dict(zip(columns, row)))
+        
+        with connections["demo"].cursor() as cursor:
+            cursor.execute("EXEC sp_GenerateBitCheckProduction")
 
-            # data  r_p=True
-            if sticker_data:
-                BitcheckingPlyDetails.objects.using('demo').filter(
-                    qr_id=scanner_id
-                ).update(r_p=True)
-            else:
-                BitcheckingPlyDetails.objects.using('demo').filter(
-                    qr_id=scanner_id
-                ).update(r_p=False)
+        # data  r_p=True
+        if sticker_data:
+            BitcheckingPlyDetails.objects.using('demo').filter(
+                qr_id=scanner_id
+            ).update(r_p=True)
+        else:
+            BitcheckingPlyDetails.objects.using('demo').filter(
+                qr_id=scanner_id
+            ).update(r_p=False)
 
         return Response(
             {
