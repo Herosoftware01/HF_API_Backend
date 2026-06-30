@@ -46,4 +46,6 @@ urlpatterns = [
     path('blocks/', block_list),
     path('blocks/<int:id>/', block_detail),
     path('stock_dtls/', views.load_tmpwrk),
+    path("upload/", views.upload_to_drive, name="upload_file"),
+    path("uploadss/", views.service_to_drive, name="upload_files"),
 ]

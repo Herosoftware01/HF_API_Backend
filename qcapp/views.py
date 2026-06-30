@@ -20,7 +20,7 @@ from datetime import date
 from django.db.models import Q
 from datetime import time
 from django.db import connection
-from django.db.models import Sum
+from datetime import datetime
 from django.utils import timezone
 from django.db.models import Case, When, Value, IntegerField
 
@@ -739,10 +739,23 @@ class MachineAllocationDetailAPIView(APIView):
 class EmployeeAPIView(APIView):
     def get(self, request):
 
-        # 1. Main employees
-        employees = Empwisesal.objects.using('main').filter(
-            status='working'
-        ).values('code', 'name', 'photo', 'dept')
+        today = timezone.now().date()
+
+        online_emp_codes = list(
+            emp_allocate.objects.filter(
+                date__date=today,
+                status=True
+            ).values_list("emp_code", flat=True)
+        )
+
+        print("online_emp_codes", online_emp_codes)
+
+        employees = (
+            Empwisesal.objects.using('main')
+            .filter(status='working')
+            .exclude(code__in=online_emp_codes)
+            .values('code', 'name', 'photo', 'dept')
+        )
 
         staff_url = settings.STAFF_IMAGES_URL.rstrip('/')
 
@@ -764,7 +777,12 @@ class EmployeeAPIView(APIView):
             })
 
         # 2. Contractor employees (Cont_employee + Mas_contractor)
-        contractors = Cont_employee.objects.select_related('con_id').all()
+        # contractors = Cont_employee.objects.select_related('con_id').all()
+        contractors = (
+            Cont_employee.objects
+            .select_related('con_id')
+            .exclude(code__in=online_emp_codes)
+        )
 
         for emp in contractors:
             contractor_name = emp.con_id.name if emp.con_id else ""
@@ -802,85 +820,223 @@ class Employee_and_staffAPIView(APIView):
         return Response(data)
 
 
+
 # class EmpAllocateAPIView(APIView):
 #     def post(self, request):
-#         emp_code = request.data.get("emp_code")
-#         machine_id = request.data.get("machine_id")
-#         unit = request.data.get("unit")
-#         line = request.data.get("line")
-#         status = request.data.get("status", 1)  # default online
-#         sequence = request.data.get("sequence")
-        
+#         data = request.data
+#         print("data==",data)
+
+#         emp_data = data.get("emp_code")
+#         print("emp_data==",emp_data)
+
+#         if isinstance(emp_data, dict):
+#             emp_code = emp_data.get("empCode")
+#             machine_id = emp_data.get("mId")
+#             jobno = emp_data.get("jobno")
+#             top_bottom = emp_data.get("top_bottom")
+#             sequence = emp_data.get("sequence")
+#         else:
+#             emp_code = emp_data
+#             machine_id = data.get("machine_id")
+#             jobno = data.get("jobno")
+#             top_bottom = data.get("top_bottom")
+#             sequence = data.get("sequence")
+
+#         unit = data.get("unit")
+#         line = data.get("line")
+#         status = data.get("status", 1)
+#         # sequence = data.get("sequence")
 
 #         if not emp_code or not machine_id or not unit or not line:
-#             return Response(
-#                 {"error": "emp_code, machine_id, unit and line are required"},
-#                 status=400
-#             )
+#             return Response({"error": "Missing required fields"}, status=400)
 
-#         # today = now().date()
-        
-#         jobno = None
-#         top_bottom = None
-#         seq = None
-
+#         steps = []
 #         if sequence:
+#             steps = [s.strip() for s in sequence.split(",") if s.strip()]
 
-#             parts = sequence.split("~")
+#         today = timezone.now().date()
 
-#             if len(parts) >= 3:
-#                 jobno = parts[0]
-#                 top_bottom = parts[1]
-#                 seq = parts[2]
-
-#             else:
-#                 seq = sequence
-#         from django.utils import timezone
-
-#         today = datetime.now().date()
-
+#         # -------------------------
+#         # GET OR CREATE allocation
+#         # -------------------------
 #         allocation = emp_allocate.objects.filter(
 #             emp_code=emp_code,
 #             machine_id=machine_id,
 #             unit=unit,
 #             line=line,
-#             date__date=today  # use correct field
-#         ).first() # get latest allocation if multiple exist
+#             date__date=today
+#         ).first()
 
-        
-#         if allocation: 
-#             allocation.status = status
 
-#             allocation.jobno = jobno
-#             allocation.top_bottom = top_bottom
-#             allocation.seq = seq
-#             allocation.save()
-#             return Response({"message": "Status and Sequence updated"})
-#         else:
-#             emp_allocate.objects.create(
+#         if not allocation:
+#             allocation = emp_allocate.objects.create(
 #                 emp_code=emp_code,
 #                 machine_id=machine_id,
 #                 unit=unit,
 #                 line=line,
 #                 status=status,
-#                 date=datetime.now(), 
+#                 date=timezone.now()
+#                 # date=today
+#             )
+
+#         # -------------------------
+#         # SAVE SEQUENCE
+#         # -------------------------
+#         if steps:
+#             for step in steps:
+#                 try:
+#                     obj = sequency_data.objects.create(
+#                         emp_allocate_id=allocation,   # ✅ FIXED (most likely issue)
+#                         seq=step,
+#                         jobno=jobno,
+#                         top_bottom=top_bottom,
+#                         date=timezone.now()
+#                     )
+#                     print("SAVED:", obj.id, step)
+
+#                 except Exception as e:
+#                     import traceback
+#                     print("SEQUENCE SAVE ERROR:", str(e))
+#                     print(traceback.format_exc())
+#                     return Response({"error": str(e)}, status=500)
+
+#         return Response({
+#             "message": "Saved successfully",
+#             "allocation_id": allocation.id,
+#             "steps_saved": len(steps)
+#         })
+    
+
+
+# class EmpAllocateAPIView(APIView):
+
+#     def post(self, request):
+#         data = request.data
+
+#         print("data =", data)
+
+#         emp_data = data.get("emp_code")
+
+#         # -------------------------
+#         # READ DATA
+#         # -------------------------
+#         if isinstance(emp_data, dict):
+#             emp_code = emp_data.get("empCode")
+#             machine_id = emp_data.get("mId")
+#             jobno = emp_data.get("jobno")
+#             top_bottom = emp_data.get("top_bottom")
+#             sequence = emp_data.get("sequence")
+#         else:
+#             emp_code = emp_data
+#             machine_id = data.get("machine_id")
+#             jobno = data.get("jobno")
+#             top_bottom = data.get("top_bottom")
+#             sequence = data.get("sequence")
+
+#         unit = data.get("unit")
+#         line = data.get("line")
+#         status = data.get("status", 1)
+
+#         # -------------------------
+#         # BASIC VALIDATION
+#         # -------------------------
+#         if not emp_code or not machine_id:
+#             return Response(
+#                 {"error": "emp_code and machine_id are required"},
+#                 status=400
+#             )
+
+#         today = timezone.now().date()
+
+#         # -------------------------
+#         # FIND LATEST ALLOCATION
+#         # -------------------------
+#         allocation = (
+#             emp_allocate.objects
+#             .filter(
+#                 emp_code=emp_code,
+#                 machine_id=machine_id,
+#                 date__date=today
+#             )
+#             .order_by("-id")
+#             .first()
+#         )
+
+#         # -------------------------
+#         # ONLINE / OFFLINE UPDATE
+#         # -------------------------
+#         if allocation and sequence is None:
+#             allocation.status = bool(int(status))
+#             allocation.save(update_fields=["status"])
+
+#             return Response({
+#                 "message": "Status updated successfully",
+#                 "status": allocation.status
+#             })
+
+#         # -------------------------
+#         # CREATE NEW ALLOCATION
+#         # -------------------------
+#         if not allocation:
+
+#             if not unit or not line:
+#                 return Response(
+#                     {"error": "unit and line are required"},
+#                     status=400
+#                 )
+
+#             allocation = emp_allocate.objects.create(
+#                 emp_code=emp_code,
+#                 machine_id=machine_id,
+#                 unit=unit,
+#                 line=line,
+#                 status=bool(int(status)),
 #                 jobno=jobno,
 #                 top_bottom=top_bottom,
-#                 seq=seq
-
+#                 seq=sequence,
+#                 date=timezone.now()
 #             )
-#             return Response({"message": "Employee allocated"})
 
+#         # -------------------------
+#         # SAVE SEQUENCES
+#         # -------------------------
+#         steps = []
 
+#         if sequence:
+#             steps = [
+#                 s.strip()
+#                 for s in sequence.split(",")
+#                 if s.strip()
+#             ]
+
+#         for step in steps:
+#             sequency_data.objects.create(
+#                 emp_allocate_id=allocation,
+#                 seq=step,
+#                 jobno=jobno,
+#                 top_bottom=top_bottom,
+#                 date=timezone.now()
+#             )
+
+#         return Response({
+#             "message": "Saved successfully",
+#             "allocation_id": allocation.id,
+#             "steps_saved": len(steps)
+#         })
+    
 
 class EmpAllocateAPIView(APIView):
+
     def post(self, request):
         data = request.data
-        print("data==",data)
+
+        print("data =", data)
 
         emp_data = data.get("emp_code")
-        print("emp_data==",emp_data)
 
+        # -------------------------
+        # READ DATA
+        # -------------------------
         if isinstance(emp_data, dict):
             emp_code = emp_data.get("empCode")
             machine_id = emp_data.get("mId")
@@ -890,45 +1046,145 @@ class EmpAllocateAPIView(APIView):
         else:
             emp_code = emp_data
             machine_id = data.get("machine_id")
-            jobno = None
-            top_bottom = None
+            jobno = data.get("jobno")
+            top_bottom = data.get("top_bottom")
             sequence = data.get("sequence")
 
         unit = data.get("unit")
         line = data.get("line")
         status = data.get("status", 1)
-        # sequence = data.get("sequence")
 
-        if not emp_code or not machine_id or not unit or not line:
-            return Response({"error": "Missing required fields"}, status=400)
-
-        steps = []
-        if sequence:
-            steps = [s.strip() for s in sequence.split(",") if s.strip()]
+        # -------------------------
+        # VALIDATION
+        # -------------------------
+        if not emp_code or not machine_id:
+            return Response(
+                {"error": "emp_code and machine_id are required"},
+                status=400
+            )
 
         today = timezone.now().date()
 
+        # ==================================================
+        # STATUS UPDATE (ONLINE / OFFLINE)
+        # ==================================================
+        if "status" in data and sequence is None:
+
+            allocation = (
+                emp_allocate.objects
+                .filter(
+                    emp_code=emp_code,
+                    machine_id=machine_id,
+                    date__date=today
+                )
+                .order_by("-id")
+                .first()
+            )
+
+            if not allocation:
+                return Response(
+                    {"error": "Allocation not found"},
+                    status=404
+                )
+
+            allocation.status = bool(int(status))
+            allocation.save(update_fields=["status"])
+
+            return Response({
+                "message": "Status updated successfully",
+                "status": allocation.status
+            })
+
+        # ==================================================
+        # NEW ALLOCATION
+        # ==================================================
+
+        if not unit or not line:
+            return Response(
+                {"error": "unit and line are required"},
+                status=400
+            )
+
         # -------------------------
-        # GET OR CREATE allocation
+        # EMPLOYEE ALREADY ONLINE ?
         # -------------------------
-        allocation = emp_allocate.objects.filter(
+        employee_online = emp_allocate.objects.filter(
+            emp_code=emp_code,
+            date__date=today,
+            status=True
+        ).exists()
+
+        if employee_online:
+            return Response(
+                {
+                    "error": f"Employee {emp_code} already assigned and online"
+                },
+                status=400
+            )
+
+        # -------------------------
+        # MACHINE ALREADY ONLINE ?
+        # -------------------------
+        machine_online = emp_allocate.objects.filter(
+            machine_id=machine_id,
+            date__date=today,
+            status=True
+        ).exists()
+
+        if machine_online:
+            return Response(
+                {
+                    "error": f"Machine {machine_id} already allocated and online"
+                },
+                status=400
+            )
+
+        # -------------------------
+        # ALWAYS CREATE NEW ROW
+        # -------------------------
+        allocation = emp_allocate.objects.create(
             emp_code=emp_code,
             machine_id=machine_id,
             unit=unit,
             line=line,
-            date__date=today
-        ).first()
+            status=True,
+            jobno=jobno,
+            top_bottom=top_bottom,
+            seq=sequence,
+            date=timezone.now()
+        )
 
-        if not allocation:
-            allocation = emp_allocate.objects.create(
-                emp_code=emp_code,
-                machine_id=machine_id,
-                unit=unit,
-                line=line,
-                status=status,
+        # -------------------------
+        # SAVE SEQUENCES
+        # -------------------------
+        steps = []
+
+        if sequence:
+            steps = [
+                s.strip()
+                for s in sequence.split(",")
+                if s.strip()
+            ]
+
+        sequence_objects = [
+            sequency_data(
+                emp_allocate_id=allocation,
+                seq=step,
+                jobno=jobno,
+                top_bottom=top_bottom,
                 date=timezone.now()
-                # date=today
             )
+            for step in steps
+        ]
+
+        if sequence_objects:
+            sequency_data.objects.bulk_create(sequence_objects)
+
+        return Response({
+            "message": "Saved successfully",
+            "allocation_id": allocation.id,
+            "steps_saved": len(steps)
+        })
 
         # -------------------------
         # SAVE SEQUENCE
@@ -1053,23 +1309,40 @@ def get_machine_employee(request, identity):
                 ).values_list('seq', flat=True)
             )
 
-            queryset = VueProcessSequence.objects.using('demo').filter(
-                jobno=jobno,
-                topbottom_des=topbottom_des,
-                mc=machine.mcgrp
-            ).exclude(
-                process_des__in=seq_match
-            ).order_by('sl')
+            # queryset = VueProcessSequence.objects.using('demo').filter(
+            #     jobno=jobno,
+            #     topbottom_des=topbottom_des,
+            #     mc=machine.mcgrp
+            # ).exclude(
+            #     process_des__in=seq_match
+            # ).order_by('sl')
 
+            # processes = [
+            #     {
+            #         "sl": p.sl,
+            #         "sl1": p.sl1,
+            #         "prsid": p.prsid,
+            #         "process_des": p.process_des,
+            #         "mc": p.mc
+            #     }
+            #     for p in queryset
+            # ]
+
+            queryset = sequency_data.objects.filter(
+                jobno=jobno,
+                top_bottom=topbottom_des,
+                emp_allocate_id=last_entry.id
+            )
             processes = [
                 {
-                    "sl": p.sl,
-                    "sl1": p.sl1,
-                    "prsid": p.prsid,
-                    "process_des": p.process_des,
-                    "mc": p.mc
+                    # "sl": p.sl,
+                    # "sl1": p.sl1,
+                    # "prsid": p.prsid,
+                    # "process_des": p.seq,
+                    "process_des": last_entry.seq,
+                    # "mc": p.mc
                 }
-                for p in queryset
+                # for p in queryset
             ]
 
         # ---------------- RESPONSE ----------------
@@ -1152,18 +1425,75 @@ class MachineTransferDetailAPIView(APIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
+# @csrf_exempt
+# def machine_status_api(request):
+    
+#     if request.method == "POST":
+#         try:
+#             data = json.loads(request.body)
+#             identity = data.get("machine_id")
+#         except:
+#             return JsonResponse({"error": "Invalid JSON"}, status=400)
+
+#     elif request.method == "GET":
+#         identity = request.GET.get("Identity")
+
+#     else:
+#         return JsonResponse({"error": "Only GET and POST allowed"}, status=405)
+
+#     if not identity:
+#         return JsonResponse({"error": "Identity is required"}, status=400)
+
+#     identity = identity.strip()
+
+#     try:
+#         machine = machine_details.objects.get(Identity__iexact=identity)
+#     except machine_details.DoesNotExist:
+#         return JsonResponse({"error": "Machine not found"}, status=404)
+
+#     # today = date.today()
+#     today = timezone.now().date()
+
+#     allocation = emp_allocate.objects.filter(
+#         machine=machine,
+#         date__date=today
+#     ).order_by('-id').first()
+
+    
+
+#     if not allocation:
+#         return JsonResponse({
+#             "message": "Machine not allocated today"
+#         })
+
+#     if not allocation.status:
+#         return JsonResponse({
+#             "message": "Machine is offline"
+#         })
+
+#     return JsonResponse({
+#         "message": "Machine is online",
+#         "emp_code": allocation.emp_code,
+#         "unit": allocation.unit,
+#         "line": allocation.line
+#     })
+
+
+
 @csrf_exempt
 def machine_status_api(request):
-    
+
     if request.method == "POST":
         try:
             data = json.loads(request.body)
             identity = data.get("machine_id")
+            mode = data.get("mode")   # NEW
         except:
             return JsonResponse({"error": "Invalid JSON"}, status=400)
 
     elif request.method == "GET":
         identity = request.GET.get("Identity")
+        mode = request.GET.get("mode")
 
     else:
         return JsonResponse({"error": "Only GET and POST allowed"}, status=405)
@@ -1171,36 +1501,47 @@ def machine_status_api(request):
     if not identity:
         return JsonResponse({"error": "Identity is required"}, status=400)
 
-    identity = identity.strip()
+    machine = machine_details.objects.get(Identity__iexact=identity.strip())
 
-    try:
-        machine = machine_details.objects.get(Identity__iexact=identity)
-    except machine_details.DoesNotExist:
-        return JsonResponse({"error": "Machine not found"}, status=404)
-
-    # today = date.today()
     today = timezone.now().date()
 
-    allocation = emp_allocate.objects.filter(
-        machine=machine,
-        date__date=today
-    ).order_by('-id').first()
+    allocation = (
+        emp_allocate.objects
+        .filter(machine=machine, date__date=today)
+        .order_by("-id")
+        .first()
+    )
 
     if not allocation:
         return JsonResponse({
             "message": "Machine not allocated today"
         })
 
-    if not allocation.status:
+    # Needle scan
+    if mode == "needle":
+        if allocation.status:
+            return JsonResponse({
+                "message": "Machine is online",
+                "emp_code": allocation.emp_code,
+                "unit": allocation.unit,
+                "line": allocation.line
+            })
+
         return JsonResponse({
             "message": "Machine is offline"
         })
 
+    # Allocation scan
+    if allocation.status:
+        return JsonResponse({
+            "message": "Machine already allocated",
+            "emp_code": allocation.emp_code,
+            "unit": allocation.unit,
+            "line": allocation.line
+        })
+
     return JsonResponse({
-        "message": "Machine is online",
-        "emp_code": allocation.emp_code,
-        "unit": allocation.unit,
-        "line": allocation.line
+        "message": "Machine is offline"
     })
 
 
@@ -1505,70 +1846,69 @@ def get_allocate_report(request):
 
     return JsonResponse(data, safe=False)
 
-
-
-def machine_allocation_api(request):
-
-    selected_date = request.GET.get(
-        "date",
-        date.today().strftime("%Y-%m-%d")
-    )
-
-    unit = request.GET.get("unit")
-
-    allocations = MachineAllocation.objects.select_related(
-        "machine",
-        "unit",
-        "line"
-    )
-
-    if unit:
-        allocations = allocations.filter(unit_id=unit)
-
-    # Get all employee allocations for the selected date
-    emp_queryset = emp_allocate.objects.filter(
-        date__date=selected_date
-    )
-
-    if unit:
-        emp_queryset = emp_queryset.filter(unit=unit)
-
-    # Group employees by machine_id
-    employee_map = {}
-
-    for emp in emp_queryset.values(
+    s_data = emp_allocate.objects.filter(
+        unit=unit_id,
+        line=line_id,
+        date__date=date.today()
+    ).values(
         "emp_code",
-        "date",
-        "unit",
-        "machine_id",
-        "line",
-        "status",
         "seq",
         "jobno",
-        "top_bottom",
-    ):
-        employee_map.setdefault(emp["machine_id"], []).append(emp)
+        "top_bottom"
+    )
 
+    data = []
+
+    for row in s_data:
+        emp = Empwisesal.objects.using('main').filter(
+            code=row["emp_code"]
+        ).first()
+
+        data.append({
+            "emp_code": row["emp_code"],
+            "seq": row["seq"],
+            "jobno": row["jobno"],
+            "top_bottom": row["top_bottom"],
+            "name": emp.name if emp else ""
+        })
+
+    return JsonResponse(data, safe=False)
+
+def machine_allocation_api(request):
+    # 1. Get the date from the frontend, default to today's date if not provided
+    selected_date = request.GET.get('date')
+
+    if selected_date:
+        selected_date = datetime.strptime(selected_date, "%Y-%m-%d").date()
+    else:
+        selected_date = date.today()
+    
     result = []
 
-    total_machine = 0
-    online_machine = 0
-    idle_machine = 0
+    allocations = MachineAllocation.objects.select_related(
+        'machine',
+        'unit',
+        'line'
+    )
 
     for allocation in allocations:
-
-        total_machine += 1
-
-        employees = employee_map.get(allocation.machine_id, [])
-
-        is_online = any(emp.get("emp_code") for emp in employees)
-
-        if is_online:
-            online_machine += 1
-            machine_status = "Online"
-        else:
-            idle_machine += 1
-            machine_status = "Idle"
+        # 2. Filter employees by BOTH the machine AND the selected date
+        employees = list(
+            emp_allocate.objects.filter(
+                machine=allocation.machine,
+                date__date=selected_date  # <--- THIS IS THE CRITICAL FIX
+            ).values(
+                'emp_code',
+                'date',
+                'unit',
+                'machine_id',
+                'line',
+                'status',
+                'seq',
+                'jobno',
+                'top_bottom'
+            )
+        )
 
         result.append({
             "machine": {
@@ -1630,6 +1970,7 @@ def machine_attendance_api(request):
             "status": False,
             "error": str(e)
         })
+
 
 
 def needle_report_api(request):
