@@ -243,6 +243,7 @@ class Empwisesal(models.Model):
         managed = False
         db_table = 'EmpwiseSal'
 
+from datetime import datetime
 
 class emp_allocate(models.Model):
     emp_code = models.CharField(max_length=50)
@@ -251,7 +252,7 @@ class emp_allocate(models.Model):
         on_delete=models.CASCADE,
         related_name="emp_allocations"
     )
-    date = models.DateField(auto_now_add=True)
+    date = models.DateTimeField(default=timezone.now)
     unit = models.IntegerField()
     line = models.IntegerField()
     status = models.BooleanField(default=False)
@@ -259,6 +260,18 @@ class emp_allocate(models.Model):
     seq = models.CharField(max_length=100, null=True, blank=True)
     jobno = models.CharField(max_length=100, null=True, blank=True)
     top_bottom = models.CharField(max_length=100, null=True, blank=True)
+
+class sequency_data(models.Model):
+    emp_allocate_id = models.ForeignKey(
+        emp_allocate,
+        on_delete=models.CASCADE,
+        related_name="sequences"
+    )
+    seq = models.CharField(max_length=100, null=True, blank=True)
+    jobno = models.CharField(max_length=100, null=True, blank=True)
+    top_bottom = models.CharField(max_length=100, null=True, blank=True)
+    date = models.DateTimeField(default=timezone.now)
+
 
 class VueProcessSequence(models.Model):
     jobno = models.CharField(db_column='JOBNO', max_length=50)  # Field name made lowercase.

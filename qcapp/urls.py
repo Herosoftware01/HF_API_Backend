@@ -21,6 +21,7 @@ urlpatterns = [
     path('api/needle_details/', needle_details_api),
     path('machine_allocation_api/', views.machine_allocation_api, name='machine_allocation_api'),
     path('needle_report_api/', views.needle_report_api, name='needle_report_api'),
+    path('machine_attendance_api/', views.machine_attendance_api, name='machine_attendance_api'),
 
     path('api/machines/', MachineListAPIView.as_view(), name='machines-list'),
     path('api/units/', UnitListAPIView.as_view(), name='units-list'),
@@ -44,7 +45,7 @@ urlpatterns = [
     path("check-ironing-status/", views.check_ironing_status),
     path("get-existing-measurements/", views.get_existing_measurements),
     path("get_cutting_measurements/", views.get_cutting_measurements),
-    path("qc_reports/", views.qc_reports, name='qc_reports'),
+    path("qcroving/", views.qcroving, name='qcroving'),
   
 
 ]
