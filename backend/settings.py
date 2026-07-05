@@ -12,9 +12,13 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 
 from pathlib import Path
 import os
+from dotenv import load_dotenv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+# Load environment variables from .env file
+load_dotenv(os.path.join(BASE_DIR, '.env'))
 
 
 # Quick-start development settings - unsuitable for production
@@ -162,17 +166,23 @@ WSGI_APPLICATION = 'backend.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
+DB_HOST = os.environ.get('DB_HOST', '10.1.21.11')
+DB_USER = os.environ.get('DB_USER', 'sa')
+DB_PASSWORD = os.environ.get('DB_PASSWORD', 'Fashion@01')
+DB_PORT = os.environ.get('DB_PORT', '1433')
+DB_TRUSTED_CONNECTION = os.environ.get('DB_TRUSTED_CONNECTION', 'yes')
+
 DATABASES = {
     'default': {
         'ENGINE': 'mssql',
         'NAME': 'hfapi',
-        'USER': 'sa',
-        'PASSWORD': 'Fashion@01',
-        'HOST': '10.1.21.11',
-        'PORT': '1433',
+        'USER': DB_USER,
+        'PASSWORD': DB_PASSWORD,
+        'HOST': DB_HOST,
+        'PORT': DB_PORT,
         'OPTIONS': {
             'driver': 'ODBC Driver 17 for SQL Server',
-            'trusted_connection': "yes"
+            'trusted_connection': DB_TRUSTED_CONNECTION
         },
         'CONN_MAX_AGE': 300,
     },
@@ -180,78 +190,78 @@ DATABASES = {
     'demo': {
         'ENGINE': 'mssql',
         'NAME': 'Tally2sql',
-        'USER': 'sa',
-        'PASSWORD': 'Fashion@01',
-        'HOST': '10.1.21.11',
-        'PORT': '1433',
+        'USER': DB_USER,
+        'PASSWORD': DB_PASSWORD,
+        'HOST': DB_HOST,
+        'PORT': DB_PORT,
         'OPTIONS': {
             'driver': 'ODBC Driver 17 for SQL Server',
-            'trusted_connection': "yes"
+            'trusted_connection': DB_TRUSTED_CONNECTION
         },
         'CONN_MAX_AGE': 300,
     },
     'main': {
         'ENGINE': 'mssql',
         'NAME': 'Garmentrk',
-        'USER': 'sa',
-        'PASSWORD': 'Fashion@01',
-        'HOST': '10.1.21.11',
-        'PORT': '1433',
+        'USER': DB_USER,
+        'PASSWORD': DB_PASSWORD,
+        'HOST': DB_HOST,
+        'PORT': DB_PORT,
         'OPTIONS': {
             'driver': 'ODBC Driver 17 for SQL Server',
-            'trusted_connection': "yes"
+            'trusted_connection': DB_TRUSTED_CONNECTION
         },
         'CONN_MAX_AGE': 300,
     },
     'mssql1' : {
         'ENGINE': 'mssql',
         'NAME': 'demo',
-        'USER': 'sa',
-        'PASSWORD': 'Fashion@01',
-        'HOST': '10.1.21.11',
-        'PORT': '1433',
+        'USER': DB_USER,
+        'PASSWORD': DB_PASSWORD,
+        'HOST': DB_HOST,
+        'PORT': DB_PORT,
         'OPTIONS': {
                 'driver': 'ODBC Driver 17 for SQL Server',
-                'trusted_connection': "yes"
+                'trusted_connection': DB_TRUSTED_CONNECTION
             },
         'CONN_MAX_AGE': 300,
     },
      'app' : {
         'ENGINE': 'mssql',
         'NAME': 'Django',
-        'USER': 'sa',
-        'PASSWORD': 'Fashion@01',
-        'HOST': '10.1.21.11',
-        'PORT': '1433',
+        'USER': DB_USER,
+        'PASSWORD': DB_PASSWORD,
+        'HOST': DB_HOST,
+        'PORT': DB_PORT,
         'OPTIONS': {
                 'driver': 'ODBC Driver 17 for SQL Server',
-                'trusted_connection': "yes"
+                'trusted_connection': DB_TRUSTED_CONNECTION
             },
         'CONN_MAX_AGE': 300,
     },
      'demo1': {
             'ENGINE': 'mssql',
             'NAME': 'NewPowerBi',
-            'USER': 'sa',
-            'PASSWORD': 'Fashion@01',
-            'HOST': '10.1.21.11',
-            'PORT': '1433',
+            'USER': DB_USER,
+            'PASSWORD': DB_PASSWORD,
+            'HOST': DB_HOST,
+            'PORT': DB_PORT,
             'OPTIONS': {
                 'driver': 'ODBC Driver 17 for SQL Server',
-                'trusted_connection': "yes"
+                'trusted_connection': DB_TRUSTED_CONNECTION
             },
             'CONN_MAX_AGE': 300,
     },
     'test': {
             'ENGINE': 'mssql',
             'NAME': 'testerphero',
-            'USER': 'sa',
-            'PASSWORD': 'Fashion@01',
-            'HOST': '10.1.21.11',
-            'PORT': '1433',
+            'USER': DB_USER,
+            'PASSWORD': DB_PASSWORD,
+            'HOST': DB_HOST,
+            'PORT': DB_PORT,
             'OPTIONS': {
                 'driver': 'ODBC Driver 17 for SQL Server',
-                'trusted_connection': "yes"
+                'trusted_connection': DB_TRUSTED_CONNECTION
             },
             'CONN_MAX_AGE': 300,
     },
