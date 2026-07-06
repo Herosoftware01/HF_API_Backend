@@ -19,6 +19,8 @@ urlpatterns = [
     path('pending-scaners/', views.pending_scaner_ids),
     path("qc_start/", views.qc_start),
     path('delete_pending_scanner/',views.delete_pending_scanner),
+    path("print-sticker/",views.print_bit_checking_sticker),
+    path("merge-images/", views.merge_images),
     
 ]
 

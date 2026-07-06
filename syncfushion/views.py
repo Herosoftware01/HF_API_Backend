@@ -500,7 +500,8 @@ def block_list(request):
         try:
             body = json.loads(request.body)
             obj = BlockEditor.objects.using('mssql1').create(
-                blocks=body.get("blocks", [])
+                blocks=body.get("blocks", []),
+                name=body.get("name")
             )
             return JsonResponse({
                 "message": "Created Successfully",
@@ -511,30 +512,33 @@ def block_list(request):
             return JsonResponse({ "error": str(e) }, status=400)
 
 @csrf_exempt
-def block_detail(request, id):
+def block_detail(request, id, name):
 
     try:
-        obj = BlockEditor.objects.using('mssql1').get(id=id)
-
+        obj = BlockEditor.objects.using("mssql1").get(id=id, name=name)
+        
     except BlockEditor.DoesNotExist:
         return JsonResponse({
             "error": "Data Not Found"
         }, status=404)
 
     if request.method == "GET":
-        data = {
+        return JsonResponse({
             "id": obj.id,
+            "name": obj.name,
             "blocks": obj.blocks,
             "created_at": obj.created_at,
             "updated_at": obj.updated_at,
-        }
-        return JsonResponse(data)
+        })
 
     elif request.method == "PUT":
         try:
             body = json.loads(request.body)
-            obj.blocks = body.get("blocks", obj.blocks)
-            obj.save(using='mssql1')
+            if "name" in body:
+                obj.name = body["name"]
+            if "blocks" in body:
+                obj.blocks = body["blocks"]
+            obj.save(using="mssql1")
             return JsonResponse({
                 "message": "Updated Successfully"
             })
@@ -545,7 +549,7 @@ def block_detail(request, id):
             }, status=400)
 
     elif request.method == "DELETE":
-        obj.delete()
+        obj.delete(using="mssql1")
         return JsonResponse({
             "message": "Deleted Successfully"
         })

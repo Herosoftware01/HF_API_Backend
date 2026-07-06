@@ -140,7 +140,7 @@ def request_advance(request):
         smon  = request.GET.get('smon')
         syear = request.GET.get('syear')
 
-        qs = Adreq.objects.using('demo').all()
+        qs = Adreq.objects.using('demo').all().order_by('-entryno')
 
         if empid:
             qs = qs.filter(empid=empid)
