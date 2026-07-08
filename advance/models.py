@@ -31,6 +31,20 @@ class Adreq(models.Model):
         managed = False
         db_table = 'ladvreq'
 
+class Monthlysaltime(models.Model):
+    id = models.AutoField(db_column='Id', primary_key=True)  # Field name made lowercase.
+    modulename = models.CharField(db_column='ModuleName', max_length=50, db_collation='SQL_Latin1_General_CP1_CI_AS')  # Field name made lowercase.
+    dayofweek = models.CharField(db_column='DayOfWeek', max_length=15, db_collation='SQL_Latin1_General_CP1_CI_AS')  # Field name made lowercase.
+    isactive = models.BooleanField(db_column='IsActive', blank=True, null=True)  # Field name made lowercase.
+    starttime = models.TimeField(db_column='StartTime')  # Field name made lowercase.
+    endtime = models.TimeField(db_column='EndTime')  # Field name made lowercase.
+    updatedat = models.DateTimeField(db_column='UpdatedAt', blank=True, null=True)  # Field name made lowercase.
+
+    class Meta:
+        managed = False
+        db_table = 'Monthlysaltime'
+        unique_together = (('modulename', 'dayofweek'),)
+
 
 class Empwisesal(models.Model):
     dept = models.CharField(max_length=50, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)

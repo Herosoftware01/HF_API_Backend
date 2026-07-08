@@ -713,9 +713,10 @@ class Employeeworking1(models.Model):
 
 
 class BitcheckHour(models.Model):
+    dt = models.DateTimeField(blank=True, null=True)
+    empid = models.IntegerField(primary_key=True)
     name = models.CharField(max_length=100, blank=True, null=True)
-    empid = models.IntegerField(primary_key=True) 
-    dt = models.DateField(blank=True, null=True)
+    s = models.DecimalField(max_digits=38, decimal_places=2, blank=True, null=True,)
     v_pc = models.IntegerField(blank=True, null=True)
     vi_pc = models.IntegerField(blank=True, null=True)
     i_pc = models.IntegerField(blank=True, null=True)
@@ -728,7 +729,6 @@ class BitcheckHour(models.Model):
     ii_pan = models.IntegerField(blank=True, null=True)
     iii_pan = models.IntegerField(blank=True, null=True)
     iv_pan = models.IntegerField(blank=True, null=True)
-    s_hift = models.DecimalField(max_digits=38, decimal_places=2)
     amt = models.DecimalField(max_digits=38, decimal_places=4, blank=True, null=True)
 
     class Meta:

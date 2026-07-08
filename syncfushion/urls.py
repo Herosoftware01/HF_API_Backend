@@ -48,4 +48,5 @@ urlpatterns = [
     path('stock_dtls/', views.load_tmpwrk),
     path("upload/", views.upload_to_drive, name="upload_file"),
     path("uploadss/", views.service_to_drive, name="upload_files"),
+    path('fashionr_results/', views.fashionr_results, name='fashionr_results'),
 ]

@@ -7,7 +7,7 @@ from .models import GridSetting,TrsMaildtls
 from django.http import JsonResponse
 from rest_framework import status
 from rest_framework import viewsets
-from .models import GridSetting,DiWasg,DiWasg_img,TrsMaildtls, SyncfushionKanban, SyncfusionGantt, BlockEditor
+from .models import GridSetting,DiWasg,DiWasg_img,TrsMaildtls, SyncfushionKanban, SyncfusionGantt, BlockEditor, FashionrResult
 from .serializers import GridSettingSerializer,TrsMaildtlsSerializer
 from rest_framework.permissions import IsAuthenticated  # optional
 import json
@@ -753,3 +753,52 @@ def service_to_drive(request):
             "error": str(e)
         }, status=500)
 
+
+from django.utils import timezone
+@csrf_exempt
+def fashionr_results(request):
+
+    if request.method == "GET":
+        data = list(
+            FashionrResult.objects.using('mssql1').values(
+                "slno",
+                "title",
+                "result",
+                "created_datetime",
+                "jobno"
+            ).order_by("-slno")
+        )
+        return JsonResponse(data, safe=False)
+
+    elif request.method == "POST":
+        try:
+            body = json.loads(request.body)
+
+            existing = FashionrResult.objects.using("mssql1").filter(
+                jobno=body.get("jobno"),
+                title=body.get("title")
+            ).exists()
+
+            if existing:
+                return JsonResponse({
+                    "success": False,
+                    "message": "Record Already Exists"
+                }, status=200)
+
+            obj = FashionrResult.objects.using('mssql1').create(
+                title=body.get("title"),
+                result=body.get("result"),   # Store JSON as string
+                created_datetime=timezone.now(),
+                jobno=body.get("jobno")
+            )
+
+            return JsonResponse({
+                "success": True,
+                "message": "Record Created Successfully",
+                "slno": obj.slno
+            }, status=201)
+
+        except Exception as e:
+            return JsonResponse({"success": False, "error": str(e)}, status=400)
+
+    return JsonResponse({"message": "Method not allowed"}, status=405)

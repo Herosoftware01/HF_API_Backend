@@ -1852,49 +1852,63 @@ def get_allocate_report(request):
 
 
 def machine_allocation_api(request):
-    # Get filters
     selected_date = request.GET.get("date")
     unit_id = request.GET.get("unit")
 
     if selected_date:
-        selected_date = datetime.strptime(selected_date, "%Y-%m-%d").date()
+        try:
+            selected_date = datetime.strptime(selected_date, "%Y-%m-%d").date()
+        except:
+            selected_date = date.today()
     else:
         selected_date = date.today()
 
-    result = []
+    # ------------------------------------
+    # Machine Allocation
+    # ------------------------------------
 
-    # Base queryset
     allocations = MachineAllocation.objects.select_related(
         "machine",
         "unit",
         "line"
-    )
+    ).order_by("-allocated_at", "-id")
 
-    # Apply unit filter
+    # Keep only latest allocation for each machine
+    latest_allocations = []
+    seen = set()
+
+    for allocation in allocations:
+        if allocation.machine_id in seen:
+            continue
+
+        seen.add(allocation.machine_id)
+        latest_allocations.append(allocation)
+
+    # Apply Unit Filter AFTER removing duplicates
     if unit_id:
-        allocations = allocations.filter(unit_id=unit_id)
+        latest_allocations = [
+            x for x in latest_allocations
+            if str(x.unit_id) == str(unit_id)
+        ]
 
-    # Remove duplicate machines (SQL Server compatible)
-    unique_allocations = []
-    seen_machine_ids = set()
+    result = []
 
-    for allocation in allocations.order_by("-allocated_at", "-id"):
-        if allocation.machine_id not in seen_machine_ids:
-            seen_machine_ids.add(allocation.machine_id)
-            unique_allocations.append(allocation)
-
-    total_machine = len(unique_allocations)
+    total_machine = len(latest_allocations)
     online_machine = 0
     idle_machine = 0
 
-    for allocation in unique_allocations:
+    for allocation in latest_allocations:
+
+        emp_queryset = emp_allocate.objects.filter(
+            machine_id=allocation.machine_id,
+            date__date=selected_date
+        )
+
+        if unit_id:
+            emp_queryset = emp_queryset.filter(unit=unit_id)
 
         employees = list(
-            emp_allocate.objects.filter(
-                machine=allocation.machine,
-                date__date=selected_date
-            )
-            .values(
+            emp_queryset.values(
                 "emp_code",
                 "date",
                 "unit",
@@ -1903,16 +1917,13 @@ def machine_allocation_api(request):
                 "status",
                 "seq",
                 "jobno",
-                "top_bottom",
-            )
-            .distinct()
+                "top_bottom"
+            ).distinct()
         )
 
-        machine_status = getattr(allocation.machine, "status", None)
-        if machine_status is None:
-            machine_status = "online" if employees else "idle"
+        machine_status = "online" if employees else "idle"
 
-        if employees:
+        if machine_status == "online":
             online_machine += 1
         else:
             idle_machine += 1
@@ -1926,7 +1937,6 @@ def machine_allocation_api(request):
                 "mcgrp": allocation.machine.mcgrp,
                 "status": machine_status,
             },
-
             "allocation": {
                 "unit_id": allocation.unit.id if allocation.unit else None,
                 "unit_name": allocation.unit.name if allocation.unit else None,
@@ -1936,7 +1946,6 @@ def machine_allocation_api(request):
                 "allocated_at": allocation.allocated_at.strftime("%Y-%m-%d %H:%M:%S")
                 if allocation.allocated_at else None,
             },
-
             "employee_count": len(employees),
             "employees": employees,
         })
@@ -1951,6 +1960,7 @@ def machine_allocation_api(request):
         "count": len(result),
         "data": result,
     })
+
 
 
 def machine_attendance_api(request):
@@ -2005,11 +2015,16 @@ def machine_attendance_api(request):
 
 
 def needle_report_api(request):
-
     if request.method == "GET":
-        data = Needle_change.objects.using('default').all().values()
-        data_list = list(data)
-        return JsonResponse(data_list, safe=False)
+        today = timezone.localdate()
+
+        data = (
+            Needle_change.objects.using('default')
+            .filter(date__date=today)   # Replace 'created_at' with your DateTimeField
+            .values()
+        )
+
+        return JsonResponse(list(data), safe=False)
     
 
 def get_shift(dt):

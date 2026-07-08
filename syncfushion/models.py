@@ -152,3 +152,14 @@ class BlockEditor(models.Model):
 
     def __str__(self):
         return f"Block Template - {self.name}"
+    
+class FashionrResult(models.Model):
+    slno = models.AutoField(primary_key=True)
+    title = models.CharField(max_length=255)
+    result = models.JSONField(default=list)
+    created_datetime = models.DateTimeField(blank=True, null=True)
+    jobno = models.CharField(max_length=100, unique=True)
+
+    class Meta:
+        managed = False
+        db_table = 'Fashionr_result'

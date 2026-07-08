@@ -2459,17 +2459,25 @@ def labour_attendance_api(request):
 
 
 def bitcheckhour(request):
-    data = BitcheckHour.objects.using('demo').all()
+    # Get date from query params (YYYY-MM-DD)
+    date_str = request.GET.get("date")
 
-    start_date = request.GET.get('startDate')
-    end_date = request.GET.get('endDate')
-
-    if start_date and end_date:
-        data = data.filter(
-            dt__range=[start_date, end_date]
-        )
+    if date_str:
+        try:
+            filter_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+        except ValueError:
+            return JsonResponse(
+                {"error": "Invalid date format. Use YYYY-MM-DD"},
+                status=400
+            )
     else:
-        data = data.filter(dt=date.today())
+        # Default to today's date
+        filter_date = timezone.localdate()
+
+    data = (
+        BitcheckHour.objects.using("demo")
+        .filter(dt__date=filter_date)
+    )
 
     return JsonResponse(list(data.values()), safe=False)
 
