@@ -2,14 +2,11 @@ from django.shortcuts import render,get_object_or_404
 from django.db import connections
 from rest_framework.decorators import api_view
 # import pandas as pd
-from django.http import HttpResponse
-from django.core.exceptions import ValidationError
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, permissions
 from .models import QcAdminMistake,cut_sample_data_final,Cont_employee,sequency_data,cut_sample_data,cut_sample_data_final,VueUser,Unit,Needle_change,Line,roving_qc_mistake,qc_piece_final, MachineAllocation, machine_details, emp_allocate, Empwisesal, VueProcessSequence
 from .serializers import QcAdminMistakeSerializer,UnitSerializer,MachineTrasnsferSerializer,MachineSerializer,LineSerializer, MachineAllocationSerializer, VueProcessSequenceSerializer
-from rest_framework.parsers import MultiPartParser, FormParser
 from collections import defaultdict
 from django.shortcuts import get_object_or_404
 from datetime import date
@@ -18,6 +15,10 @@ from django.conf import settings
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 import json
+from django.utils import timezone
+from datetime import date
+from django.db.models import Q
+from datetime import time
 from django.db import connection
 from datetime import datetime
 from django.utils import timezone
@@ -1852,13 +1853,33 @@ def get_allocate_report(request):
 
     return JsonResponse(data, safe=False)
 
-def qc_reports(request):
+    s_data = emp_allocate.objects.filter(
+        unit=unit_id,
+        line=line_id,
+        date__date=date.today()
+    ).values(
+        "emp_code",
+        "seq",
+        "jobno",
+        "top_bottom"
+    )
 
-    if request.method == "GET":
-        data = qc_piece_data.objects.using('default').all().values()
-        data_list = list(data)
-        return JsonResponse(data_list, safe=False)
+    data = []
 
+    for row in s_data:
+        emp = Empwisesal.objects.using('main').filter(
+            code=row["emp_code"]
+        ).first()
+
+        data.append({
+            "emp_code": row["emp_code"],
+            "seq": row["seq"],
+            "jobno": row["jobno"],
+            "top_bottom": row["top_bottom"],
+            "name": emp.name if emp else ""
+        })
+
+    return JsonResponse(data, safe=False)
 
 def machine_allocation_api(request):
     # 1. Get the date from the frontend, default to today's date if not provided
@@ -1902,24 +1923,60 @@ def machine_allocation_api(request):
                 "identity": allocation.machine.Identity,
                 "item": allocation.machine.Item,
                 "description": allocation.machine.Description,
-                "mcgrp": allocation.machine.mcgrp
+                "mcgrp": allocation.machine.mcgrp,
+                "status": machine_status,
             },
+
             "allocation": {
                 "unit_id": allocation.unit.id if allocation.unit else None,
                 "unit_name": allocation.unit.name if allocation.unit else None,
                 "line_id": allocation.line.id if allocation.line else None,
                 "line_number": allocation.line.line_number if allocation.line else None,
                 "machine_id": allocation.machine.id,
-                "allocated_at": allocation.allocated_at.strftime("%Y-%m-%d %H:%M:%S") if allocation.allocated_at else None
+                "allocated_at": allocation.allocated_at.strftime("%Y-%m-%d %H:%M:%S")
+                if allocation.allocated_at else None,
             },
-            "employees": employees # Now this ONLY contains today's operators
+
+            "employee_count": len(employees),
+            "employees": employees,
         })
 
     return JsonResponse({
         "status": True,
+        "selected_date": selected_date,
+        "total_machine": total_machine,
+        "online_machine": online_machine,
+        "idle_machine": idle_machine,
         "count": len(result),
-        "data": result
+        "data": result,
     })
+
+def machine_attendance_api(request):
+    try:
+        with connections['demo'].cursor() as cursor:
+            cursor.execute("EXEC pr_Tailor_PresentAbsent")
+            columns = [col[0] for col in cursor.description]
+            rows = cursor.fetchall()
+
+        data = []
+
+        for row in rows:
+            row_dict = dict(zip(columns, row))
+
+            data.append({
+                "detp": row_dict.get("detp"),
+                "code": row_dict.get("code"),
+                "name": row_dict.get("name"),
+                "status": row_dict.get("stat")
+            })
+
+        return JsonResponse(data, safe=False)
+
+    except Exception as e:
+        return JsonResponse({
+            "status": False,
+            "error": str(e)
+        })
 
 
 
@@ -1946,3 +2003,154 @@ class CutSampleViewSet(viewsets.ModelViewSet):
     
     # Bundle_id and other fields for Global Search
     search_fields = ['jobno', 'bundle_no', 'bundle_id', 'product', 'color', 'size']
+def get_shift(dt):
+    t = dt.time()
+
+    if time(8, 30) <= t < time(10, 30):
+        return "I"
+
+    elif time(10, 45) <= t < time(12, 45):
+        return "II"
+
+    elif time(13, 30) <= t < time(15, 30):
+        return "III"
+
+    elif time(15, 30) <= t < time(17, 30):
+        return "IV"
+
+    elif time(17, 45) <= t < time(20, 0):
+        return "V"
+
+    elif time(20, 45) <= t < time(23, 30):
+        return "VI"
+
+    return "NOT CHECK"
+
+
+def qcroving(request):
+    unit = request.GET.get("unit")
+    date = request.GET.get("date")
+   
+    qc_queryset = qc_piece_data.objects.all()
+
+    # Rely entirely on backend database filters
+    # Default today's data
+    if date:
+        qc_queryset = qc_queryset.filter(date__date=date)
+    else:
+        qc_queryset = qc_queryset.filter(date__date=timezone.now().date())
+
+    qc_list = list(
+        qc_queryset
+        .values(
+            "machine_id",
+            "bundle_id",
+            "date",
+            "jobno",
+            "product",
+            "seq",
+            "size",
+        )
+        .annotate(
+            mistake_count=Sum("mistake_count")
+        )
+    )
+
+    # Building machine map safely using Identity field
+    machines = {
+        m.Identity: m
+        for m in machine_details.objects.all()
+    }
+
+    emp_map = {}
+    emp_queryset = emp_allocate.objects.select_related("machine")
+
+    if unit:
+        emp_queryset = emp_queryset.filter(unit=unit)
+
+    for e in emp_queryset.order_by("-date"):
+        if e.machine and e.machine.Identity:
+            identity = e.machine.Identity
+            if identity not in emp_map:
+                emp_map[identity] = e
+    
+
+    final_queryset = qc_piece_final.objects.using('default').all()
+
+    if date:
+        final_queryset = final_queryset.filter(date__date=date)
+    else:
+        final_queryset = final_queryset.filter(date__date=timezone.now().date())
+
+    final_map = {}
+
+    for f in final_queryset:
+        key = (
+            f.bundle_id,
+            f.machine_id,
+            f.jobno,
+            f.seq,
+            f.size,
+        )
+
+        final_map[key] = {
+            "total_pieces": f.total_pieces,
+            "checked_piece": f.checked_piece,
+        }
+
+    result = []
+
+    for row in qc_list:
+        # Cross-reference with the aggregated machine identity string
+        machine = machines.get(row["machine_id"])
+        emp = emp_map.get(row["machine_id"])
+        timeline = get_shift(row["date"])
+
+        final_data = final_map.get(
+            (
+                row["bundle_id"],
+                row["machine_id"],
+                row["jobno"],
+                row["seq"],
+                row["size"],
+            ),
+            {
+                "total_pieces": 0,
+                "checked_piece": 0,
+            }
+        )
+
+        if unit and emp is None:
+            continue
+        
+        # Rigorous Status Assignment Logic
+        if row["mistake_count"] == 0:
+            status = "Perfect"
+        elif row["mistake_count"] in [1, 2]:
+            status = "Good"
+        else:
+            status = "Priority"
+
+        result.append({
+            "machine_pk": machine.id if machine else None,
+            "identity": machine.Identity if machine else None,
+            "emp_code": emp.emp_code if emp else None,
+            "unit": emp.unit if emp else None,
+
+            "date": row["date"],
+            "timeline": timeline,
+
+            "jobno": row["jobno"],
+            "product": row["product"],
+            "size": row["size"],
+            "seq": row["seq"],
+            "bundle_id": row["bundle_id"],
+
+            "total_pieces": final_data["total_pieces"],
+            "checked_piece": final_data["checked_piece"],
+
+            "mistake_count": row["mistake_count"],
+            "status": status,
+        })
+
+    return JsonResponse(result, safe=False)

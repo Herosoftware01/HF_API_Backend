@@ -202,64 +202,6 @@ def emp_stick(request):
 
 
 
-# def emp_stick(request):
-
-#     from_date = parse_datetime("2026-05-18 08:28:55.931995")
-
-#     # Existing QR + Type combinations
-#     existing_qr_type = set(
-#         BitcheckingPlyDetails.objects.using('demo')
-#         .values_list('qr_id', 'typ')
-#     )
-
-#     # Get updates after date
-#     updates = (
-#         bit_checking_updates.objects
-#         .filter(date__gte=from_date)
-#         .values('scaner_id', 'types', 'emp_id')
-#     )
-
-#     pending_emp_ids = set()
-
-#     for item in updates:
-
-#         qr_type = (
-#             item['scaner_id'],
-#             item['types']
-#         )
-
-#         # QR + Type already exists -> skip
-#         if qr_type in existing_qr_type:
-#             continue
-
-#         pending_emp_ids.add(item['emp_id'])
-
-
-#     queryset = (
-#         Stickemp.objects.using('main')
-#         .exclude(code__in=pending_emp_ids)
-#         .values()
-#     )
-
-#     data = []
-
-#     for obj in queryset.iterator(chunk_size=1000):
-
-#         raw_path = obj.get('photo')
-
-#         if raw_path:
-#             filename = raw_path.split('\\')[-1]
-#             obj['photo'] = (
-#                 f"https://hfapi.herofashion.com/staff_images/{filename}"
-#             )
-#         else:
-#             obj['photo'] = ""
-
-#         data.append(obj)
-
-#     return JsonResponse(data, safe=False)
-
-
 
 @api_view(['POST'])
 def save_checking(request):
@@ -268,11 +210,13 @@ def save_checking(request):
 
     plan_no = data.get('plan_no')
     desc = data.get('descriptions')
+    types = data.get('types')
 
     # prevent duplicate save
     exists = bit_checking_updates.objects.filter(
         plan_no=plan_no,
         descriptions=desc,
+        types=types,
         scaner_id=data.get('scaner_id')
     ).exists()
 
@@ -299,7 +243,7 @@ def save_checking(request):
         plan_no=plan_no,
         total_select_pcs=data.get('total_select_pcs') or 0,
         entry_mood=entry_mode,
-        types=data.get('types', '')
+        types=types
     )
 
     return Response({
@@ -313,6 +257,7 @@ def get_saved_plans(request):
 
     data = bit_checking_updates.objects.values(
         'plan_no',
+        'types',
         'descriptions'
     )
 
@@ -355,7 +300,7 @@ def bitchecking_final_data(request):
         if not raw_mode or raw_mode in invalid_values:
             existing_mode = (
                 BitcheckingPlyDetails.objects.using('demo')
-                .filter(qr_id=scanner_id)
+                .filter(qr_id=scanner_id, typ=types)
                 .values_list('entry_mode', flat=True)
                 .first()
             )
@@ -376,6 +321,7 @@ def bitchecking_final_data(request):
                 # already exists check
                 qr_id=scanner_id,
                 category=description,
+                typ=types,
 
                 defaults={
                     "emp_id": emp_id,
@@ -460,9 +406,11 @@ def bitchecking_final_data(request):
 def check_final_saved(request):
 
     scanner_id = request.GET.get("scanner_id")
+    types = request.GET.get("types")
 
     exists = BitcheckingPlyDetails.objects.using('demo').filter(
-        qr_id=scanner_id
+        qr_id=scanner_id,
+        typ = types
     ).exists()
 
     return Response({
