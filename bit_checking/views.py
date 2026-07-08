@@ -11,6 +11,7 @@ from django.utils import timezone
 from django.db import connections
 
 
+
 # def get_previous_entry_mode(qrid):
 #     with connections['demo'].cursor() as cursor:
 #         cursor.execute(
@@ -51,7 +52,7 @@ def get_previous_entry_mode(qrid):
 def qr_api(request):
 
     sl = request.GET.get('qr_id')
-    print("fgugo",sl)
+    print("sl",sl)
     # previous_entry_mode = get_previous_entry_mode(sl)
     previous_entry_mode, prev_error = get_previous_entry_mode(sl)
 
@@ -69,7 +70,7 @@ def qr_api(request):
         .first()
     )
 
-    print("qrid", data['qrid'])
+    # print("qrid", data['qrid'])
 
     if not data:
         return JsonResponse({
@@ -85,11 +86,13 @@ def qr_api(request):
 
     # START / END CHECK
     start_entry = bit_start_end_time.objects.filter(
-        qrid=data['qrid']
+        qrid=data['qrid'],
+        types=data['t']
     ).first()
 
     saved_data = bit_checking_updates.objects.filter(
-        scaner_id=sl
+        scaner_id=sl,
+        types=data['t']
     )
     # =========================
     # ALREADY SAVED CASE
@@ -180,26 +183,81 @@ def emp_stick(request):
         )
     )
 
-    queryset = Stickemp.objects.using('main').values()
+    queryset = Stickemp.objects.using("main").values()
 
     data = []
 
     for obj in queryset:
-
-        if obj['code'] in pending_emp_ids:
-            continue
-
-        raw_path = obj.get('photo')
+        raw_path = obj.get("photo")
 
         if raw_path:
-            filename = raw_path.split('\\')[-1]
-            obj['photo'] = f"https://hfapi.herofashion.com/staff_images/{filename}"
+            filename = raw_path.split("\\")[-1]
+            obj["photo"] = f"https://hfapi.herofashion.com/staff_images/{filename}"
         else:
-            obj['photo'] = ""
+            obj["photo"] = ""
 
         data.append(obj)
 
     return JsonResponse(data, safe=False)
+
+
+
+# def emp_stick(request):
+
+#     from_date = parse_datetime("2026-05-18 08:28:55.931995")
+
+#     # Existing QR + Type combinations
+#     existing_qr_type = set(
+#         BitcheckingPlyDetails.objects.using('demo')
+#         .values_list('qr_id', 'typ')
+#     )
+
+#     # Get updates after date
+#     updates = (
+#         bit_checking_updates.objects
+#         .filter(date__gte=from_date)
+#         .values('scaner_id', 'types', 'emp_id')
+#     )
+
+#     pending_emp_ids = set()
+
+#     for item in updates:
+
+#         qr_type = (
+#             item['scaner_id'],
+#             item['types']
+#         )
+
+#         # QR + Type already exists -> skip
+#         if qr_type in existing_qr_type:
+#             continue
+
+#         pending_emp_ids.add(item['emp_id'])
+
+
+#     queryset = (
+#         Stickemp.objects.using('main')
+#         .exclude(code__in=pending_emp_ids)
+#         .values()
+#     )
+
+#     data = []
+
+#     for obj in queryset.iterator(chunk_size=1000):
+
+#         raw_path = obj.get('photo')
+
+#         if raw_path:
+#             filename = raw_path.split('\\')[-1]
+#             obj['photo'] = (
+#                 f"https://hfapi.herofashion.com/staff_images/{filename}"
+#             )
+#         else:
+#             obj['photo'] = ""
+
+#         data.append(obj)
+
+#     return JsonResponse(data, safe=False)
 
 
 
@@ -272,6 +330,7 @@ def bitchecking_final_data(request):
         emp_id = payload.get("emp_id")
         scanner_id = payload.get("scaner_id")
         total_qty = payload.get("total_qty")
+        types = payload.get("types", "")
 
         details = payload.get("details", [])
 
@@ -339,6 +398,7 @@ def bitchecking_final_data(request):
 
         bit_start_end_time.objects.filter(
             qrid=scanner_id,
+            types= types,
             end__isnull=True
         ).update(
             end=timezone.now()
@@ -365,11 +425,13 @@ def bitchecking_final_data(request):
         # data  r_p=True
         if sticker_data:
             BitcheckingPlyDetails.objects.using('demo').filter(
-                qr_id=scanner_id
+                qr_id=scanner_id,
+                typ=types
             ).update(r_p=True)
         else:
             BitcheckingPlyDetails.objects.using('demo').filter(
-                qr_id=scanner_id
+                qr_id=scanner_id,
+                typ=types
             ).update(r_p=False)
 
         return Response(
@@ -422,6 +484,7 @@ def delete_checking(request):
     try:
         # plan_no = request.GET.get("plan_no")
         qrid = request.GET.get("qrid")
+        types = request.GET.get("types")
 
         if not qrid:
             return JsonResponse({
@@ -429,7 +492,7 @@ def delete_checking(request):
                 "message": "plan_no required"
             })
 
-        update_records = bit_checking_updates.objects.filter(scaner_id=qrid)
+        update_records = bit_checking_updates.objects.filter(scaner_id=qrid, types=types)
 
         if not update_records.exists():
             return JsonResponse({
@@ -453,10 +516,11 @@ def delete_checking(request):
                 )
 
         BitcheckingPlyDetails.objects.using('demo').filter(
-            qr_id__in=scanner_ids
+            qr_id__in=scanner_ids,
+            typ=types
         ).delete()
 
-        bit_start_end_time.objects.filter(qrid__in=scanner_ids).delete()
+        bit_start_end_time.objects.filter(qrid__in=scanner_ids, types=types).delete()
 
         update_records.delete()
 
@@ -488,10 +552,12 @@ def delete_single_checking(request):
         plan_no = body.get("plan_no")
         descriptions = body.get("descriptions")
         scaner_id = body.get("scaner_id")
+        types = body.get("types")
 
     
         final_exists = BitcheckingPlyDetails.objects.using('demo').filter(
-            qr_id=scaner_id
+            qr_id=scaner_id,
+            typ=types
         ).exists()
 
         if final_exists:
@@ -506,7 +572,8 @@ def delete_single_checking(request):
         bit_checking_updates.objects.filter(
             plan_no=plan_no,
             descriptions=descriptions,
-            scaner_id=scaner_id
+            scaner_id=scaner_id,
+            types=types
         ).delete()
 
         return JsonResponse({
@@ -537,7 +604,7 @@ def pending_scaner_ids(request):
     queryset = bit_start_end_time.objects.filter(
         start__gte=from_date
     ).exclude(
-        qrid__in=existing_qr_ids
+        qrid__in=existing_qr_ids,
     ).order_by('qrid', 'start')
 
     seen = set()
@@ -574,9 +641,12 @@ def qc_start(request):
 
         qrid = data.get("qrid")
         empid = data.get("empid")
+        types = data.get("types")
+        print("Received Data:", qrid, empid, types)
 
         already_exists = bit_start_end_time.objects.filter(
-            qrid=qrid
+            qrid=qrid,
+            types=types
         ).exists()
 
         if already_exists:
@@ -591,6 +661,7 @@ def qc_start(request):
         obj = bit_start_end_time.objects.create(
             qrid=qrid,
             empid=empid,
+            types=types,
             start=ist_time
         )
 
@@ -614,6 +685,7 @@ def delete_pending_scanner(request):
             body = json.loads(request.body)
 
             qrid = body.get("qrid")
+            types = body.get("types")
 
             if not qrid:
                 return JsonResponse({
@@ -622,7 +694,8 @@ def delete_pending_scanner(request):
                 })
 
             deleted_count, _ = bit_start_end_time.objects.filter(
-                qrid=qrid
+                qrid=qrid,
+                types=types
             ).delete()
 
             if deleted_count > 0:
@@ -648,3 +721,76 @@ def delete_pending_scanner(request):
         "status": False,
         "message": "Invalid Request"
     })
+
+
+
+@csrf_exempt
+def print_bit_checking_sticker(request):
+    if request.method == "POST":
+        data = json.loads(request.body)
+
+        sl = data["sl"]
+        print_cut = data["print_cut_sticker"]
+        print_mistake = data["print_mistake_sticker"]
+
+        print("Printing Sticker for SL:", sl)
+        print("Print Cut Sticker:", print_cut)
+        print("Print Mistake Sticker:", print_mistake)
+
+        with connections['demo'].cursor() as cursor:
+            cursor.execute("""
+                EXEC sp_PrintBitCheckingSticker
+                    @SL=%s,
+                    @PrintCutSticker=%s,
+                    @PrintMistakeSticker=%s
+            """, [
+                sl,
+                int(print_cut),
+                int(print_mistake)
+            ])
+
+        return JsonResponse({
+            "status": "success"
+        })
+    
+
+
+
+from io import BytesIO
+from PIL import Image
+from django.http import HttpResponse
+from rest_framework.decorators import api_view, parser_classes
+from rest_framework.parsers import MultiPartParser, FormParser
+
+@api_view(["POST"])
+@parser_classes([MultiPartParser, FormParser])
+def merge_images(request):
+    image1 = request.FILES.get("image1")
+    image2 = request.FILES.get("image2")
+
+    if not image1 or not image2:
+        return HttpResponse("Both images are required.", status=400)
+
+    # Open images
+    bg = Image.open(image1).convert("RGBA")
+    overlay = Image.open(image2).convert("RGBA")
+
+    # Resize overlay (25% of background width)
+    overlay_width = int(bg.width * 0.25)
+    ratio = overlay_width / overlay.width
+    overlay_height = int(overlay.height * ratio)
+
+    overlay = overlay.resize((overlay_width, overlay_height))
+
+    # Position (Bottom Right)
+    x = 20
+    y = 20
+
+    bg.paste(overlay, (x, y), overlay)
+
+    output = BytesIO()
+    bg.save(output, format="PNG")
+    output.seek(0)
+
+    return HttpResponse(output.getvalue(), content_type="image/png")
+

@@ -4,7 +4,7 @@ from datetime import date
 from django.utils import timezone
 from django.db.models import Sum
 
-from .models import QcAdminMistake,sequency_data,Cont_employee,Needle_change,Unit, Line, MachineAllocation, machine_details, emp_allocate,Empwisesal,VueProcessSequence
+from .models import QcAdminMistake,cut_sample_data_final,sequency_data,Cont_employee,Needle_change,Unit, Line, MachineAllocation, machine_details, emp_allocate,Empwisesal,VueProcessSequence
 
 
 class QcAdminMistakeSerializer(serializers.ModelSerializer):
@@ -240,5 +240,10 @@ class MachineTrasnsferSerializer(serializers.ModelSerializer):
             )
 
         return data
-    
-    
+
+
+class CutSampleSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = cut_sample_data_final
+        fields = '__all__'
+

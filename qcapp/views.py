@@ -7,7 +7,7 @@ from django.core.exceptions import ValidationError
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, permissions
-from .models import QcAdminMistake,Cont_employee,sequency_data,cut_sample_data,cut_sample_data_final,VueUser,Unit,Needle_change,Line,roving_qc_mistake,qc_piece_final, MachineAllocation, machine_details, emp_allocate, Empwisesal, VueProcessSequence
+from .models import QcAdminMistake,cut_sample_data_final,Cont_employee,sequency_data,cut_sample_data,cut_sample_data_final,VueUser,Unit,Needle_change,Line,roving_qc_mistake,qc_piece_final, MachineAllocation, machine_details, emp_allocate, Empwisesal, VueProcessSequence
 from .serializers import QcAdminMistakeSerializer,UnitSerializer,MachineTrasnsferSerializer,MachineSerializer,LineSerializer, MachineAllocationSerializer, VueProcessSequenceSerializer
 from rest_framework.parsers import MultiPartParser, FormParser
 from collections import defaultdict
@@ -22,6 +22,13 @@ from django.db import connection
 from datetime import datetime
 from django.utils import timezone
 from django.db.models import Case, When, Value, IntegerField
+
+
+from rest_framework import viewsets, filters
+from django_filters.rest_framework import DjangoFilterBackend
+
+from .serializers import CutSampleSerializer
+
 
 
 class QcAdminMistakeAPIView(APIView):
@@ -1922,3 +1929,20 @@ def needle_report_api(request):
         data = Needle_change.objects.using('default').all().values()
         data_list = list(data)
         return JsonResponse(data_list, safe=False)
+    
+
+class CutSampleViewSet(viewsets.ModelViewSet):
+    queryset = cut_sample_data_final.objects.all().order_by('-date')
+    serializer_class = CutSampleSerializer
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter]
+    
+    # Filter setup for switches
+    filterset_fields = {
+        'jobno': ['exact', 'icontains'],
+        'bf_ironing': ['exact'],
+        'af_ironing': ['exact'],
+        'date': ['gte', 'lte', 'date'], # Date range filtering
+    }
+    
+    # Bundle_id and other fields for Global Search
+    search_fields = ['jobno', 'bundle_no', 'bundle_id', 'product', 'color', 'size']
