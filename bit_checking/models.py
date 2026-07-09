@@ -134,5 +134,6 @@ class bit_start_end_time(models.Model):
     empid = models.IntegerField()
     start = models.DateTimeField()
     end = models.DateTimeField(null=True, blank=True)
-
+    types = models.CharField(max_length=50, db_collation='Latin1_General_CI_AI', blank=True, null=True)
+    
 

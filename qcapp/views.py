@@ -5,7 +5,7 @@ from rest_framework.decorators import api_view
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, permissions
-from .models import QcAdminMistake,Cont_employee,sequency_data,cut_sample_data,cut_sample_data_final,VueUser,Unit,Needle_change,Line,roving_qc_mistake,qc_piece_final, MachineAllocation, machine_details, emp_allocate, Empwisesal, VueProcessSequence
+from .models import QcAdminMistake,cut_sample_data_final,Cont_employee,sequency_data,cut_sample_data,cut_sample_data_final,VueUser,Unit,Needle_change,Line,roving_qc_mistake,qc_piece_final, MachineAllocation, machine_details, emp_allocate, Empwisesal, VueProcessSequence
 from .serializers import QcAdminMistakeSerializer,UnitSerializer,MachineTrasnsferSerializer,MachineSerializer,LineSerializer, MachineAllocationSerializer, VueProcessSequenceSerializer
 from collections import defaultdict
 from django.shortcuts import get_object_or_404
@@ -25,6 +25,13 @@ from django.utils import timezone
 from django.db.models import Case, When, Value, IntegerField,Sum
 from django.utils.timezone import localtime
 
+
+
+
+from rest_framework import viewsets, filters
+from django_filters.rest_framework import DjangoFilterBackend
+
+from .serializers import CutSampleSerializer
 
 
 
@@ -1850,6 +1857,20 @@ def get_allocate_report(request):
     return JsonResponse(data, safe=False)
 
 
+    for row in s_data:
+        emp = Empwisesal.objects.using('main').filter(
+            code=row["emp_code"]
+        ).first()
+
+        data.append({
+            "emp_code": row["emp_code"],
+            "seq": row["seq"],
+            "jobno": row["jobno"],
+            "top_bottom": row["top_bottom"],
+            "name": emp.name if emp else ""
+        })
+
+    return JsonResponse(data, safe=False)
 
 def machine_allocation_api(request):
     selected_date = request.GET.get("date")
@@ -1937,6 +1958,7 @@ def machine_allocation_api(request):
                 "mcgrp": allocation.machine.mcgrp,
                 "status": machine_status,
             },
+
             "allocation": {
                 "unit_id": allocation.unit.id if allocation.unit else None,
                 "unit_name": allocation.unit.name if allocation.unit else None,
@@ -1960,6 +1982,33 @@ def machine_allocation_api(request):
         "count": len(result),
         "data": result,
     })
+
+def machine_attendance_api(request):
+    try:
+        with connections['demo'].cursor() as cursor:
+            cursor.execute("EXEC pr_Tailor_PresentAbsent")
+            columns = [col[0] for col in cursor.description]
+            rows = cursor.fetchall()
+
+        data = []
+
+        for row in rows:
+            row_dict = dict(zip(columns, row))
+
+            data.append({
+                "detp": row_dict.get("detp"),
+                "code": row_dict.get("code"),
+                "name": row_dict.get("name"),
+                "status": row_dict.get("stat")
+            })
+
+        return JsonResponse(data, safe=False)
+
+    except Exception as e:
+        return JsonResponse({
+            "status": False,
+            "error": str(e)
+        })
 
 
 

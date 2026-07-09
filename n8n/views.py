@@ -26,13 +26,9 @@ def ws_attendance(request):
 
 
 def liveprdn(request):
-
     data = TmpPrdprn.objects.using('demo').all()
-
     print("Total records in TmpPrdprn:", data.count())  # Debug: Check total records
-
     response_data = []
-
     for rec in data:    
         response_data.append({
             "unit": rec.unit,
@@ -53,9 +49,7 @@ def liveprdn(request):
             "mist": rec.mist,
             "rejqty": rec.rejqty,
         })
-
     return JsonResponse(response_data, safe=False)
-
 
 
 @csrf_exempt

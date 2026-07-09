@@ -596,8 +596,8 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 
 from google.oauth2.credentials import Credentials
-from googleapiclient.discovery import build
-from googleapiclient.http import MediaIoBaseUpload
+# from googleapiclient.discovery import build
+# from googleapiclient.http import MediaIoBaseUpload
 
 FOLDER_ID = "1wveeF-CVW_FfJ5pCwXiMpdSrDi1F8043"
 
@@ -673,8 +673,7 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 
 from google.oauth2 import service_account
-from googleapiclient.discovery import build
-from googleapiclient.http import MediaIoBaseUpload
+
 
 
 SERVICE_ACCOUNT_FILE = "file-upload.json"

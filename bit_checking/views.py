@@ -11,6 +11,7 @@ from django.utils import timezone
 from django.db import connections, DatabaseError
 
 
+
 # def get_previous_entry_mode(qrid):
 #     with connections['demo'].cursor() as cursor:
 #         cursor.execute(
@@ -50,7 +51,7 @@ def get_previous_entry_mode(qrid):
 def qr_api(request):
 
     sl = request.GET.get('qr_id')
-    print("fgugo",sl)
+    print("sl",sl)
     # previous_entry_mode = get_previous_entry_mode(sl)
     previous_entry_mode, prev_error = get_previous_entry_mode(sl)
 
@@ -68,7 +69,8 @@ def qr_api(request):
         .first()
     )
 
-   
+    # print("qrid", data['qrid'])
+
     if not data:
         return JsonResponse({
             "status": False,
@@ -85,7 +87,8 @@ def qr_api(request):
 
     # START / END CHECK
     start_entry = bit_start_end_time.objects.filter(
-        qrid=data['qrid']
+        qrid=data['qrid'],
+        types=data['t']
     ).first()
 
     saved_data = bit_checking_updates.objects.filter(
@@ -200,6 +203,7 @@ def emp_stick(request):
 
 
 
+
 @api_view(['POST'])
 def save_checking(request):
 
@@ -207,12 +211,13 @@ def save_checking(request):
 
     plan_no = data.get('plan_no')
     desc = data.get('descriptions')
+    types = data.get('types')
 
     # prevent duplicate save
     exists = bit_checking_updates.objects.filter(
         plan_no=plan_no,
         descriptions=desc,
-        types=data.get('types'),
+        types=types,
         scaner_id=data.get('scaner_id')
     ).exists()
 
@@ -239,7 +244,7 @@ def save_checking(request):
         plan_no=plan_no,
         total_select_pcs=data.get('total_select_pcs') or 0,
         entry_mood=entry_mode,
-        types=data.get('types', '')
+        types=types
     )
 
     return Response({
@@ -253,8 +258,8 @@ def get_saved_plans(request):
 
     data = bit_checking_updates.objects.values(
         'plan_no',
-        'descriptions',
-        'typ'
+        'types',
+        'descriptions'
     )
 
     return Response(list(data))
@@ -271,6 +276,7 @@ def bitchecking_final_data(request):
         emp_id = payload.get("emp_id")
         scanner_id = payload.get("scaner_id")
         total_qty = payload.get("total_qty")
+        types = payload.get("types", "")
 
         details = payload.get("details", [])
 
@@ -295,7 +301,7 @@ def bitchecking_final_data(request):
         if not raw_mode or raw_mode in invalid_values:
             existing_mode = (
                 BitcheckingPlyDetails.objects.using('demo')
-                .filter(qr_id=scanner_id)
+                .filter(qr_id=scanner_id, typ=types)
                 .values_list('entry_mode', flat=True)
                 .first()
             )
@@ -316,6 +322,7 @@ def bitchecking_final_data(request):
                 # already exists check
                 qr_id=scanner_id,
                 category=description,
+                typ=types,
 
                 defaults={
                     "emp_id": emp_id,
@@ -338,6 +345,7 @@ def bitchecking_final_data(request):
 
         bit_start_end_time.objects.filter(
             qrid=scanner_id,
+            types= types,
             end__isnull=True
         ).update(
             end=timezone.now()
@@ -364,11 +372,13 @@ def bitchecking_final_data(request):
         # data  r_p=True
         if sticker_data:
             BitcheckingPlyDetails.objects.using('demo').filter(
-                qr_id=scanner_id
+                qr_id=scanner_id,
+                typ=types
             ).update(r_p=True)
         else:
             BitcheckingPlyDetails.objects.using('demo').filter(
-                qr_id=scanner_id
+                qr_id=scanner_id,
+                typ=types
             ).update(r_p=False)
 
         return Response(
@@ -401,7 +411,7 @@ def check_final_saved(request):
 
     exists = BitcheckingPlyDetails.objects.using('demo').filter(
         qr_id=scanner_id,
-        typ=types
+        typ = types
     ).exists()
 
     return Response({
@@ -459,7 +469,7 @@ def delete_checking(request):
             typ=types
         ).delete()
 
-        bit_start_end_time.objects.filter(qrid__in=scanner_ids).delete()
+        bit_start_end_time.objects.filter(qrid__in=scanner_ids, types=types).delete()
 
         update_records.delete()
 
@@ -510,9 +520,9 @@ def delete_single_checking(request):
    
         bit_checking_updates.objects.filter(
             plan_no=plan_no,
-            types=types,
             descriptions=descriptions,
-            scaner_id=scaner_id
+            scaner_id=scaner_id,
+            types=types
         ).delete()
 
         return JsonResponse({
@@ -526,6 +536,7 @@ def delete_single_checking(request):
             "status": False,
             "message": str(e)
         })
+    
     
 
 
@@ -543,7 +554,7 @@ def pending_scaner_ids(request):
     queryset = bit_start_end_time.objects.filter(
         start__gte=from_date
     ).exclude(
-        qrid__in=existing_qr_ids
+        qrid__in=existing_qr_ids,
     ).order_by('qrid', 'start')
 
     seen = set()
@@ -580,9 +591,12 @@ def qc_start(request):
 
         qrid = data.get("qrid")
         empid = data.get("empid")
+        types = data.get("types")
+        print("Received Data:", qrid, empid, types)
 
         already_exists = bit_start_end_time.objects.filter(
-            qrid=qrid
+            qrid=qrid,
+            types=types
         ).exists()
 
         if already_exists:
@@ -597,6 +611,7 @@ def qc_start(request):
         obj = bit_start_end_time.objects.create(
             qrid=qrid,
             empid=empid,
+            types=types,
             start=ist_time
         )
 
@@ -620,6 +635,7 @@ def delete_pending_scanner(request):
             body = json.loads(request.body)
 
             qrid = body.get("qrid")
+            types = body.get("types")
 
             if not qrid:
                 return JsonResponse({
@@ -628,7 +644,8 @@ def delete_pending_scanner(request):
                 })
 
             deleted_count, _ = bit_start_end_time.objects.filter(
-                qrid=qrid
+                qrid=qrid,
+                types=types
             ).delete()
 
             if deleted_count > 0:
