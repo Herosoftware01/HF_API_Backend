@@ -595,7 +595,7 @@ import io
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 
-from google.oauth2.credentials import Credentials
+# from google.oauth2.credentials import Credentials
 # from googleapiclient.discovery import build
 # from googleapiclient.http import MediaIoBaseUpload
 
@@ -672,7 +672,7 @@ import io
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 
-from google.oauth2 import service_account
+# from google.oauth2 import service_account
 
 
 

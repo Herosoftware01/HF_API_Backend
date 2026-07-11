@@ -24,12 +24,15 @@ from datetime import datetime
 from django.utils import timezone
 from django.db.models import Case, When, Value, IntegerField,Sum
 from django.utils.timezone import localtime
-
+import os
+import glob
+import subprocess
+from django.conf import settings
 
 
 
 from rest_framework import viewsets, filters
-from django_filters.rest_framework import DjangoFilterBackend
+# from django_filters.rest_framework import DjangoFilterBackend
 
 from .serializers import CutSampleSerializer
 
@@ -2278,3 +2281,144 @@ def qcroving(request):
         })
 
     return JsonResponse(result, safe=False)
+
+
+@csrf_exempt
+def generate_all_reports(request):
+    date = request.GET.get('date')
+ 
+    if not date:
+        date = datetime.today().strftime('%Y-%m-%d')
+ 
+    units = ['1', '2', '3', '4', '5', '6']
+ 
+    reports = []
+ 
+    script_path = os.path.join(
+        settings.BASE_DIR,
+        'capture_report.js'
+    )
+ 
+    reports_dir = r'D:\Qc Report Image'
+ 
+    os.makedirs(reports_dir, exist_ok=True)
+ 
+    for unit in units:
+        # Delete old screenshots
+        old_files = glob.glob(
+            os.path.join(
+                reports_dir,
+                f'roving_{unit}_{date}_*.png'
+            )
+        )
+ 
+        for file in old_files:
+            try:
+                os.remove(file)
+            except:
+                pass
+ 
+        result = subprocess.run(
+            [
+                'node',
+                script_path,
+                unit,
+                date,
+            ],
+            capture_output=True,
+            text=True,
+            cwd=settings.BASE_DIR,
+        )
+ 
+        print(result.stdout)
+        print(result.stderr)
+ 
+        unit_files = glob.glob(
+            os.path.join(
+                reports_dir,
+                f'roving_{unit}_{date}_*.png'
+            )
+        )
+ 
+        if not unit_files:
+            print(f'No report for Unit {unit}')
+            continue
+ 
+        images = []
+ 
+        for file in unit_files:
+            images.append(file)
+ 
+            # Send to WhatsApp, then schedule deletion only if send succeeded
+            sent = send_to_whatsapp(file)  # or send_to_whatsapp(file, group_id_for_unit)
+ 
+            if sent:
+                delete_file_later(file, delay_seconds=3600)
+ 
+        reports.append({
+            'unit': unit,
+            'images': images,
+        })
+ 
+    return JsonResponse({
+        'success': True,
+        'date': date,
+        'reports': reports,
+    })
+
+
+import requests
+import threading
+
+WHATSAPP_SEND_URL = 'https://ws.herofashion.com/send'
+ 
+# If every unit posts to the same group, keep this.
+# If units go to different groups, swap this for a dict: {'1': 'xxxx@g.us', ...}
+WHATSAPP_GROUP_ID = '120363427040771599@g.us'
+ 
+ 
+def send_to_whatsapp(file_path, group_id=WHATSAPP_GROUP_ID):
+    """Send one image file to a WhatsApp group via multipart form-data."""
+    try:
+        with open(file_path, 'rb') as f:
+            files = {'file': (os.path.basename(file_path), f, 'image/png')}
+            data = {'groupId': group_id}
+ 
+            resp = requests.post(
+                WHATSAPP_SEND_URL,
+                data=data,
+                files=files,
+                timeout=30,
+            )
+ 
+        print(f'[WA] status={resp.status_code} body={resp.text[:500]}')
+ 
+        if resp.status_code == 200:
+            print(f'Sent to WhatsApp: {file_path}')
+            return True
+        else:
+            print(f'WhatsApp send failed ({resp.status_code}): {file_path}')
+            return False
+ 
+    except requests.exceptions.RequestException as e:
+        print(f'WhatsApp REQUEST error for {file_path}: {type(e).__name__} - {e}')
+        return False
+    except Exception as e:
+        print(f'WhatsApp send error for {file_path}: {e}')
+        return False
+ 
+ 
+def delete_file_later(file_path, delay_seconds=3600):
+    """Delete a file after delay_seconds, without blocking the request."""
+    def _delete():
+        try:
+            if os.path.exists(file_path):
+                os.remove(file_path)
+                print(f'Auto-deleted: {file_path}')
+        except Exception as e:
+            print(f'Delete failed for {file_path}: {e}')
+ 
+    timer = threading.Timer(delay_seconds, _delete)
+    timer.daemon = True
+    timer.start()
+ 
