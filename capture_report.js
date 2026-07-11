@@ -33,7 +33,7 @@ const fs = require('fs');
     const page = await context.newPage();
 
     const url =
-      `http://10.1.21.13:3000/#/qc_reports/roving_qc_whatsapp?unit=${unit}&date=${date}`;
+      `https://dev.herofashion.com/#/qc_reports/roving_qc_whatsapp?unit=${unit}&date=${date}`;
 
     console.log('Opening:', url);
 

@@ -10,7 +10,7 @@ const { chromium } = require('playwright');
 
   console.log('Opening login page...');
 
-  await page.goto('http://10.1.21.13:3000', {
+  await page.goto('https://hf.herofashion.com/', {
     waitUntil: 'domcontentloaded',
     timeout: 120000,
   });
