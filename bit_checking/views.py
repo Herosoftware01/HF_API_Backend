@@ -8,7 +8,7 @@ from django.views.decorators.csrf import csrf_exempt
 import json
 from django.utils.dateparse import parse_datetime
 from django.utils import timezone
-from django.db import connections, DatabaseError
+from django.db import connections
 
 
 
@@ -25,6 +25,7 @@ from django.db import connections, DatabaseError
 #             return row[0]
 #         return None
 
+from django.db import connections, DatabaseError
 
 def get_previous_entry_mode(qrid):
     try:
@@ -76,8 +77,6 @@ def qr_api(request):
             "status": False,
             "message": "Data not found"
         })
-    # ✅ NOW SAFE TO ACCESS
-    print("qrid", data['qrid'])
 
     desc = list(
         VueMistakePartDetails.objects.using('demo')
@@ -537,7 +536,6 @@ def delete_single_checking(request):
             "message": str(e)
         })
     
-    
 
 
 def pending_scaner_ids(request):
@@ -705,6 +703,7 @@ def print_bit_checking_sticker(request):
     
 
 
+
 from io import BytesIO
 from PIL import Image
 from django.http import HttpResponse
@@ -742,3 +741,4 @@ def merge_images(request):
     output.seek(0)
 
     return HttpResponse(output.getvalue(), content_type="image/png")
+

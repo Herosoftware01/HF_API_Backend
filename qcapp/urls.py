@@ -45,8 +45,6 @@ urlpatterns = [
     path("qcroving/", views.qcroving, name='qcroving'),
     path("allocate-report/", views.get_allocate_report, name='qc_reports'),
     path("generate_all_reports/", views.generate_all_reports, name='qc_reports'),
-  
-  
 
 ]
 

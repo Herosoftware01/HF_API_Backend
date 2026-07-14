@@ -172,7 +172,7 @@ DATABASES = {
         'NAME': 'hfapi',
         'USER': 'sa',
         'PASSWORD': 'Fashion@01',
-        'HOST': '10.1.21.11',
+        'HOST': '10.1.21.10',
         'PORT': '1433',
         'OPTIONS': {
             'driver': 'ODBC Driver 17 for SQL Server',
@@ -186,7 +186,7 @@ DATABASES = {
         'NAME': 'Tally2sql',
         'USER': 'sa',
         'PASSWORD': 'Fashion@01',
-        'HOST': '10.1.21.11',
+        'HOST': '10.1.21.10',
         'PORT': '1433',
         'OPTIONS': {
             'driver': 'ODBC Driver 17 for SQL Server',
@@ -199,7 +199,7 @@ DATABASES = {
         'NAME': 'Garmentrk',
         'USER': 'sa',
         'PASSWORD': 'Fashion@01',
-        'HOST': '10.1.21.11',
+        'HOST': '10.1.21.10',
         'PORT': '1433',
         'OPTIONS': {
             'driver': 'ODBC Driver 17 for SQL Server',
@@ -212,7 +212,7 @@ DATABASES = {
         'NAME': 'demo',
         'USER': 'sa',
         'PASSWORD': 'Fashion@01',
-        'HOST': '10.1.21.11',
+        'HOST': '10.1.21.10',
         'PORT': '1433',
         'OPTIONS': {
                 'driver': 'ODBC Driver 17 for SQL Server',
@@ -225,7 +225,7 @@ DATABASES = {
         'NAME': 'Django',
         'USER': 'sa',
         'PASSWORD': 'Fashion@01',
-        'HOST': '10.1.21.11',
+        'HOST': '10.1.21.10',
         'PORT': '1433',
         'OPTIONS': {
                 'driver': 'ODBC Driver 17 for SQL Server',
@@ -238,7 +238,7 @@ DATABASES = {
             'NAME': 'NewPowerBi',
             'USER': 'sa',
             'PASSWORD': 'Fashion@01',
-            'HOST': '10.1.21.11',
+            'HOST': '10.1.21.10',
             'PORT': '1433',
             'OPTIONS': {
                 'driver': 'ODBC Driver 17 for SQL Server',
@@ -251,7 +251,7 @@ DATABASES = {
             'NAME': 'testerphero',
             'USER': 'sa',
             'PASSWORD': 'Fashion@01',
-            'HOST': '10.1.21.11',
+            'HOST': '10.1.21.10',
             'PORT': '1433',
             'OPTIONS': {
                 'driver': 'ODBC Driver 17 for SQL Server',

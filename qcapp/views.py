@@ -31,6 +31,7 @@ from django.conf import settings
 
 
 
+
 from rest_framework import viewsets, filters
 # from django_filters.rest_framework import DjangoFilterBackend
 
@@ -2319,19 +2320,27 @@ def generate_all_reports(request):
                 pass
  
         result = subprocess.run(
-            [
-                'node',
-                script_path,
-                unit,
-                date,
-            ],
-            capture_output=True,
-            text=True,
+            ['node', script_path, unit, date],
+            capture_output=True,   # <-- required for result.stdout/stderr to be strings, not None
+            text=True,             # <-- required so stdout/stderr are str, not bytes
             cwd=settings.BASE_DIR,
         )
- 
-        print(result.stdout)
-        print(result.stderr)
+
+        stdout = result.stdout or ''
+        stderr = result.stderr or ''
+
+        print(stdout)
+        print(stderr)
+
+        # Try to parse the script's own JSON status line for visibility
+        node_status = None
+        for line in stdout.strip().splitlines():
+            line = line.strip()
+            if line.startswith('{'):
+                try:
+                    node_status = json.loads(line)
+                except json.JSONDecodeError:
+                    pass
  
         unit_files = glob.glob(
             os.path.join(
