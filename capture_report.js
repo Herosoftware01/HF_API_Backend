@@ -11,8 +11,7 @@ const fs = require('fs');
       console.log(
         JSON.stringify({
           success: false,
-          message:
-            'Usage: node capture_report.js <unit> <date>',
+          message: 'Usage: node capture_report.js <unit> <date>',
         })
       );
       process.exit(0);
@@ -20,10 +19,11 @@ const fs = require('fs');
 
     const browser = await chromium.launch({
       headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox'] // FIX: Required for running on most host servers
     });
 
     const context = await browser.newContext({
-      storageState: 'auth.json',
+      storageState: 'auth.json', // Ensure auth.json is on the host server
       viewport: {
         width: 2600,
         height: 2000,
@@ -32,9 +32,7 @@ const fs = require('fs');
 
     const page = await context.newPage();
 
-    const url =
-      `https://dev.herofashion.com/#/qc_reports/roving_qc_whatsapp?unit=${unit}&date=${date}`;
-
+    const url = `https://hf.herofashion.com/#/qc_reports/roving_qc_whatsapp?unit=${unit}&date=${date}`;
     console.log('Opening:', url);
 
     try {
@@ -49,7 +47,6 @@ const fs = require('fs');
           message: err.message,
         })
       );
-
       await browser.close();
       process.exit(0);
     }
@@ -63,9 +60,7 @@ const fs = require('fs');
     }
 
     await page.evaluate(() => {
-      const el =
-        document.getElementById('report-table');
-
+      const el = document.getElementById('report-table');
       if (el) {
         el.style.overflow = 'visible';
         el.style.maxWidth = 'none';
@@ -80,9 +75,6 @@ const fs = require('fs');
       const reportTable = document.getElementById('report-table');
       if (!reportTable) return;
 
-      // The header panel is the first child div, before the
-      // .report-page blocks (the "Roving QC Report" title +
-      // Date/Unit line panel).
       const existingHeader = reportTable.querySelector(':scope > div:first-child');
       const pages = document.querySelectorAll('.report-page');
 
@@ -93,20 +85,17 @@ const fs = require('fs');
         headerClone.classList.add('injected-report-header');
         headerClone.style.marginBottom = '20px';
 
-        // Make the title bigger
         const titleEl = headerClone.querySelector('h1');
         if (titleEl) {
           titleEl.style.fontSize = '36px';
           titleEl.style.lineHeight = '1.2';
         }
 
-        // Make the subtitle line bigger too
         const subtitleEl = headerClone.querySelector('p.text-sm.text-slate-500');
         if (subtitleEl) {
           subtitleEl.style.fontSize = '18px';
         }
 
-        // Make the Date / Unit line bigger
         const dateUnitEl = headerClone.querySelector('.text-sm.font-medium.text-slate-600');
         if (dateUnitEl) {
           dateUnitEl.style.fontSize = '20px';
@@ -120,9 +109,7 @@ const fs = require('fs');
     await page.waitForTimeout(300);
     // --- End header injection ---
 
-    const reports =
-      page.locator('.report-page');
-
+    const reports = page.locator('.report-page');
     const count = await reports.count();
 
     console.log(`Found ${count} page(s)`);
@@ -131,16 +118,15 @@ const fs = require('fs');
       console.log(
         JSON.stringify({
           success: false,
-          message: 'No report data',
+          message: 'No report data found. Token in auth.json may be expired.',
         })
       );
-
       await browser.close();
       process.exit(0);
     }
 
-    const saveDir =
-      'D:\\Qc Report Image';
+    // FIX: Use dynamic path instead of hardcoded 'D:\'
+    const saveDir = path.join(__dirname, 'qc_reports');
 
     if (!fs.existsSync(saveDir)) {
       fs.mkdirSync(saveDir, {
@@ -152,21 +138,14 @@ const fs = require('fs');
 
     for (let i = 0; i < count; i++) {
       const report = reports.nth(i);
-
-      const fileName =
-        `roving_${unit}_${date}_${i + 1}.png`;
-
-      const filePath = path.join(
-        saveDir,
-        fileName
-      );
+      const fileName = `roving_${unit}_${date}_${i + 1}.png`;
+      const filePath = path.join(saveDir, fileName);
 
       await report.screenshot({
         path: filePath,
       });
 
       files.push(filePath);
-
       console.log('Saved:', filePath);
     }
 
@@ -189,7 +168,6 @@ const fs = require('fs');
         message: err.message,
       })
     );
-
     process.exit(0);
   }
 })();

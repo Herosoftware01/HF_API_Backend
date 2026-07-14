@@ -8,9 +8,13 @@ from .models import QcAdminMistake,cut_sample_data_final,sequency_data,Cont_empl
 
 
 class QcAdminMistakeSerializer(serializers.ModelSerializer):
+
     class Meta:
         model = QcAdminMistake
-        fields = '__all__'
+        fields = "__all__"
+        read_only_fields = [
+            "code"
+        ]
 
 
 class LineSerializer(serializers.ModelSerializer):

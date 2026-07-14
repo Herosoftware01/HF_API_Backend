@@ -127,7 +127,6 @@ class QcAdminMistakeDetailAPIView(APIView):
 
 
 
-
 class LineAPIView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
@@ -2284,55 +2283,120 @@ def qcroving(request):
     return JsonResponse(result, safe=False)
 
 
+import os
+import glob
+import json
+import subprocess
+import requests
+import threading
+from datetime import datetime
+from django.conf import settings
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+
+WHATSAPP_SEND_URL = 'https://ws.herofashion.com/send'
+WHATSAPP_GROUP_ID = '120363427040771599@g.us'
+
+def send_to_whatsapp(file_path, group_id=WHATSAPP_GROUP_ID):
+    try:
+        with open(file_path, 'rb') as f:
+            files = {'file': (os.path.basename(file_path), f, 'image/png')}
+            data = {'groupId': group_id}
+
+            resp = requests.post(
+                WHATSAPP_SEND_URL,
+                data=data,
+                files=files,
+                timeout=30,
+            )
+
+        print(f'[WA] status={resp.status_code} body={resp.text[:500]}')
+
+        if resp.status_code == 200:
+            print(f'Sent to WhatsApp: {file_path}')
+            return True
+        else:
+            print(f'WhatsApp send failed ({resp.status_code}): {file_path}')
+            return False
+
+    except requests.exceptions.RequestException as e:
+        print(f'WhatsApp REQUEST error for {file_path}: {type(e).__name__} - {e}')
+        return False
+    except Exception as e:
+        print(f'WhatsApp send error for {file_path}: {e}')
+        return False
+
+def delete_file_later(file_path, delay_seconds=3600):
+    def _delete():
+        try:
+            if os.path.exists(file_path):
+                os.remove(file_path)
+                print(f'Auto-deleted: {file_path}')
+        except Exception as e:
+            print(f'Delete failed for {file_path}: {e}')
+
+    timer = threading.Timer(delay_seconds, _delete)
+    timer.daemon = True
+    timer.start()
+
 @csrf_exempt
 def generate_all_reports(request):
-    date = request.GET.get('date')
- 
+    date = request.GET.get('date') or request.POST.get('date')
+
     if not date:
         date = datetime.today().strftime('%Y-%m-%d')
- 
+
     units = ['1', '2', '3', '4', '5', '6']
- 
     reports = []
- 
-    script_path = os.path.join(
-        settings.BASE_DIR,
-        'capture_report.js'
-    )
- 
-    reports_dir = r'D:\Qc Report Image'
- 
+
+    script_path = os.path.join(settings.BASE_DIR, 'capture_report.js')
+
+    # FIX: Use dynamic path instead of hardcoded 'D:\'
+    reports_dir = os.path.join(settings.BASE_DIR, 'qc_reports')
     os.makedirs(reports_dir, exist_ok=True)
- 
+
     for unit in units:
+        unit_debug = {
+            'unit': unit,
+            'images': [],
+            'node_exit_code': None,
+            'node_status': None,
+            'node_stdout': None,
+            'node_stderr': None,
+        }
+
         # Delete old screenshots
         old_files = glob.glob(
-            os.path.join(
-                reports_dir,
-                f'roving_{unit}_{date}_*.png'
-            )
+            os.path.join(reports_dir, f'roving_{unit}_{date}_*.png')
         )
- 
+
         for file in old_files:
             try:
                 os.remove(file)
             except:
                 pass
- 
+
+        # Run Node Script
         result = subprocess.run(
             ['node', script_path, unit, date],
-            capture_output=True,   # <-- required for result.stdout/stderr to be strings, not None
-            text=True,             # <-- required so stdout/stderr are str, not bytes
+            capture_output=True,   
+            text=True,             
             cwd=settings.BASE_DIR,
         )
 
         stdout = result.stdout or ''
         stderr = result.stderr or ''
 
+        print(f'--- Unit {unit} stdout ---')
         print(stdout)
+        print(f'--- Unit {unit} stderr ---')
         print(stderr)
 
-        # Try to parse the script's own JSON status line for visibility
+        unit_debug['node_exit_code'] = result.returncode
+        unit_debug['node_stdout'] = stdout.strip()
+        unit_debug['node_stderr'] = stderr.strip()
+
+        # Parse Playwright's JSON response
         node_status = None
         for line in stdout.strip().splitlines():
             line = line.strip()
@@ -2341,80 +2405,35 @@ def generate_all_reports(request):
                     node_status = json.loads(line)
                 except json.JSONDecodeError:
                     pass
- 
+
+        unit_debug['node_status'] = node_status
+
+        # Check for generated images
         unit_files = glob.glob(
-            os.path.join(
-                reports_dir,
-                f'roving_{unit}_{date}_*.png'
-            )
+            os.path.join(reports_dir, f'roving_{unit}_{date}_*.png')
         )
- 
+
         if not unit_files:
             print(f'No report for Unit {unit}')
+            reports.append(unit_debug) # Append debug info even if it fails
             continue
- 
+
         images = []
- 
+
         for file in unit_files:
             images.append(file)
- 
-            # Send to WhatsApp, then schedule deletion only if send succeeded
-            sent = send_to_whatsapp(file)  # or send_to_whatsapp(file, group_id_for_unit)
- 
+            sent = send_to_whatsapp(file)
             if sent:
                 delete_file_later(file, delay_seconds=3600)
- 
-        reports.append({
-            'unit': unit,
-            'images': images,
-        })
- 
+
+        unit_debug['images'] = images
+        reports.append(unit_debug)
+
     return JsonResponse({
         'success': True,
         'date': date,
         'reports': reports,
     })
-
-
-import requests
-import threading
-
-WHATSAPP_SEND_URL = 'https://ws.herofashion.com/send'
- 
-# If every unit posts to the same group, keep this.
-# If units go to different groups, swap this for a dict: {'1': 'xxxx@g.us', ...}
-WHATSAPP_GROUP_ID = '120363427040771599@g.us'
- 
- 
-def send_to_whatsapp(file_path, group_id=WHATSAPP_GROUP_ID):
-    """Send one image file to a WhatsApp group via multipart form-data."""
-    try:
-        with open(file_path, 'rb') as f:
-            files = {'file': (os.path.basename(file_path), f, 'image/png')}
-            data = {'groupId': group_id}
- 
-            resp = requests.post(
-                WHATSAPP_SEND_URL,
-                data=data,
-                files=files,
-                timeout=30,
-            )
- 
-        print(f'[WA] status={resp.status_code} body={resp.text[:500]}')
- 
-        if resp.status_code == 200:
-            print(f'Sent to WhatsApp: {file_path}')
-            return True
-        else:
-            print(f'WhatsApp send failed ({resp.status_code}): {file_path}')
-            return False
- 
-    except requests.exceptions.RequestException as e:
-        print(f'WhatsApp REQUEST error for {file_path}: {type(e).__name__} - {e}')
-        return False
-    except Exception as e:
-        print(f'WhatsApp send error for {file_path}: {e}')
-        return False
  
  
 def delete_file_later(file_path, delay_seconds=3600):
