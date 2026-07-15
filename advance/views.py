@@ -2,7 +2,7 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.db.models import Max
 import json
-from .models import IncdebUsers, Adreq, Empwisesal,Employeeworking,HrWrkdtlsnew,RptCut002
+from .models import IncdebUsers, Adreq, Empwisesal,Employeeworking,HrWrkdtlsnew,RptCut002,Monthlysaltime
 from django.db import connections
 import os
 from django.core.mail import send_mail
@@ -140,7 +140,7 @@ def request_advance(request):
         smon  = request.GET.get('smon')
         syear = request.GET.get('syear')
 
-        qs = Adreq.objects.using('demo').all()
+        qs = Adreq.objects.using('demo').all().order_by('-entryno')
 
         if empid:
             qs = qs.filter(empid=empid)
@@ -551,6 +551,150 @@ def state(request):
         return JsonResponse(result, safe=False)
 
 
+@csrf_exempt
+def monthlysaltime_api(request, id=None):
+
+    # ================= GET =================
+    if request.method == "GET":
+        if id:
+            try:
+                obj = Monthlysaltime.objects.using('demo').get(id=id)
+
+                data = {
+                    "id": obj.id,
+                    "modulename": obj.modulename,
+                    "dayofweek": obj.dayofweek,
+                    "isactive": obj.isactive,
+                    "starttime": obj.starttime.strftime("%H:%M:%S") if obj.starttime else None,
+                    "endtime": obj.endtime.strftime("%H:%M:%S") if obj.endtime else None,
+                    "updatedat": obj.updatedat.strftime("%Y-%m-%d %H:%M:%S") if obj.updatedat else None,
+                }
+
+                return JsonResponse({
+                    "status": True,
+                    "data": data
+                })
+
+            except Monthlysaltime.DoesNotExist:
+                return JsonResponse({
+                    "status": False,
+                    "message": "Record not found"
+                }, status=404)
+
+        else:
+            data = []
+
+            for obj in Monthlysaltime.objects.using('demo').all().order_by("id"):
+                data.append({
+                    "id": obj.id,
+                    "modulename": obj.modulename,
+                    "dayofweek": obj.dayofweek,
+                    "isactive": obj.isactive,
+                    "starttime": obj.starttime.strftime("%H:%M:%S") if obj.starttime else None,
+                    "endtime": obj.endtime.strftime("%H:%M:%S") if obj.endtime else None,
+                    "updatedat": obj.updatedat.strftime("%Y-%m-%d %H:%M:%S") if obj.updatedat else None,
+                })
+
+            return JsonResponse({
+                "status": True,
+                "data": data
+            })
+
+    # ================= POST =================
+    elif request.method == "POST":
+        try:
+            body = json.loads(request.body)
+
+            obj = Monthlysaltime.objects.using('demo').create(
+                modulename=body.get("modulename"),
+                dayofweek=body.get("dayofweek"),
+                isactive=body.get("isactive", True),
+                starttime=body.get("starttime"),
+                endtime=body.get("endtime"),
+                updatedat=datetime.now()
+            )
+
+            return JsonResponse({
+                "status": True,
+                "message": "Created Successfully",
+                "id": obj.id
+            })
+
+        except Exception as e:
+            return JsonResponse({
+                "status": False,
+                "message": str(e)
+            }, status=400)
+
+    # ================= PUT =================
+    elif request.method == "PUT":
+        if not id:
+            return JsonResponse({
+                "status": False,
+                "message": "ID is required"
+            }, status=400)
+
+        try:
+            obj = Monthlysaltime.objects.using('demo').get(id=id)
+            body = json.loads(request.body)
+
+            obj.modulename = body.get("modulename", obj.modulename)
+            obj.dayofweek = body.get("dayofweek", obj.dayofweek)
+            obj.isactive = body.get("isactive", obj.isactive)
+
+            if body.get("starttime"):
+                obj.starttime = body.get("starttime")
+
+            if body.get("endtime"):
+                obj.endtime = body.get("endtime")
+
+            obj.updatedat = datetime.now()
+            obj.save()
+
+            return JsonResponse({
+                "status": True,
+                "message": "Updated Successfully"
+            })
+
+        except Monthlysaltime.DoesNotExist:
+            return JsonResponse({
+                "status": False,
+                "message": "Record not found"
+            }, status=404)
+
+        except Exception as e:
+            return JsonResponse({
+                "status": False,
+                "message": str(e)
+            }, status=400)
+
+    # ================= DELETE =================
+    elif request.method == "DELETE":
+        if not id:
+            return JsonResponse({
+                "status": False,
+                "message": "ID is required"
+            }, status=400)
+
+        try:
+            obj = Monthlysaltime.objects.using('demo').get(id=id)
+            obj.delete()
+
+            return JsonResponse({
+                "status": True,
+                "message": "Deleted Successfully"
+            })
+
+        except Monthlysaltime.DoesNotExist:
+            return JsonResponse({
+                "status": False,
+                "message": "Record not found"
+            }, status=404)
+
+    return JsonResponse({
+        "status": False,
+        "message": "Method Not Allowed"
+    }, status=405)
 
 # google contact API
 def google_contact_api(request):

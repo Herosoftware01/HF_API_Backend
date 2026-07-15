@@ -20,7 +20,7 @@ urlpatterns = [
     path('machine-status/', machine_status_api),
     path('api/needle_details/', needle_details_api),
     path('machine_allocation_api/', views.machine_allocation_api, name='machine_allocation_api'),
-    path('needle_report_api/', views.needle_report_api, name='needle_report_api'),
+    path('needle_report_api/', views.needle_report_api, name='needle_report_api'),\
     path('machine_attendance_api/', views.machine_attendance_api, name='machine_attendance_api'),
 
     path('api/machines/', MachineListAPIView.as_view(), name='machines-list'),
@@ -42,9 +42,9 @@ urlpatterns = [
     path("check-ironing-status/", views.check_ironing_status),
     path("get-existing-measurements/", views.get_existing_measurements),
     path("get_cutting_measurements/", views.get_cutting_measurements),
+    path("qcroving/", views.qcroving, name='qcroving'),
     path("allocate-report/", views.get_allocate_report, name='qc_reports'),
-    # path("cutsample-report/", CutSampleViewSet.as_view({'get': 'list'}), name='qc_reports'),
-  
+    path("generate_all_reports/", views.generate_all_reports, name='qc_reports'),
 
 ]
 

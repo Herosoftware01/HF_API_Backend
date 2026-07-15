@@ -16,17 +16,24 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 import json
 from django.utils import timezone
-from datetime import date
+from datetime import date,datetime
 from django.db.models import Q
 from datetime import time
 from django.db import connection
 from datetime import datetime
 from django.utils import timezone
-from django.db.models import Case, When, Value, IntegerField
+from django.db.models import Case, When, Value, IntegerField,Sum
+from django.utils.timezone import localtime
+import os
+import glob
+import subprocess
+from django.conf import settings
+
+
 
 
 from rest_framework import viewsets, filters
-from django_filters.rest_framework import DjangoFilterBackend
+# from django_filters.rest_framework import DjangoFilterBackend
 
 from .serializers import CutSampleSerializer
 
@@ -116,7 +123,6 @@ class QcAdminMistakeDetailAPIView(APIView):
 
         mistake.delete()
         return Response(status=204) 
-
 
 
 
@@ -1848,18 +1854,6 @@ def get_allocate_report(request):
 
     return JsonResponse(data, safe=False)
 
-    s_data = emp_allocate.objects.filter(
-        unit=unit_id,
-        line=line_id,
-        date__date=date.today()
-    ).values(
-        "emp_code",
-        "seq",
-        "jobno",
-        "top_bottom"
-    )
-
-    data = []
 
     for row in s_data:
         emp = Empwisesal.objects.using('main').filter(
@@ -1877,40 +1871,81 @@ def get_allocate_report(request):
     return JsonResponse(data, safe=False)
 
 def machine_allocation_api(request):
-    # 1. Get the date from the frontend, default to today's date if not provided
-    selected_date = request.GET.get('date')
+    selected_date = request.GET.get("date")
+    unit_id = request.GET.get("unit")
 
     if selected_date:
-        selected_date = datetime.strptime(selected_date, "%Y-%m-%d").date()
+        try:
+            selected_date = datetime.strptime(selected_date, "%Y-%m-%d").date()
+        except:
+            selected_date = date.today()
     else:
         selected_date = date.today()
-    
-    result = []
+
+    # ------------------------------------
+    # Machine Allocation
+    # ------------------------------------
 
     allocations = MachineAllocation.objects.select_related(
-        'machine',
-        'unit',
-        'line'
-    )
+        "machine",
+        "unit",
+        "line"
+    ).order_by("-allocated_at", "-id")
+
+    # Keep only latest allocation for each machine
+    latest_allocations = []
+    seen = set()
 
     for allocation in allocations:
-        # 2. Filter employees by BOTH the machine AND the selected date
-        employees = list(
-            emp_allocate.objects.filter(
-                machine=allocation.machine,
-                date__date=selected_date  # <--- THIS IS THE CRITICAL FIX
-            ).values(
-                'emp_code',
-                'date',
-                'unit',
-                'machine_id',
-                'line',
-                'status',
-                'seq',
-                'jobno',
-                'top_bottom'
-            )
+        if allocation.machine_id in seen:
+            continue
+
+        seen.add(allocation.machine_id)
+        latest_allocations.append(allocation)
+
+    # Apply Unit Filter AFTER removing duplicates
+    if unit_id:
+        latest_allocations = [
+            x for x in latest_allocations
+            if str(x.unit_id) == str(unit_id)
+        ]
+
+    result = []
+
+    total_machine = len(latest_allocations)
+    online_machine = 0
+    idle_machine = 0
+
+    for allocation in latest_allocations:
+
+        emp_queryset = emp_allocate.objects.filter(
+            machine_id=allocation.machine_id,
+            date__date=selected_date
         )
+
+        if unit_id:
+            emp_queryset = emp_queryset.filter(unit=unit_id)
+
+        employees = list(
+            emp_queryset.values(
+                "emp_code",
+                "date",
+                "unit",
+                "machine_id",
+                "line",
+                "status",
+                "seq",
+                "jobno",
+                "top_bottom"
+            ).distinct()
+        )
+
+        machine_status = "online" if employees else "idle"
+
+        if machine_status == "online":
+            online_machine += 1
+        else:
+            idle_machine += 1
 
         result.append({
             "machine": {
@@ -1931,14 +1966,14 @@ def machine_allocation_api(request):
                 "allocated_at": allocation.allocated_at.strftime("%Y-%m-%d %H:%M:%S")
                 if allocation.allocated_at else None,
             },
-
             "employee_count": len(employees),
             "employees": employees,
         })
 
     return JsonResponse({
         "status": True,
-        "selected_date": selected_date,
+        "selected_date": selected_date.strftime("%Y-%m-%d"),
+        "selected_unit": unit_id,
         "total_machine": total_machine,
         "online_machine": online_machine,
         "idle_machine": idle_machine,
@@ -1975,32 +2010,86 @@ def machine_attendance_api(request):
 
 
 
-def needle_report_api(request):
+def machine_attendance_api(request):
+    try:
+        with connections['demo'].cursor() as cursor:
 
+            # Check which database Django is connected to
+            cursor.execute("SELECT DB_NAME()")
+            db_name = cursor.fetchone()[0]
+            print("Database :", db_name)
+
+            # Execute Stored Procedure
+            cursor.execute("EXEC pr_Tailor_PresentAbsent")
+
+            # Get column names
+            columns = [col[0] for col in cursor.description]
+            print("Columns :", columns)
+
+            # Fetch all rows
+            rows = cursor.fetchall()
+
+            if rows:
+                print("First Row :", rows[0])
+
+                first_row_dict = dict(zip(columns, rows[0]))
+                print("First Row Dict :", first_row_dict)
+
+            data = []
+
+            for row in rows:
+                row_dict = dict(zip(columns, row))
+
+                data.append({
+                    "dept": row_dict.get("dept"),
+                    "code": row_dict.get("code"),
+                    "name": row_dict.get("name"),
+                    "status": row_dict.get("stat")
+                })
+
+        return JsonResponse({
+            "status": True,
+            "database": db_name,
+            "data": data
+        })
+
+    except Exception as e:
+        return JsonResponse({
+            "status": False,
+            "error": str(e)
+        })
+
+
+
+def needle_report_api(request):
     if request.method == "GET":
-        data = Needle_change.objects.using('default').all().values()
-        data_list = list(data)
-        return JsonResponse(data_list, safe=False)
+        today = timezone.localdate()
+
+        data = (
+            Needle_change.objects.using('default')
+            .filter(date__date=today)   # Replace 'created_at' with your DateTimeField
+            .values()
+        )
+
+        return JsonResponse(list(data), safe=False)
     
 
 def get_shift(dt):
+    # Convert UTC to IST
+    dt = timezone.localtime(dt)
+
     t = dt.time()
 
     if time(8, 30) <= t < time(10, 30):
         return "I"
-
     elif time(10, 45) <= t < time(12, 45):
         return "II"
-
     elif time(13, 30) <= t < time(15, 30):
         return "III"
-
     elif time(15, 30) <= t < time(17, 30):
         return "IV"
-
     elif time(17, 45) <= t < time(20, 0):
         return "V"
-
     elif time(20, 45) <= t < time(23, 30):
         return "VI"
 
@@ -2010,19 +2099,20 @@ def get_shift(dt):
 def qcroving(request):
     unit = request.GET.get("unit")
     date = request.GET.get("date")
-   
+
     qc_queryset = qc_piece_data.objects.all()
 
-    # Rely entirely on backend database filters
-    # Default today's data
+    # Date Filter
     if date:
         qc_queryset = qc_queryset.filter(date__date=date)
     else:
         qc_queryset = qc_queryset.filter(date__date=timezone.now().date())
 
+    # ----------------------------
+    # Summary Query
+    # ----------------------------
     qc_list = list(
-        qc_queryset
-        .values(
+        qc_queryset.values(
             "machine_id",
             "bundle_id",
             "date",
@@ -2030,19 +2120,59 @@ def qcroving(request):
             "product",
             "seq",
             "size",
-        )
-        .annotate(
+        ).annotate(
             mistake_count=Sum("mistake_count")
         )
     )
 
-    # Building machine map safely using Identity field
+    # ----------------------------
+    # Mistake Details
+    # ----------------------------
+    piece_map = {}
+
+    piece_queryset = (
+        qc_queryset
+        .exclude(category="no_mistake")
+        .exclude(mistake_count=0)
+        .values(
+            "machine_id",
+            "bundle_id",
+            "jobno",
+            "seq",
+            "size",
+            "piece_no",
+            "mistake_name",
+        )
+        .order_by("piece_no")
+    )
+
+    for p in piece_queryset:
+        key = (
+            p["bundle_id"],
+            p["machine_id"],
+            p["jobno"],
+            p["seq"],
+            p["size"],
+        )
+
+        piece_map.setdefault(key, []).append({
+            "piece_no": p["piece_no"],
+            "mistake_name": p["mistake_name"],
+        })
+
+    # ----------------------------
+    # Machine Map
+    # ----------------------------
     machines = {
         m.Identity: m
         for m in machine_details.objects.all()
     }
 
+    # ----------------------------
+    # Employee Map
+    # ----------------------------
     emp_map = {}
+
     emp_queryset = emp_allocate.objects.select_related("machine")
 
     if unit:
@@ -2050,12 +2180,13 @@ def qcroving(request):
 
     for e in emp_queryset.order_by("-date"):
         if e.machine and e.machine.Identity:
-            identity = e.machine.Identity
-            if identity not in emp_map:
-                emp_map[identity] = e
-    
+            if e.machine.Identity not in emp_map:
+                emp_map[e.machine.Identity] = e
 
-    final_queryset = qc_piece_final.objects.using('default').all()
+    # ----------------------------
+    # Final QC Data
+    # ----------------------------
+    final_queryset = qc_piece_final.objects.using("default").all()
 
     if date:
         final_queryset = final_queryset.filter(date__date=date)
@@ -2078,35 +2209,42 @@ def qcroving(request):
             "checked_piece": f.checked_piece,
         }
 
+    # ----------------------------
+    # Result
+    # ----------------------------
     result = []
 
     for row in qc_list:
-        # Cross-reference with the aggregated machine identity string
+
         machine = machines.get(row["machine_id"])
         emp = emp_map.get(row["machine_id"])
-        timeline = get_shift(row["date"])
-
-        final_data = final_map.get(
-            (
-                row["bundle_id"],
-                row["machine_id"],
-                row["jobno"],
-                row["seq"],
-                row["size"],
-            ),
-            {
-                "total_pieces": 0,
-                "checked_piece": 0,
-            }
-        )
 
         if unit and emp is None:
             continue
-        
-        # Rigorous Status Assignment Logic
+
+        timeline = get_shift(row["date"])
+
+        key = (
+            row["bundle_id"],
+            row["machine_id"],
+            row["jobno"],
+            row["seq"],
+            row["size"],
+        )
+
+        final_data = final_map.get(
+            key,
+            {
+                "total_pieces": 0,
+                "checked_piece": 0,
+            },
+        )
+
+        mistakes = piece_map.get(key, [])
+
         if row["mistake_count"] == 0:
             status = "Perfect"
-        elif row["mistake_count"] in [1, 2]:
+        elif row["mistake_count"] <= 2:
             status = "Good"
         else:
             status = "Priority"
@@ -2114,10 +2252,11 @@ def qcroving(request):
         result.append({
             "machine_pk": machine.id if machine else None,
             "identity": machine.Identity if machine else None,
+
             "emp_code": emp.emp_code if emp else None,
             "unit": emp.unit if emp else None,
 
-            "date": row["date"],
+            "date": row["date"].strftime("%d/%m/%Y %H:%M:%S") if row["date"] else None,
             "timeline": timeline,
 
             "jobno": row["jobno"],
@@ -2131,6 +2270,178 @@ def qcroving(request):
 
             "mistake_count": row["mistake_count"],
             "status": status,
+
+            # List of pieces having mistakes
+            "mistakes": mistakes,
         })
 
     return JsonResponse(result, safe=False)
+
+
+import os
+import glob
+import json
+import subprocess
+import requests
+import threading
+from datetime import datetime
+from django.conf import settings
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+
+WHATSAPP_SEND_URL = 'https://ws.herofashion.com/send'
+WHATSAPP_GROUP_ID = '120363427040771599@g.us'
+
+def send_to_whatsapp(file_path, group_id=WHATSAPP_GROUP_ID):
+    try:
+        with open(file_path, 'rb') as f:
+            files = {'file': (os.path.basename(file_path), f, 'image/png')}
+            data = {'groupId': group_id}
+
+            resp = requests.post(
+                WHATSAPP_SEND_URL,
+                data=data,
+                files=files,
+                timeout=30,
+            )
+
+        print(f'[WA] status={resp.status_code} body={resp.text[:500]}')
+
+        if resp.status_code == 200:
+            print(f'Sent to WhatsApp: {file_path}')
+            return True
+        else:
+            print(f'WhatsApp send failed ({resp.status_code}): {file_path}')
+            return False
+
+    except requests.exceptions.RequestException as e:
+        print(f'WhatsApp REQUEST error for {file_path}: {type(e).__name__} - {e}')
+        return False
+    except Exception as e:
+        print(f'WhatsApp send error for {file_path}: {e}')
+        return False
+
+def delete_file_later(file_path, delay_seconds=3600):
+    def _delete():
+        try:
+            if os.path.exists(file_path):
+                os.remove(file_path)
+                print(f'Auto-deleted: {file_path}')
+        except Exception as e:
+            print(f'Delete failed for {file_path}: {e}')
+
+    timer = threading.Timer(delay_seconds, _delete)
+    timer.daemon = True
+    timer.start()
+
+@csrf_exempt
+def generate_all_reports(request):
+    date = request.GET.get('date') or request.POST.get('date')
+
+    if not date:
+        date = datetime.today().strftime('%Y-%m-%d')
+
+    units = ['1', '2', '3', '4', '5', '6']
+    reports = []
+
+    script_path = os.path.join(settings.BASE_DIR, 'capture_report.js')
+
+    # FIX: Use dynamic path instead of hardcoded 'D:\'
+    reports_dir = os.path.join(settings.BASE_DIR, 'qc_reports')
+    os.makedirs(reports_dir, exist_ok=True)
+
+    for unit in units:
+        unit_debug = {
+            'unit': unit,
+            'images': [],
+            'node_exit_code': None,
+            'node_status': None,
+            'node_stdout': None,
+            'node_stderr': None,
+        }
+
+        # Delete old screenshots
+        old_files = glob.glob(
+            os.path.join(reports_dir, f'roving_{unit}_{date}_*.png')
+        )
+
+        for file in old_files:
+            try:
+                os.remove(file)
+            except:
+                pass
+
+        # Run Node Script
+        result = subprocess.run(
+            ['node', script_path, unit, date],
+            capture_output=True,   
+            text=True,             
+            cwd=settings.BASE_DIR,
+        )
+
+        stdout = result.stdout or ''
+        stderr = result.stderr or ''
+
+        print(f'--- Unit {unit} stdout ---')
+        print(stdout)
+        print(f'--- Unit {unit} stderr ---')
+        print(stderr)
+
+        unit_debug['node_exit_code'] = result.returncode
+        unit_debug['node_stdout'] = stdout.strip()
+        unit_debug['node_stderr'] = stderr.strip()
+
+        # Parse Playwright's JSON response
+        node_status = None
+        for line in stdout.strip().splitlines():
+            line = line.strip()
+            if line.startswith('{'):
+                try:
+                    node_status = json.loads(line)
+                except json.JSONDecodeError:
+                    pass
+
+        unit_debug['node_status'] = node_status
+
+        # Check for generated images
+        unit_files = glob.glob(
+            os.path.join(reports_dir, f'roving_{unit}_{date}_*.png')
+        )
+
+        if not unit_files:
+            print(f'No report for Unit {unit}')
+            reports.append(unit_debug) # Append debug info even if it fails
+            continue
+
+        images = []
+
+        for file in unit_files:
+            images.append(file)
+            sent = send_to_whatsapp(file)
+            if sent:
+                delete_file_later(file, delay_seconds=3600)
+
+        unit_debug['images'] = images
+        reports.append(unit_debug)
+
+    return JsonResponse({
+        'success': True,
+        'date': date,
+        'reports': reports,
+    })
+ 
+ 
+def delete_file_later(file_path, delay_seconds=3600):
+    """Delete a file after delay_seconds, without blocking the request."""
+    def _delete():
+        try:
+            if os.path.exists(file_path):
+                os.remove(file_path)
+                print(f'Auto-deleted: {file_path}')
+        except Exception as e:
+            print(f'Delete failed for {file_path}: {e}')
+ 
+    timer = threading.Timer(delay_seconds, _delete)
+    timer.daemon = True
+    timer.start()
+ 

@@ -141,6 +141,7 @@ class SyncfusionGantt(models.Model):
     
 class BlockEditor(models.Model):
     id = models.BigAutoField(primary_key=True)
+    name = models.CharField(max_length=50, help_text="Name of the block template")
     blocks = models.JSONField(default=list, help_text="JSON blocks from block editor")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -150,4 +151,15 @@ class BlockEditor(models.Model):
         ordering = ['-updated_at']
 
     def __str__(self):
-        return f"Block Template - {self.id}"
+        return f"Block Template - {self.name}"
+    
+class FashionrResult(models.Model):
+    slno = models.AutoField(primary_key=True)
+    title = models.CharField(max_length=255)
+    result = models.JSONField(default=list)
+    created_datetime = models.DateTimeField(blank=True, null=True)
+    jobno = models.CharField(max_length=100, unique=True)
+
+    class Meta:
+        managed = False
+        db_table = 'Fashionr_result'

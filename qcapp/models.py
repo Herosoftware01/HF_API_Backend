@@ -362,18 +362,6 @@ class sequency_data(models.Model):
     date = models.DateTimeField(default=timezone.now)
 
 
-class sequency_data(models.Model):
-    emp_allocate_id = models.ForeignKey(
-        emp_allocate,
-        on_delete=models.CASCADE,
-        related_name="sequences"
-    )
-    seq = models.CharField(max_length=100, null=True, blank=True)
-    jobno = models.CharField(max_length=100, null=True, blank=True)
-    top_bottom = models.CharField(max_length=100, null=True, blank=True)
-    date = models.DateTimeField(default=timezone.now)
-
-
 class VueProcessSequence(models.Model):
     jobno = models.CharField(db_column='JOBNO', max_length=50)  # Field name made lowercase.
     topbottom_des = models.CharField(db_column='TopBottom_des', max_length=50, blank=True, null=True)  # Field name made lowercase.
