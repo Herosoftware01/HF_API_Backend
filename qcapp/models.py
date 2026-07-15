@@ -3,10 +3,98 @@ from django.core.exceptions import ValidationError
 import datetime
 from django.utils import timezone
 
+# class QcAdminMistake(models.Model):
+#     name = models.CharField(max_length=100)
+#     category = models.CharField(max_length=50)
+#     code = models.CharField(max_length=50)
+#     image = models.ImageField(upload_to='qc_admin_mistakes/')
+
+#     def __str__(self):
+#         return self.name
+
+
 class QcAdminMistake(models.Model):
+
+    DEPARTMENT_PREFIX = {
+        "fabric": "F",
+        "dyeing": "D",
+        "knitting": "K",
+        "cutting": "C",
+        "printing": "P",
+        "sewing": "S",
+        "trimming_checking": "TC",
+        "accessories": "A",
+    }
+
+    DEPARTMENT_CHOICES = [
+        ("fabric", "Fabric"),
+        ("dyeing", "Dyeing"),
+        ("knitting", "Knitting"),
+        ("cutting", "Cutting"),
+        ("printing", "Printing"),
+        ("sewing", "Sewing"),
+        ("trimming_checking", "Trimming & Checking"),
+        ("accessories", "Accessories"),
+    ]
+
+    DEFECT_CHOICES = [
+        ("Minor Defects", "Minor Defects"),
+        ("Major Defects", "Major Defects"),
+        ("Critical Defects", "Critical Defects"),
+        ("rowing_qc", "Rowing QC"),
+    ]
+
+
     name = models.CharField(max_length=100)
-    category = models.CharField(max_length=50)
-    image = models.ImageField(upload_to='qc_admin_mistakes/')
+
+    department = models.CharField(
+        max_length=50,
+        choices=DEPARTMENT_CHOICES
+    )
+
+    category = models.CharField(
+        max_length=50,
+        choices=DEFECT_CHOICES
+    )
+
+    code = models.CharField(
+    max_length=20,
+    editable=False
+)
+
+    image = models.ImageField(
+        upload_to="qc_admin_mistakes/",
+        blank=True,
+        null=True
+    )
+
+
+    def save(self, *args, **kwargs):
+
+        if not self.code:
+
+            prefix = self.DEPARTMENT_PREFIX[self.department]
+
+            last = (
+                QcAdminMistake.objects
+                .filter(department=self.department)
+                .order_by("-id")
+                .first()
+            )
+
+            if last:
+                last_number = int(last.code.split("-")[1])
+                next_number = last_number + 1
+            else:
+                next_number = 1
+
+
+            # self.code = f"{prefix}-{next_number:04d}"
+            self.code = f"{prefix}-{next_number}"
+
+
+        super().save(*args, **kwargs)
+
 
     def __str__(self):
         return self.name

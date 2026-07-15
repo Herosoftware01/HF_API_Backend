@@ -527,7 +527,6 @@ def get_last_bundle(request):
 @api_view(["GET"])
 def check_bundle_entry_status(request):
     bundle_id = request.GET.get("bundle_id")
-   
 
     if not bundle_id:
         return Response({"error": "bundle_id required"}, status=400)
@@ -1041,9 +1040,6 @@ class EmpAllocateAPIView(APIView):
 
         emp_data = data.get("emp_code")
 
-        # -------------------------
-        # READ DATA
-        # -------------------------
         if isinstance(emp_data, dict):
             emp_code = emp_data.get("empCode")
             machine_id = emp_data.get("mId")
@@ -1193,32 +1189,32 @@ class EmpAllocateAPIView(APIView):
             "steps_saved": len(steps)
         })
 
-        # -------------------------
-        # SAVE SEQUENCE
-        # -------------------------
-        if steps:
-            for step in steps:
-                try:
-                    obj = sequency_data.objects.create(
-                        emp_allocate_id=allocation,   # ✅ FIXED (most likely issue)
-                        seq=step,
-                        jobno=jobno,
-                        top_bottom=top_bottom,
-                        date=timezone.now()
-                    )
-                    print("SAVED:", obj.id, step)
+        # # -------------------------
+        # # SAVE SEQUENCE
+        # # -------------------------
+        # if steps:
+        #     for step in steps:
+        #         try:
+        #             obj = sequency_data.objects.create(
+        #                 emp_allocate_id=allocation,   # ✅ FIXED (most likely issue)
+        #                 seq=step,
+        #                 jobno=jobno,
+        #                 top_bottom=top_bottom,
+        #                 date=timezone.now()
+        #             )
+        #             print("SAVED:", obj.id, step)
 
-                except Exception as e:
-                    import traceback
-                    print("SEQUENCE SAVE ERROR:", str(e))
-                    print(traceback.format_exc())
-                    return Response({"error": str(e)}, status=500)
+        #         except Exception as e:
+        #             import traceback
+        #             print("SEQUENCE SAVE ERROR:", str(e))
+        #             print(traceback.format_exc())
+        #             return Response({"error": str(e)}, status=500)
 
-        return Response({
-            "message": "Saved successfully",
-            "allocation_id": allocation.id,
-            "steps_saved": len(steps)
-        })
+        # return Response({
+        #     "message": "Saved successfully",
+        #     "allocation_id": allocation.id,
+        #     "steps_saved": len(steps)
+        # })
     
     
 
@@ -1255,7 +1251,6 @@ def get_machine_employee(request, identity):
         # today = now().date()
         today = timezone.now().date()
         
-
         #  Step 1: Get line_id from Line table
         line_obj = Line.objects.filter(
             unit_id=unit,
@@ -1988,21 +1983,6 @@ def needle_report_api(request):
         return JsonResponse(data_list, safe=False)
     
 
-class CutSampleViewSet(viewsets.ModelViewSet):
-    queryset = cut_sample_data_final.objects.all().order_by('-date')
-    serializer_class = CutSampleSerializer
-    filter_backends = [DjangoFilterBackend, filters.SearchFilter]
-    
-    # Filter setup for switches
-    filterset_fields = {
-        'jobno': ['exact', 'icontains'],
-        'bf_ironing': ['exact'],
-        'af_ironing': ['exact'],
-        'date': ['gte', 'lte', 'date'], # Date range filtering
-    }
-    
-    # Bundle_id and other fields for Global Search
-    search_fields = ['jobno', 'bundle_no', 'bundle_id', 'product', 'color', 'size']
 def get_shift(dt):
     t = dt.time()
 

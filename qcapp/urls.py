@@ -43,7 +43,7 @@ urlpatterns = [
     path("get-existing-measurements/", views.get_existing_measurements),
     path("get_cutting_measurements/", views.get_cutting_measurements),
     path("allocate-report/", views.get_allocate_report, name='qc_reports'),
-    path("cutsample-report/", CutSampleViewSet.as_view({'get': 'list'}), name='qc_reports'),
+    # path("cutsample-report/", CutSampleViewSet.as_view({'get': 'list'}), name='qc_reports'),
   
 
 ]
