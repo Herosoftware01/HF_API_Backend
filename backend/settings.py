@@ -97,6 +97,7 @@ INSTALLED_APPS = [
     "channels",
     'n8n',
     'bundle_tracking',
+    'production_live_scan'
 ]
 
 X_FRAME_OPTIONS = 'ALLOWALL'
@@ -295,7 +296,8 @@ TIME_ZONE = 'Asia/Kolkata'
 
 USE_I18N = True
 
-USE_TZ = True
+USE_TZ = False
+# USE_TZ = True
 
 
 

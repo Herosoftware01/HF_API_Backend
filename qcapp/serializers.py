@@ -7,6 +7,11 @@ from django.db.models import Sum
 from .models import QcAdminMistake,cut_sample_data_final,sequency_data,Cont_employee,Needle_change,Unit, Line, MachineAllocation, machine_details, emp_allocate,Empwisesal,VueProcessSequence
 
 
+# class QcAdminMistakeSerializer(serializers.ModelSerializer):
+#     class Meta:
+#         model = QcAdminMistake
+#         fields = '__all__'
+
 class QcAdminMistakeSerializer(serializers.ModelSerializer):
 
     class Meta:
@@ -15,7 +20,6 @@ class QcAdminMistakeSerializer(serializers.ModelSerializer):
         read_only_fields = [
             "code"
         ]
-
 
 class LineSerializer(serializers.ModelSerializer):
     class Meta:
