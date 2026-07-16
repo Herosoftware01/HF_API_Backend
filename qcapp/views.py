@@ -2370,18 +2370,20 @@ def generate_all_reports(request):
             os.path.join(reports_dir, f'roving_{unit}_{date}_*.png')
         )
 
-        for file in old_files:
-            try:
-                os.remove(file)
-            except:
-                pass
+        # 1. Quick sanity check to ensure the file isn't empty
+        file_size = 0
+        if os.path.exists(script_path):
+            file_size = os.path.getsize(script_path)
+            if file_size == 0:
+                print(f"WARNING: {script_path} is completely empty!")
 
-        # Run Node Script
+        # 2. Run with shell=True for Windows compatibility
         result = subprocess.run(
             ['node', script_path, unit, date],
             capture_output=True,   
             text=True,             
             cwd=settings.BASE_DIR,
+            shell=True  # <-- FIX: This is often required on Windows host servers!
         )
 
         stdout = result.stdout or ''

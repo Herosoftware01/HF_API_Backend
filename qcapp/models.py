@@ -79,7 +79,8 @@ class QcAdminMistake(models.Model):
                 next_number = 1
 
 
-            self.code = f"{prefix}-{next_number:04d}"
+            # self.code = f"{prefix}-{next_number:04d}"
+            self.code = f"{prefix}-{next_number}"
 
 
         super().save(*args, **kwargs)
