@@ -293,7 +293,8 @@ TIME_ZONE = 'Asia/Kolkata'
 
 USE_I18N = True
 
-USE_TZ = True
+USE_TZ = False
+# USE_TZ = True
 
 
 
