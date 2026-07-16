@@ -7,7 +7,7 @@ from .models import GridSetting,TrsMaildtls
 from django.http import JsonResponse
 from rest_framework import status
 from rest_framework import viewsets
-from .models import GridSetting,DiWasg,DiWasg_img,TrsMaildtls, SyncfushionKanban, SyncfusionGantt, BlockEditor, FashionrResult
+from .models import GridSetting,DiWasg,DiWasg_img,TrsMaildtls, SyncfushionKanban, SyncfusionGantt, BlockEditor, FashionrResult, ViewAccinwpend
 from .serializers import GridSettingSerializer,TrsMaildtlsSerializer
 from rest_framework.permissions import IsAuthenticated  # optional
 import json
@@ -801,3 +801,10 @@ def fashionr_results(request):
             return JsonResponse({"success": False, "error": str(e)}, status=400)
 
     return JsonResponse({"message": "Method not allowed"}, status=405)
+
+def DueDateList(request):
+    if request.method != "GET":
+        return JsonResponse({"message": "Method not allowed"}, status=405)
+
+    data = list(ViewAccinwpend.objects.using('test').values()) 
+    return JsonResponse(data, safe=False)

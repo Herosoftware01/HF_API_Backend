@@ -52,6 +52,7 @@ class MasUnit(models.Model):
     class Meta:
         managed = False
         db_table = 'Mas_Unit'
+        
 class MasTopbottom(models.Model):
     topbottom_des = models.CharField(db_column='TopBottom_des', max_length=50, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)  # Field name made lowercase.
     topbottom_id = models.IntegerField(db_column='TopBottom_id', primary_key=True)  # Field name made lowercase.
@@ -152,9 +153,6 @@ class Unituser(models.Model):
         db_table = 'unit_unituser'
 
 
-
-
-
 class TrsMcutstickerprod(models.Model):
     dt = models.DateTimeField(db_column='Dt')  # Field name made lowercase.
     empid = models.IntegerField(db_column='EmpID')  # Field name made lowercase.
@@ -173,9 +171,9 @@ class TrsMcutstickerprod(models.Model):
     hempid = models.IntegerField(blank=True, null=True)
     frmbc = models.CharField(max_length=1, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)
     scan = models.CharField(max_length=1, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)
+    livescan = models.CharField(max_length=1, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)
 
     class Meta:
         managed = False
         db_table = 'Trs_MCutStickerProd'
-
 

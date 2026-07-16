@@ -36,8 +36,10 @@ CORS_ALLOWED_ORIGINS = [
     "https://web.herofashion.com",
     "https://hf.herofashion.com",
     "https://hfapi.herofashion.com",
+    "https://sync.herofashion.com",
     "https://dev.herofashion.com",
     "http://10.1.21.13:3000",
+    "http://10.1.21.80:3600",
     "https://hfempdtls.netlify.app",
     "http://10.1.21.110:7003",
     
@@ -49,6 +51,7 @@ CSRF_TRUSTED_ORIGINS = [
     "http://10.1.21.110:7003",
     "https://hf.herofashion.com",
     "https://hfapi.herofashion.com",
+    "https://sync.herofashion.com",
     "https://web.herofashion.com",
     "https://dev.herofashion.com",
     "http://10.1.21.13:3000",
@@ -94,6 +97,7 @@ INSTALLED_APPS = [
     "channels",
     'n8n',
     'bundle_tracking',
+    'production_live_scan'
 ]
 
 X_FRAME_OPTIONS = 'ALLOWALL'
@@ -292,7 +296,8 @@ TIME_ZONE = 'Asia/Kolkata'
 
 USE_I18N = True
 
-USE_TZ = True
+USE_TZ = False
+# USE_TZ = True
 
 
 

@@ -35,6 +35,7 @@ urlpatterns = [
     path('api/chat_app/', include('chat_app.urls')),
     path('n8n/', include('n8n.urls')),
     path('bundle_tracking/', include('bundle_tracking.urls')),
+    path('production_live_scan/', include('production_live_scan.urls')),
 ] 
 
 

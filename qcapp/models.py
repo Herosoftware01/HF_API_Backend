@@ -3,6 +3,16 @@ from django.core.exceptions import ValidationError
 import datetime
 from django.utils import timezone
 
+# class QcAdminMistake(models.Model):
+#     name = models.CharField(max_length=100)
+#     category = models.CharField(max_length=50)
+#     code = models.CharField(max_length=50)
+#     image = models.ImageField(upload_to='qc_admin_mistakes/')
+
+#     def __str__(self):
+#         return self.name
+
+
 class QcAdminMistake(models.Model):
 
     DEPARTMENT_PREFIX = {
@@ -79,7 +89,8 @@ class QcAdminMistake(models.Model):
                 next_number = 1
 
 
-            self.code = f"{prefix}-{next_number:04d}"
+            # self.code = f"{prefix}-{next_number:04d}"
+            self.code = f"{prefix}-{next_number}"
 
 
         super().save(*args, **kwargs)
