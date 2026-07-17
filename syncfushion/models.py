@@ -163,3 +163,28 @@ class FashionrResult(models.Model):
     class Meta:
         managed = False
         db_table = 'Fashionr_result'
+
+class ViewAccinwpend(models.Model):
+    slno = models.BigIntegerField(primary_key=True)
+    img = models.CharField(max_length=450, blank=True, null=True)
+    merch = models.CharField(max_length=35, blank=True, null=True)
+    orderno = models.CharField(db_column='OrderNo', max_length=50, blank=True, null=True)  # Field name made lowercase.
+    no = models.IntegerField(db_column='No')  # Field name made lowercase.
+    date = models.DateTimeField(db_column='Date')  # Field name made lowercase.
+    duedate = models.DateTimeField(db_column='DueDate', blank=True, null=True)  # Field name made lowercase.
+    dueday = models.IntegerField(blank=True, null=True)
+    orderdt = models.DateTimeField(db_column='orderDt', blank=True, null=True)  # Field name made lowercase.
+    ordremday = models.IntegerField(blank=True, null=True)
+    name = models.CharField(db_column='Name', max_length=35, blank=True, null=True)  # Field name made lowercase.
+    completed = models.SmallIntegerField(db_column='Completed')  # Field name made lowercase.
+    ag = models.CharField(max_length=35)
+    an = models.CharField(max_length=35)
+    sz = models.CharField(max_length=50, blank=True, null=True)
+    item = models.CharField(max_length=173, blank=True, null=True)
+    quantity = models.DecimalField(db_column='Quantity', max_digits=18, decimal_places=4)  # Field name made lowercase.
+    inwqty = models.DecimalField(max_digits=38, decimal_places=4)
+    uom = models.CharField(max_length=25)
+
+    class Meta:
+        managed = False
+        db_table = 'view_accinwpend'

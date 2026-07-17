@@ -12,4 +12,8 @@ urlpatterns = [
     path('qc_first/', views.qcfirst, name='qc_first'),
     path('qc_roving/', views.qcroving, name='qc_roving'),
     path('punchst/', views.punchst, name='punchst'),
+    path('mas_worklist/', views.mas_worklist, name='mas_worklist'),
+    path('mas_worklist/<int:id>/', views.mas_worklist, name='mas_worklist_detail'),
+    path('trs_workentry/', views.trs_workentry, name='trs_workentry'),
+    path('trs_workentry/<int:id>/', views.trs_workentry, name='trs_workentry_detail'),
 ]  
