@@ -14,6 +14,7 @@ urlpatterns = [
     path('cutdel/', views.cutdel, name='cutdel'),
     path('bitcheckhour/', views.bitcheckhour, name='bitcheckhour'),
     path('stickerhour/', views.stickerHour, name='stickerHour'),
+    path('measurement_report/', views.measurement_report, name='measurement_report'),
 
     # HR Reports
     path('attendance/', views.attendance, name='attendance'),
