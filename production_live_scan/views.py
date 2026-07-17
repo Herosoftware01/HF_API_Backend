@@ -9,6 +9,7 @@ from rest_framework import status
 from django.db import transaction
 from imp_reports.models import UnitBundlereport
 from bundle_tracking.models import TrsMcutstickerprod,MasUnit,MasTopbottom
+from qcapp.models import Unit,Line,machine_details,emp_allocate,Empwisesal
 from .models import unit_input,Msizes
 from django.utils.dateparse import parse_datetime
 from django.utils import timezone
@@ -186,11 +187,112 @@ class GetUnitDataAPIView(APIView):
 
         if selected_date:
             date_obj = datetime.strptime(selected_date, '%Y-%m-%d')
-            data = unit_input.objects.filter(unit=unit, line=line, entry_date__date=date_obj)
+            data = unit_input.objects.filter(unit=unit, line=line, entry_date__date=date_obj, scan=False)
         else:
             four_days_ago = datetime.now() - timedelta(days=4)
-            data = unit_input.objects.filter(unit=unit, line=line, entry_date__gte=four_days_ago)
+            data = unit_input.objects.filter(unit=unit, line=line, entry_date__gte=four_days_ago, scan=False)
+
+        # JSON response
+        results = list(data.values('bundle_id','mbud', 'job_no','color','bdl_no','size','tb_name', 'pc', 'color', 'entry_date'))
+        return Response({"status": True, "data": results})
+    
+
+
+class GetUnitAssemply(APIView):
+    def get(self, request):
+        unit = request.query_params.get('unit')
+        line = request.query_params.get('line')
+        selected_date = request.query_params.get('date') 
+
+        if selected_date:
+            date_obj = datetime.strptime(selected_date, '%Y-%m-%d')
+            data = unit_input.objects.filter(unit=unit, line=line, entry_date__date=date_obj, scan=True)
+        else:
+            four_days_ago = datetime.now() - timedelta(days=4)
+            data = unit_input.objects.filter(unit=unit, line=line, entry_date__gte=four_days_ago, scan=True)
 
         # JSON response
         results = list(data.values('bundle_id', 'job_no', 'pc', 'color', 'entry_date'))
         return Response({"status": True, "data": results})
+    
+
+def assembly_emp(request):
+    unit = request.GET.get('unit')
+    line = request.GET.get('line')
+    date = request.GET.get('date')
+
+    if not unit or not line or not date:
+        return JsonResponse(
+            {"error": "unit, line and date are required"},
+            status=400
+        )
+
+    filter_date = date.split('T')[0]
+
+    unit_name = f"unit-{unit}"
+
+    unit_obj = Unit.objects.filter(name=unit_name).first()
+
+    if not unit_obj:
+        return JsonResponse({"error": "Unit not found"}, status=404)
+
+
+    line_obj = Line.objects.filter(
+        unit=unit_obj,
+        line_number=line
+    ).first()
+
+    if not line_obj:
+        return JsonResponse({"error": "Line not found"}, status=404)
+
+
+    emp_details = list(emp_allocate.objects.filter(
+        date__date=filter_date,
+        unit=unit_obj.id,
+        line=line_obj.id
+    ).values(
+        'emp_code',
+        'machine',
+        'machine__Identity',
+        'seq',
+        'jobno',
+        'top_bottom'
+    ))
+
+
+    # Convert emp_code to integer
+    emp_codes = [
+        int(emp['emp_code']) 
+        for emp in emp_details
+        if emp['emp_code'].isdigit()
+    ]
+
+
+    emp_names = Empwisesal.objects.using('main').filter(
+        code__in=emp_codes
+    ).values(
+        'code',
+        'name'
+    )
+
+
+    emp_name_dict = {
+        str(emp['code']): emp['name']
+        for emp in emp_names
+    }
+
+
+    for emp in emp_details:
+        emp['emp_name'] = emp_name_dict.get(
+            emp['emp_code'],
+            ''
+        )
+
+
+    return JsonResponse({
+        "unit_id": unit_obj.id,
+        "line_id": line_obj.id,
+        "line": line,
+        "date": filter_date,
+        "data": emp_details
+    })
