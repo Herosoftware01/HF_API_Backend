@@ -30,5 +30,48 @@ class Msizes(models.Model):
         managed = False
         db_table = 'mSizes'
 
+class Assembly_data(models.Model):
+    id = models.AutoField(primary_key=True)
+    unit = models.IntegerField()
+    line = models.IntegerField()
+    job_no = models.CharField(max_length=50)
+    tb_id = models.IntegerField()
+    tb_name = models.CharField(max_length=100)
+    machine = models.CharField(max_length=100)
+    date = models.DateTimeField()
+    bundle_id = models.CharField(max_length=50)
+    bdl_no = models.CharField(max_length=50)
+    mbud = models.CharField(max_length=50)
+    size = models.CharField(max_length=50)
+    size_id = models.IntegerField()
+    color = models.CharField(max_length=100)
+    pc = models.CharField(max_length=50)
+    entry_date = models.DateTimeField()
+    scan = models.BooleanField(default=False)
+    lot =models.CharField(max_length=50)
+
+class dependency(models.Model):
+    id = models.AutoField(primary_key=True)
+    job_no = models.CharField(max_length=50)
+    tb_id = models.IntegerField()
+    tb_name = models.CharField(max_length=100)
+    date = models.DateTimeField()
+    process_des = models.CharField(max_length=50)
+    mc = models.CharField(max_length=50)
+    thrd = models.IntegerField()
+    wsec = models.CharField(max_length=50)
+    process_id = models.IntegerField()
+    and_or = models.BooleanField(default=False)
+
+class dependency_data(models.Model):
+    id = models.AutoField(primary_key=True)
+    date = models.DateTimeField()
+    descriptions = models.CharField(max_length=50)
+    dep_id = models.ForeignKey(dependency, on_delete=models.CASCADE, related_name='data_entries')
+
+    
+    
+    
+
 
     

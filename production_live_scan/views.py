@@ -2,16 +2,19 @@ from django.shortcuts import render
 from datetime import datetime
 from django.http import JsonResponse
 from django.views.decorators.http import require_GET
-
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from django.db import transaction
 from imp_reports.models import UnitBundlereport
 from bundle_tracking.models import TrsMcutstickerprod,MasUnit,MasTopbottom
-from .models import unit_input,Msizes
+from qcapp.models import Unit,Line,machine_details,emp_allocate,Empwisesal
+from .models import Assembly_data, unit_input, Msizes,dependency,dependency_data
 from django.utils.dateparse import parse_datetime
 from django.utils import timezone
+from django.views.decorators.csrf import csrf_exempt
+import json
+
 
 @require_GET
 def live_scan_data(request):
@@ -186,13 +189,233 @@ class GetUnitDataAPIView(APIView):
 
         if selected_date:
             date_obj = datetime.strptime(selected_date, '%Y-%m-%d')
-            data = unit_input.objects.filter(unit=unit, line=line, entry_date__date=date_obj)
+            data = unit_input.objects.filter(unit=unit, line=line, entry_date__date=date_obj, scan=False)
         else:
             four_days_ago = datetime.now() - timedelta(days=4)
-            data = unit_input.objects.filter(unit=unit, line=line, entry_date__gte=four_days_ago)
+            data = unit_input.objects.filter(unit=unit, line=line, entry_date__gte=four_days_ago, scan=False)
+
+        # JSON response
+        results = list(data.values('bundle_id','mbud', 'job_no','color','bdl_no','size','tb_name', 'pc', 'color', 'entry_date'))
+        return Response({"status": True, "data": results})
+    
+
+
+class GetUnitAssemply(APIView):
+    def get(self, request):
+        unit = request.query_params.get('unit')
+        line = request.query_params.get('line')
+        selected_date = request.query_params.get('date') 
+
+        if selected_date:
+            date_obj = datetime.strptime(selected_date, '%Y-%m-%d')
+            data = Assembly_data.objects.filter(unit=unit, line=line, entry_date__date=date_obj)
+        else:
+            four_days_ago = datetime.now() - timedelta(days=4)
+            data = Assembly_data.objects.filter(unit=unit, line=line, entry_date__gte=four_days_ago)
 
         # JSON response
         results = list(data.values('bundle_id', 'job_no', 'pc', 'color', 'entry_date'))
         return Response({"status": True, "data": results})
+<<<<<<< HEAD
 
 
+=======
+    
+
+def assembly_emp(request):
+    unit = request.GET.get('unit')
+    line = request.GET.get('line')
+    date = request.GET.get('date')
+
+    if not unit or not line or not date:
+        return JsonResponse(
+            {"error": "unit, line and date are required"},
+            status=400
+        )
+
+    filter_date = date.split('T')[0]
+
+    unit_name = f"unit-{unit}"
+
+    unit_obj = Unit.objects.filter(name=unit_name).first()
+
+    if not unit_obj:
+        return JsonResponse({"error": "Unit not found"}, status=404)
+
+
+    line_obj = Line.objects.filter(
+        unit=unit_obj,
+        line_number=line
+    ).first()
+
+    if not line_obj:
+        return JsonResponse({"error": "Line not found"}, status=404)
+
+
+    emp_details = list(emp_allocate.objects.filter(
+        date__date=filter_date,
+        unit=unit_obj.id,
+        line=line_obj.id
+    ).values(
+        'emp_code',
+        'machine',
+        'machine__Identity',
+        'seq',
+        'jobno',
+        'top_bottom'
+    ))
+
+
+    # Convert emp_code to integer
+    emp_codes = [
+        int(emp['emp_code']) 
+        for emp in emp_details
+        if emp['emp_code'].isdigit()
+    ]
+
+
+    emp_names = Empwisesal.objects.using('main').filter(
+        code__in=emp_codes
+    ).values(
+        'code',
+        'name'
+    )
+
+
+    emp_name_dict = {
+        str(emp['code']): emp['name']
+        for emp in emp_names
+    }
+
+
+    for emp in emp_details:
+        emp['emp_name'] = emp_name_dict.get(
+            emp['emp_code'],
+            ''
+        )
+
+
+    return JsonResponse({
+        "unit_id": unit_obj.id,
+        "line_id": line_obj.id,
+        "line": line,
+        "date": filter_date,
+        "data": emp_details
+    })
+
+
+class SaveAssemblyAPIView(APIView):
+    def post(self, request):
+        emp_code = str(request.data.get('emp_code', '')).strip()
+        machine_id = request.data.get('machine_id')
+        unit = request.data.get('unit')
+        line = request.data.get('line')
+        bundle_ids = request.data.get('bundle_ids', [])
+        raw_date = request.data.get('date')
+
+        if not emp_code or not machine_id or not unit or not line or not bundle_ids:
+            return Response(
+                {"error": "employee, machine, unit, line and bundles are required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        selected_date = parse_datetime(raw_date) if raw_date else timezone.now()
+        allocation_date = selected_date.date() if selected_date else timezone.now().date()
+        unit_obj = Unit.objects.filter(name__iexact=f"unit-{unit}").first()
+        line_obj = Line.objects.filter(unit=unit_obj, line_number=line).first() if unit_obj else None
+        allocation = unit_obj and line_obj and emp_allocate.objects.select_related('machine').filter(
+            date__date=allocation_date,
+            unit=unit_obj.id,
+            line=line_obj.id,
+            emp_code=emp_code,
+            machine_id=machine_id
+        ).first()
+
+        if not allocation:
+            return Response(
+                {"error": "The selected employee is not allocated to this machine."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        unique_ids = list(dict.fromkeys(str(value).strip() for value in bundle_ids if str(value).strip()))
+        with transaction.atomic():
+            bundle_queryset = unit_input.objects.select_for_update().filter(
+                unit=unit,
+                line=line,
+                bundle_id__in=unique_ids,
+                scan=False
+            )
+            bundles = list(bundle_queryset)
+            found_ids = {bundle.bundle_id for bundle in bundles}
+            missing_ids = [value for value in unique_ids if value not in found_ids]
+            if missing_ids:
+                return Response(
+                    {"error": "Some bundles are unavailable or already scanned.", "bundle_ids": missing_ids},
+                    status=status.HTTP_409_CONFLICT
+                )
+
+            entry_date = timezone.now()
+            Assembly_data.objects.bulk_create([
+                Assembly_data(
+                    unit=bundle.unit,
+                    line=bundle.line,
+                    job_no=bundle.job_no,
+                    tb_id=bundle.tb_id,
+                    tb_name=bundle.tb_name,
+                    machine=allocation.machine.Identity,
+                    date=selected_date or entry_date,
+                    bundle_id=bundle.bundle_id,
+                    bdl_no=bundle.bdl_no,
+                    mbud=bundle.mbud,
+                    size=bundle.size,
+                    size_id=bundle.size_id,
+                    color=bundle.color,
+                    pc=bundle.pc,
+                    entry_date=entry_date,
+                    scan=False,
+                    lot=bundle.lot
+                )
+                for bundle in bundles
+            ])
+            updated = bundle_queryset.update(scan=True)
+
+        return Response({"status": "success", "updated": updated}, status=status.HTTP_200_OK)
+
+
+save_assembly = SaveAssemblyAPIView.as_view()
+
+
+@csrf_exempt
+def save_process_dependency(request):
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            
+            dep = dependency.objects.create(
+                job_no=data.get('job_no'),
+                tb_id=data.get('tb_id'),
+                tb_name=data.get('tb_name'),
+                process_des=data.get('process_des'),
+                mc=data.get('mc'),
+                thrd=data.get('thrd'),
+                wsec=data.get('wsec'),
+                process_id=data.get('process_id'),
+                and_or=data.get('and_or'), # True for AND, False for OR
+                date=timezone.now()
+            )
+
+            selected_processes = data.get('selected_processes', [])
+            for desc in selected_processes:
+                dependency_data.objects.create(
+                    dep_id=dep,
+                    descriptions=desc,
+                    date=timezone.now()
+                )
+
+            return JsonResponse({'message': 'Data saved successfully!'}, status=201)
+            
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=400)
+            
+    return JsonResponse({'error': 'Invalid request method'}, status=405)
+>>>>>>> ab16dac5d6f74ee455440a5981571042fc8a86cb
