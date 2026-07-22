@@ -186,6 +186,7 @@ class ViewAccinwpend(models.Model):
     quantity = models.DecimalField(max_digits=38, decimal_places=4, blank=True, null=True)
     inwqty = models.DecimalField(max_digits=38, decimal_places=4, blank=True, null=True)
     uom = models.CharField(max_length=25)
+    phone = models.CharField(max_length=101, blank=True, null=True)
 
     class Meta:
         managed = False
