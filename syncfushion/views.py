@@ -806,5 +806,5 @@ def DueDateList(request):
     if request.method != "GET":
         return JsonResponse({"message": "Method not allowed"}, status=405)
 
-    data = list(ViewAccinwpend.objects.using('test').values()) 
+    data = list(ViewAccinwpend.objects.using('test').all().values()) 
     return JsonResponse(data, safe=False)

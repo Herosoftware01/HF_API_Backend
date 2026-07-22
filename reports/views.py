@@ -64,7 +64,7 @@ def empwisesal(request):
             # Photo URL
             if rec.photo:
                 filename = os.path.basename(rec.photo)
-                photo_url = f"https://app.herofashion.com/staff_images/{filename}"
+                photo_url = f"https://hfapi.herofashion.com/staff_images/{filename}"
             else:
                 photo_url = None
 

@@ -97,8 +97,12 @@ INSTALLED_APPS = [
     "channels",
     'n8n',
     'bundle_tracking',
-    'production_live_scan'
+    'production_live_scan',
+    'fashionr',
 ]
+
+DATA_UPLOAD_MAX_MEMORY_SIZE = 1024 * 1024 * 200
+FILE_UPLOAD_MAX_MEMORY_SIZE = 1024 * 1024 * 200
 
 X_FRAME_OPTIONS = 'ALLOWALL'
 
@@ -314,7 +318,7 @@ MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 STAFF_IMAGES_URL = '/staff_images/'
-STAFF_IMAGES_ROOT = r'\\10.1.21.11\D\Staff_Employee_Images'
+STAFF_IMAGES_ROOT = r'\\10.1.21.10\e\Staff_Employee_Images'
 
 PDF_STORAGE_PATH = r"\\adminserver\File Sharing\AAAA Hero\Syncfusion Pdf Reports"
 
