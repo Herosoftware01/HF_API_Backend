@@ -194,3 +194,5 @@ class GetUnitDataAPIView(APIView):
         # JSON response
         results = list(data.values('bundle_id', 'job_no', 'pc', 'color', 'entry_date'))
         return Response({"status": True, "data": results})
+
+

@@ -159,7 +159,39 @@ class qc_piece_final(models.Model):
     seq = models.CharField(max_length=100)
     machine_id = models.CharField(max_length=100)
 
+class qc_hourly_approval(models.Model):
 
+    unit = models.IntegerField()
+    line = models.IntegerField()
+
+    approval_hour = models.IntegerField()   # 1 to 6
+
+    date = models.DateField()
+
+    # Unit Incharge
+    unit_incharge_user = models.IntegerField(null=True)
+    unit_incharge_sign = models.ImageField(upload_to="digital_sign/", null=True)
+    unit_incharge_time = models.DateTimeField(null=True)
+
+    # OA
+    oa_user = models.IntegerField(null=True)
+    oa_sign = models.ImageField(upload_to="digital_sign/", null=True)
+    oa_time = models.DateTimeField(null=True)
+
+    # FM
+    fm_user = models.IntegerField(null=True)
+    fm_sign = models.ImageField(upload_to="digital_sign/", null=True)
+    fm_time = models.DateTimeField(null=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = (
+            "unit",
+            "line",
+            "date",
+            "approval_hour"
+        )
 
 class roving_qc_mistake(models.Model):
     qc_piece = models.ForeignKey(
