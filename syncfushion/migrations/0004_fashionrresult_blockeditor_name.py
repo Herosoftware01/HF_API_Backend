@@ -24,6 +24,30 @@ class Migration(migrations.Migration):
                 'managed': False,
             },
         ),
+        migrations.RunSQL(
+            sql="""
+            IF NOT EXISTS (
+                SELECT 1
+                FROM sys.objects
+                WHERE object_id = OBJECT_ID(N'[dbo].[syncfusion_blockeditor]')
+                  AND type IN (N'U')
+            )
+            BEGIN
+                CREATE TABLE [dbo].[syncfusion_blockeditor] (
+                    [id] bigint IDENTITY(1,1) NOT NULL PRIMARY KEY,
+                    [blocks] nvarchar(max) NOT NULL,
+                    [created_at] datetime2 NOT NULL,
+                    [updated_at] datetime2 NOT NULL
+                );
+            END
+            """,
+            reverse_sql="""
+            IF OBJECT_ID(N'[dbo].[syncfusion_blockeditor]', N'U') IS NOT NULL
+            BEGIN
+                DROP TABLE [dbo].[syncfusion_blockeditor];
+            END
+            """,
+        ),
         migrations.AddField(
             model_name='blockeditor',
             name='name',

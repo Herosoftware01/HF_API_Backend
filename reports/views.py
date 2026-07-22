@@ -2496,3 +2496,28 @@ def stickerHour(request):
         data = data.filter(dt=date.today())
 
     return JsonResponse(list(data.values()), safe=False)
+
+
+def measurement_report(request):
+    try:
+        ordid = request.GET.get('ordid')
+        topbottom_des = request.GET.get('TopBottom_des')
+
+        with connections['demo'].cursor() as cursor:
+            cursor.execute(
+                "EXEC sp_OrderMeasurementPivot %s, %s",
+                [ordid, topbottom_des]
+            )
+
+            columns = [col[0] for col in cursor.description]
+            rows = cursor.fetchall()
+
+        data = [dict(zip(columns, row)) for row in rows]
+
+        return JsonResponse(data, safe=False)
+
+    except Exception as e:
+        return JsonResponse({
+            "status": False,
+            "error": str(e)
+        })
