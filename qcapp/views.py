@@ -5,7 +5,7 @@ from rest_framework.decorators import api_view
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, permissions
-from .models import QcAdminMistake,cut_sample_data_final,Cont_employee,sequency_data,cut_sample_data,cut_sample_data_final,VueUser,Unit,Needle_change,Line,roving_qc_mistake,qc_piece_final, MachineAllocation, machine_details, emp_allocate, Empwisesal, VueProcessSequence
+from .models import QcAdminMistake,cut_sample_data_final,Cont_employee,sequency_data,cut_sample_data,cut_sample_data_final,VueUser,Unit,Needle_change,Line,roving_qc_mistake,qc_piece_final, MachineAllocation, machine_details, emp_allocate, Empwisesal, VueProcessSequence,qc_hourly_approval
 from .serializers import QcAdminMistakeSerializer,UnitSerializer,MachineTrasnsferSerializer,MachineSerializer,LineSerializer, MachineAllocationSerializer, VueProcessSequenceSerializer
 from collections import defaultdict
 from django.shortcuts import get_object_or_404
@@ -16,7 +16,8 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 import json
 from django.utils import timezone
-from datetime import date,datetime
+from django.utils.dateparse import parse_date
+from datetime import date, datetime
 from django.db.models import Q
 from datetime import time
 from django.db import connection
@@ -2075,8 +2076,13 @@ def needle_report_api(request):
     
 
 def get_shift(dt):
-    # Convert UTC to IST
-    dt = timezone.localtime(dt)
+    if dt is None:
+        return "NOT CHECK"
+
+    # The project stores Django DateTimeField values as naive datetimes
+    # when USE_TZ=False, so only call localtime() for aware datetimes.
+    if timezone.is_aware(dt):
+        dt = timezone.localtime(dt)
 
     t = dt.time()
 
@@ -2207,6 +2213,7 @@ def qcroving(request):
         final_map[key] = {
             "total_pieces": f.total_pieces,
             "checked_piece": f.checked_piece,
+            "line": f.line, # <-- ADDED: Extract line from qc_piece_final
         }
 
     # ----------------------------
@@ -2237,6 +2244,7 @@ def qcroving(request):
             {
                 "total_pieces": 0,
                 "checked_piece": 0,
+                "line": None, # <-- ADDED: Default fallback for line
             },
         )
 
@@ -2255,6 +2263,7 @@ def qcroving(request):
 
             "emp_code": emp.emp_code if emp else None,
             "unit": emp.unit if emp else None,
+            "line": final_data["line"], # <-- ADDED: Push line into JSON response
 
             "date": row["date"].strftime("%d/%m/%Y %H:%M:%S") if row["date"] else None,
             "timeline": timeline,
@@ -2278,172 +2287,97 @@ def qcroving(request):
     return JsonResponse(result, safe=False)
 
 
-import os
-import glob
-import json
-import subprocess
-import requests
-import threading
-from datetime import datetime
-from django.conf import settings
-from django.http import JsonResponse
-from django.views.decorators.csrf import csrf_exempt
-
-WHATSAPP_SEND_URL = 'https://ws.herofashion.com/send'
-WHATSAPP_GROUP_ID = '120363427040771599@g.us'
-
-def send_to_whatsapp(file_path, group_id=WHATSAPP_GROUP_ID):
-    try:
-        with open(file_path, 'rb') as f:
-            files = {'file': (os.path.basename(file_path), f, 'image/png')}
-            data = {'groupId': group_id}
-
-            resp = requests.post(
-                WHATSAPP_SEND_URL,
-                data=data,
-                files=files,
-                timeout=30,
-            )
-
-        print(f'[WA] status={resp.status_code} body={resp.text[:500]}')
-
-        if resp.status_code == 200:
-            print(f'Sent to WhatsApp: {file_path}')
-            return True
-        else:
-            print(f'WhatsApp send failed ({resp.status_code}): {file_path}')
-            return False
-
-    except requests.exceptions.RequestException as e:
-        print(f'WhatsApp REQUEST error for {file_path}: {type(e).__name__} - {e}')
-        return False
-    except Exception as e:
-        print(f'WhatsApp send error for {file_path}: {e}')
-        return False
-
-def delete_file_later(file_path, delay_seconds=3600):
-    def _delete():
-        try:
-            if os.path.exists(file_path):
-                os.remove(file_path)
-                print(f'Auto-deleted: {file_path}')
-        except Exception as e:
-            print(f'Delete failed for {file_path}: {e}')
-
-    timer = threading.Timer(delay_seconds, _delete)
-    timer.daemon = True
-    timer.start()
-
 @csrf_exempt
-def generate_all_reports(request):
-    date = request.GET.get('date') or request.POST.get('date')
+def qc_hourly_signature(request):
+    if request.method == "GET":
+        unit = request.GET.get("unit")
+        line = request.GET.get("line")
+        approval_hour = request.GET.get("hour")
+        report_date = request.GET.get("date") or str(date.today())
 
-    if not date:
-        date = datetime.today().strftime('%Y-%m-%d')
+        filters = {"date": report_date}
+        if unit: filters["unit"] = unit
+        if line: filters["line"] = line
+        if approval_hour: filters["approval_hour"] = approval_hour
 
-    units = ['1', '2', '3', '4', '5', '6']
-    reports = []
+        approvals = qc_hourly_approval.objects.filter(**filters).order_by("approval_hour")
+        data = []
 
-    script_path = os.path.join(settings.BASE_DIR, 'capture_report.js')
+        for row in approvals:
+            data.append({
+                "id": row.id,
+                "unit": row.unit,
+                "hour": row.approval_hour,
+                "date": str(row.date),
+                "unit_incharge": {
+                    "user": row.unit_incharge_user,
+                    "sign": row.unit_incharge_sign.url if row.unit_incharge_sign else None,
+                    "time": row.unit_incharge_time.strftime('%I:%M %p') if row.unit_incharge_time else None,
+                },
+                "oa": {
+                    "user": row.oa_user,
+                    "sign": row.oa_sign.url if row.oa_sign else None,
+                    "time": row.oa_time.strftime('%I:%M %p') if row.oa_time else None,
+                },
+                "fm": {
+                    "user": row.fm_user,
+                    "sign": row.fm_sign.url if row.fm_sign else None,
+                    "time": row.fm_time.strftime('%I:%M %p') if row.fm_time else None,
+                }
+            })
+        return JsonResponse(data, safe=False)
 
-    # FIX: Use dynamic path instead of hardcoded 'D:\'
-    reports_dir = os.path.join(settings.BASE_DIR, 'qc_reports')
-    os.makedirs(reports_dir, exist_ok=True)
+    elif request.method == "POST":
+        body = json.loads(request.body)
+        unit = body.get("unit")
+        line = body.get("line", "")
+        approval_hour_raw = body.get("hour") if body.get("hour") is not None else body.get("approval_hour")
+        role = body.get("role")
+        user = body.get("user")
+        sign_base64 = body.get("signature") 
+        raw_date = body.get("date")
 
-    for unit in units:
-        unit_debug = {
-            'unit': unit,
-            'images': [],
-            'node_exit_code': None,
-            'node_status': None,
-            'node_stdout': None,
-            'node_stderr': None,
-        }
+        if approval_hour_raw in (None, "", "null", "None"):
+            approval_hour = 1
+        else:
+            try:
+                approval_hour = int(approval_hour_raw)
+            except (TypeError, ValueError):
+                return JsonResponse({"status": False, "message": "Invalid approval hour"}, status=400)
 
-        # Delete old screenshots
-        old_files = glob.glob(
-            os.path.join(reports_dir, f'roving_{unit}_{date}_*.png')
+        if not 1 <= approval_hour <= 6:
+            return JsonResponse({"status": False, "message": "approval hour must be between 1 and 6"}, status=400)
+
+        report_date = parse_date(raw_date) if raw_date else date.today()
+
+        obj, created = qc_hourly_approval.objects.get_or_create(
+            unit=unit, line=line, approval_hour=approval_hour, date=report_date
         )
 
-        # 1. Quick sanity check to ensure the file isn't empty
-        file_size = 0
-        if os.path.exists(script_path):
-            file_size = os.path.getsize(script_path)
-            if file_size == 0:
-                print(f"WARNING: {script_path} is completely empty!")
+        now = timezone.now()
+        
+        # Helper to decode Base64 to Django File
+        image_data = None
+        if sign_base64 and ';base64,' in sign_base64:
+            format, imgstr = sign_base64.split(';base64,')
+            ext = format.split('/')[-1]
+            file_name = f"{unit}_{approval_hour}_{role}_{now.timestamp()}.{ext}"
+            image_data = ContentFile(base64.b64decode(imgstr), name=file_name)
 
-        # 2. Run with shell=True for Windows compatibility
-        result = subprocess.run(
-            ['node', script_path, unit, date],
-            capture_output=True,   
-            text=True,             
-            cwd=settings.BASE_DIR,
-            shell=True  # <-- FIX: This is often required on Windows host servers!
-        )
+        if role == "UNIT":
+            obj.unit_incharge_user = user
+            if image_data: obj.unit_incharge_sign = image_data
+            obj.unit_incharge_time = now
+        elif role == "OA":
+            obj.oa_user = user
+            if image_data: obj.oa_sign = image_data
+            obj.oa_time = now
+        elif role == "FM":
+            obj.fm_user = user
+            if image_data: obj.fm_sign = image_data
+            obj.fm_time = now
+        else:
+            return JsonResponse({"status": False, "message": "Invalid Role"}, status=400)
 
-        stdout = result.stdout or ''
-        stderr = result.stderr or ''
-
-        print(f'--- Unit {unit} stdout ---')
-        print(stdout)
-        print(f'--- Unit {unit} stderr ---')
-        print(stderr)
-
-        unit_debug['node_exit_code'] = result.returncode
-        unit_debug['node_stdout'] = stdout.strip()
-        unit_debug['node_stderr'] = stderr.strip()
-
-        # Parse Playwright's JSON response
-        node_status = None
-        for line in stdout.strip().splitlines():
-            line = line.strip()
-            if line.startswith('{'):
-                try:
-                    node_status = json.loads(line)
-                except json.JSONDecodeError:
-                    pass
-
-        unit_debug['node_status'] = node_status
-
-        # Check for generated images
-        unit_files = glob.glob(
-            os.path.join(reports_dir, f'roving_{unit}_{date}_*.png')
-        )
-
-        if not unit_files:
-            print(f'No report for Unit {unit}')
-            reports.append(unit_debug) # Append debug info even if it fails
-            continue
-
-        images = []
-
-        for file in unit_files:
-            images.append(file)
-            sent = send_to_whatsapp(file)
-            if sent:
-                delete_file_later(file, delay_seconds=3600)
-
-        unit_debug['images'] = images
-        reports.append(unit_debug)
-
-    return JsonResponse({
-        'success': True,
-        'date': date,
-        'reports': reports,
-    })
- 
- 
-def delete_file_later(file_path, delay_seconds=3600):
-    """Delete a file after delay_seconds, without blocking the request."""
-    def _delete():
-        try:
-            if os.path.exists(file_path):
-                os.remove(file_path)
-                print(f'Auto-deleted: {file_path}')
-        except Exception as e:
-            print(f'Delete failed for {file_path}: {e}')
- 
-    timer = threading.Timer(delay_seconds, _delete)
-    timer.daemon = True
-    timer.start()
- 
+        obj.save()
+        return JsonResponse({"status": True, "message": "Signature Saved", "id": obj.id})

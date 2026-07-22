@@ -2498,7 +2498,6 @@ def stickerHour(request):
     return JsonResponse(list(data.values()), safe=False)
 
 
-
 def measurement_report(request):
     try:
         ordid = request.GET.get('ordid')
