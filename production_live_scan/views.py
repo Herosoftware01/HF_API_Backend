@@ -216,10 +216,6 @@ class GetUnitAssemply(APIView):
         # JSON response
         results = list(data.values('bundle_id', 'job_no', 'pc', 'color', 'entry_date'))
         return Response({"status": True, "data": results})
-<<<<<<< HEAD
-
-
-=======
     
 
 def assembly_emp(request):
@@ -418,4 +414,3 @@ def save_process_dependency(request):
             return JsonResponse({'error': str(e)}, status=400)
             
     return JsonResponse({'error': 'Invalid request method'}, status=405)
->>>>>>> ab16dac5d6f74ee455440a5981571042fc8a86cb
