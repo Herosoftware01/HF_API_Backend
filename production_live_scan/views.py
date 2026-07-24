@@ -14,6 +14,9 @@ from django.utils.dateparse import parse_datetime
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 import json
+from django.db import connections
+from django.db.models import Q
+from rest_framework.decorators import api_view
 
 
 @require_GET
@@ -381,36 +384,274 @@ class SaveAssemblyAPIView(APIView):
 save_assembly = SaveAssemblyAPIView.as_view()
 
 
+
+
+# @api_view(['POST'])
+# def get_process_details(request):
+
+#     jobno = request.data.get('jobno')
+#     topbottom = request.data.get('topbottom')
+
+#     if not jobno or not topbottom:
+#         return JsonResponse(
+#             {"error": "Jobno and TopBottom required"},
+#             status=400
+#         )
+
+#     with connections['demo'].cursor() as cursor:
+#         cursor.execute(
+#             "EXEC sp_GetProcessDetails %s, %s",
+#             [jobno, topbottom]
+#         )
+
+#         columns = [col[0] for col in cursor.description]
+
+#         rows = cursor.fetchall()
+
+#         result = []
+
+#         for row in rows:
+#             result.append(
+#                 dict(zip(columns, row))
+#             )
+
+#     return JsonResponse(result, safe=False)
+
+
+@api_view(['POST'])
+def get_process_details(request):
+    jobno = request.data.get('jobno')
+    topbottom = request.data.get('topbottom')
+
+    if not jobno or not topbottom:
+        return JsonResponse(
+            {"error": "Jobno and TopBottom required"},
+            status=400
+        )
+
+    saved_filter = Q(job_no=jobno) & Q(tb_name__iexact=str(topbottom).strip())
+    if str(topbottom).strip().isdigit():
+        saved_filter |= Q(job_no=jobno, tb_id=int(topbottom))
+
+    # Saved configuration takes priority. Include its dependency_data rows so
+    # the frontend can restore the selected checkboxes and badges directly.
+    saved_dependencies = dependency.objects.filter(saved_filter).prefetch_related(
+        'data_entries'
+    ).order_by('-id')
+    latest_by_process = {}
+    for dep in saved_dependencies:
+        latest_by_process.setdefault(dep.process_id, dep)
+
+    if latest_by_process:
+        saved_result = []
+        for index, dep in enumerate(reversed(list(latest_by_process.values())), start=1):
+            saved_result.append({
+                'Jobno': dep.job_no,
+                'TopBottdes': dep.tb_name,
+                'TbID': dep.tb_id,
+                'sl': index,
+                'Process_des': dep.process_des,
+                'mc': dep.mc,
+                'thrd': dep.thrd,
+                'Wsec': dep.wsec,
+                'Process_ID': dep.process_id,
+                'saved_and_or': 1 if dep.and_or else 0,
+                'saved_verify': bool(dep.verify),
+                'saved_selected_processes': [
+                    child.descriptions
+                    for child in dep.data_entries.all().order_by('desc_ord_no', 'id')
+                ],
+            })
+        return JsonResponse(saved_result, safe=False)
+
+    # 1. Stored Procedure moolam data eduthu varuthu
+    with connections['demo'].cursor() as cursor:
+        cursor.execute(
+            "EXEC sp_GetProcessDetails %s, %s",
+            [jobno, topbottom]
+        )
+        columns = [col[0] for col in cursor.description]
+        rows = cursor.fetchall()
+        result = []
+        for row in rows:
+            result.append(dict(zip(columns, row)))
+
+    # 2. Munbe save aanatha nu check panni results-oda serkkurathu
+    for item in result:
+        process_id = item.get('Process_ID')
+        job_no = item.get('Jobno')
+        tb_id = item.get('TbID')
+
+        try:
+            # Table-la antha job_no, tb_id, process_id irukha nu paarkurathu
+            existing_dep = dependency.objects.filter(
+                job_no=job_no,
+                tb_id=tb_id,
+                process_id=process_id
+            ).order_by('-id').first()
+
+            if existing_dep:
+                # and_or boolean-ah irunthal 1/0 aah mathi anuppurathu
+                item['saved_and_or'] = 1 if existing_dep.and_or else 0
+                item['saved_verify'] = bool(existing_dep.verify)
+                
+                # related_name='data_entries' vechu dependency_data-la irukka descriptions-ah edukkurathu
+                saved_children = existing_dep.data_entries.all().order_by('desc_ord_no', 'id')
+                item['saved_selected_processes'] = [child.descriptions for child in saved_children]
+            else:
+                item['saved_and_or'] = 0
+                item['saved_verify'] = False
+                item['saved_selected_processes'] = []
+                
+        except Exception as e:
+            item['saved_and_or'] = 0
+            item['saved_verify'] = False
+            item['saved_selected_processes'] = []
+
+    return JsonResponse(result, safe=False)
+
 @csrf_exempt
 def save_process_dependency(request):
-    if request.method == 'POST':
+    if request.method == "POST":
         try:
             data = json.loads(request.body)
-            
-            dep = dependency.objects.create(
+
+            if not isinstance(data, list):
+                data = [data]
+            saved_count = 0
+            with transaction.atomic():
+                first_row = data[0] if data else {}
+                existing_group = dependency.objects.select_for_update().filter(
+                    job_no=first_row.get('job_no'),
+                    tb_id=first_row.get('tb_id'),
+                )
+                if existing_group.filter(verify=True).exists():
+                    return JsonResponse(
+                        {"error": "Verified dependency cannot be changed"},
+                        status=409
+                    )
+                group_already_exists = existing_group.exists()
+
+                for row in data:
+                    lookup = {
+                        'job_no': row.get('job_no'),
+                        'tb_id': row.get('tb_id'),
+                        'process_id': row.get('process_id'),
+                    }
+
+                    # Reuse the latest saved row so repeated saves do not create
+                    # another dependency record for the same process.
+                    dep = dependency.objects.filter(**lookup).order_by('-id').first()
+                    if dep is None:
+                        # Once a Job No + Top/Bottom configuration exists, Save
+                        # may update it only; it must not append new parent rows.
+                        if group_already_exists:
+                            continue
+                        dep = dependency(**lookup)
+
+                    dep.tb_name = row.get('tb_name')
+                    dep.process_des = row.get('process_des')
+                    dep.mc = row.get('mc')
+                    dep.thrd = row.get('thrd')
+                    dep.wsec = row.get('wsec')
+                    dep.and_or = bool(row.get('and_or', 0))
+                    dep.verify = False
+                    dep.date = timezone.now()
+                    dep.save()
+
+                    # The submitted selection is the complete current selection.
+                    dep.data_entries.all().delete()
+                    selected_processes = row.get('selected_processes') or []
+                    dependency_data.objects.bulk_create([
+                        dependency_data(
+                            dep_id=dep,
+                            tb_id=dep.tb_id,
+                            desc_ord_no=index,
+                            descriptions=desc,
+                            date=timezone.now()
+                        )
+                        for index, desc in enumerate(selected_processes, start=1)
+                    ])
+                    saved_count += 1
+            return JsonResponse(
+                {
+                    "message":
+                    "Data saved successfully",
+                    "count":
+                    saved_count
+                },
+                status=201
+            )
+        except Exception as e:
+            return JsonResponse(
+                {
+                    "error":str(e)
+                },
+                status=400
+            )
+    return JsonResponse(
+        {
+            "error":
+            "Invalid request method"
+        },
+        status=405
+    )
+
+
+@csrf_exempt
+def verify_process_dependency(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "Invalid request method"}, status=405)
+
+    try:
+        data = json.loads(request.body)
+        username = data.get('username', '').strip()
+        password = data.get('password', '')
+        if username != 'admin' or password != 'admin':
+            return JsonResponse({"error": "Invalid admin credentials"}, status=403)
+
+        job_no = data.get('job_no')
+        tb_id = data.get('tb_id')
+        with transaction.atomic():
+            dependencies = dependency.objects.select_for_update().filter(
+                job_no=job_no,
+                tb_id=tb_id
+            )
+            if not dependencies.exists():
+                return JsonResponse(
+                    {"error": "Save the dependency before verifying"},
+                    status=404
+                )
+            updated = dependencies.update(verify=True)
+
+        return JsonResponse({"message": "Verified successfully", "count": updated})
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=400)
+
+
+@csrf_exempt
+def delete_process_dependency(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "Invalid request method"}, status=405)
+
+    try:
+        data = json.loads(request.body)
+        with transaction.atomic():
+            dependencies = dependency.objects.select_for_update().filter(
                 job_no=data.get('job_no'),
                 tb_id=data.get('tb_id'),
-                tb_name=data.get('tb_name'),
-                process_des=data.get('process_des'),
-                mc=data.get('mc'),
-                thrd=data.get('thrd'),
-                wsec=data.get('wsec'),
-                process_id=data.get('process_id'),
-                and_or=data.get('and_or'), # True for AND, False for OR
-                date=timezone.now()
+                verify=True
             )
-
-            selected_processes = data.get('selected_processes', [])
-            for desc in selected_processes:
-                dependency_data.objects.create(
-                    dep_id=dep,
-                    descriptions=desc,
-                    date=timezone.now()
+            if not dependencies.exists():
+                return JsonResponse(
+                    {"error": "Verified dependency not found"},
+                    status=404
                 )
+            deleted_count, _ = dependencies.delete()
 
-            return JsonResponse({'message': 'Data saved successfully!'}, status=201)
-            
-        except Exception as e:
-            return JsonResponse({'error': str(e)}, status=400)
-            
-    return JsonResponse({'error': 'Invalid request method'}, status=405)
+        return JsonResponse({
+            "message": "Dependency deleted successfully",
+            "count": deleted_count
+        })
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=400)
