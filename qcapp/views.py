@@ -5,7 +5,7 @@ from rest_framework.decorators import api_view
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, permissions
-from .models import QcAdminMistake,cut_sample_data_final,Cont_employee,sequency_data,cut_sample_data,cut_sample_data_final,VueUser,Unit,Needle_change,Line,roving_qc_mistake,qc_piece_final, MachineAllocation, machine_details, emp_allocate, Empwisesal, VueProcessSequence,qc_hourly_approval
+from .models import QcAdminMistake,cut_sample_data_final,Cont_employee,sequency_data,cut_sample_data,cut_sample_data_final,VueUser,Unit,Needle_change,Line,roving_qc_mistake,qc_piece_final, MachineAllocation, machine_details, emp_allocate, Empwisesal, VueProcessSequence,qc_hourly_approval,VueUloginRole
 from .serializers import QcAdminMistakeSerializer,UnitSerializer,MachineTrasnsferSerializer,MachineSerializer,LineSerializer, MachineAllocationSerializer, VueProcessSequenceSerializer
 from collections import defaultdict
 from django.shortcuts import get_object_or_404
@@ -2287,6 +2287,33 @@ def qcroving(request):
     return JsonResponse(result, safe=False)
 
 
+def get_sign_display(sign_field):
+    """Helper to safely read either an image URL or a plain text string."""
+    if not sign_field:
+        return None
+    # If the database contains the exact text "Verify"
+    if str(sign_field) == "Verify":
+        return "Verify"
+    # Otherwise, if it's a file/image, get its URL safely
+    if hasattr(sign_field, 'url'):
+        try:
+            return sign_field.url
+        except ValueError:
+            return None
+    return str(sign_field)
+
+
+
+def role_qc(request):
+    roles = list(VueUloginRole.objects.values())
+
+    return JsonResponse({
+        "status": True,
+        "message": "Roles fetched successfully",
+        "count": len(roles),
+        "data": roles
+    })
+
 @csrf_exempt
 def qc_hourly_signature(request):
     if request.method == "GET":
@@ -2311,17 +2338,18 @@ def qc_hourly_signature(request):
                 "date": str(row.date),
                 "unit_incharge": {
                     "user": row.unit_incharge_user,
-                    "sign": row.unit_incharge_sign.url if row.unit_incharge_sign else None,
+                    # USE HELPER FUNCTION HERE SO IT DOESN'T CRASH ON .url
+                    "sign": get_sign_display(row.unit_incharge_sign),
                     "time": row.unit_incharge_time.strftime('%I:%M %p') if row.unit_incharge_time else None,
                 },
                 "oa": {
                     "user": row.oa_user,
-                    "sign": row.oa_sign.url if row.oa_sign else None,
+                    "sign": get_sign_display(row.oa_sign),
                     "time": row.oa_time.strftime('%I:%M %p') if row.oa_time else None,
                 },
                 "fm": {
                     "user": row.fm_user,
-                    "sign": row.fm_sign.url if row.fm_sign else None,
+                    "sign": get_sign_display(row.fm_sign),
                     "time": row.fm_time.strftime('%I:%M %p') if row.fm_time else None,
                 }
             })
@@ -2334,7 +2362,7 @@ def qc_hourly_signature(request):
         approval_hour_raw = body.get("hour") if body.get("hour") is not None else body.get("approval_hour")
         role = body.get("role")
         user = body.get("user")
-        sign_base64 = body.get("signature") 
+        sign_payload = body.get("signature") 
         raw_date = body.get("date")
 
         if approval_hour_raw in (None, "", "null", "None"):
@@ -2356,25 +2384,28 @@ def qc_hourly_signature(request):
 
         now = timezone.now()
         
-        # Helper to decode Base64 to Django File
-        image_data = None
-        if sign_base64 and ';base64,' in sign_base64:
-            format, imgstr = sign_base64.split(';base64,')
-            ext = format.split('/')[-1]
-            file_name = f"{unit}_{approval_hour}_{role}_{now.timestamp()}.{ext}"
-            image_data = ContentFile(base64.b64decode(imgstr), name=file_name)
+        # Determine what to save (decode base64 if it's an image, otherwise use the plain text string)
+        final_sign_value = None
+        if sign_payload:
+            if ';base64,' in sign_payload:
+                format, imgstr = sign_payload.split(';base64,')
+                ext = format.split('/')[-1]
+                file_name = f"{unit}_{approval_hour}_{role}_{now.timestamp()}.{ext}"
+                final_sign_value = ContentFile(base64.b64decode(imgstr), name=file_name)
+            else:
+                final_sign_value = sign_payload  # Simply save "Verify"
 
         if role == "UNIT":
             obj.unit_incharge_user = user
-            if image_data: obj.unit_incharge_sign = image_data
+            if final_sign_value: obj.unit_incharge_sign = final_sign_value
             obj.unit_incharge_time = now
         elif role == "OA":
             obj.oa_user = user
-            if image_data: obj.oa_sign = image_data
+            if final_sign_value: obj.oa_sign = final_sign_value
             obj.oa_time = now
         elif role == "FM":
             obj.fm_user = user
-            if image_data: obj.fm_sign = image_data
+            if final_sign_value: obj.fm_sign = final_sign_value
             obj.fm_time = now
         else:
             return JsonResponse({"status": False, "message": "Invalid Role"}, status=400)

@@ -31,6 +31,7 @@ def liveprdn(request):
     response_data = []
     for rec in data:    
         response_data.append({
+            "rowno": rec.rowno,
             "unit": rec.unit,
             "jobno": rec.jobno,
             "tb": rec.tb,
@@ -48,6 +49,11 @@ def liveprdn(request):
             "pack": rec.pack,
             "mist": rec.mist,
             "rejqty": rec.rejqty,
+            "o_finaldelvdate": rec.o_finaldelvdate,
+            "o_merch": rec.o_merch,
+            "o_styledesc": rec.o_styledesc,
+            "buyer": rec.buyer,
+            "img": rec.img,
         })
     return JsonResponse(response_data, safe=False)
 

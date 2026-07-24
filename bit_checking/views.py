@@ -365,8 +365,8 @@ def bitchecking_final_data(request):
             for row in rows:
                 sticker_data.append(dict(zip(columns, row)))
         
-        # with connections["demo"].cursor() as cursor:
-        #     cursor.execute("EXEC sp_GenerateBitCheckProduction")
+        with connections["demo"].cursor() as cursor:
+            cursor.execute("EXEC sp_GenerateBitCheckProduction")
 
         # data  r_p=True
         if sticker_data:
@@ -401,39 +401,39 @@ def bitchecking_final_data(request):
         )
 
 
-@api_view(["POST"])
-def generate_bitcheck_production(request):
-    try:
-        scanner_id = request.data.get("scaner_id")
-        types = request.data.get("types")
+# @api_view(["POST"])
+# def generate_bitcheck_production(request):
+#     try:
+#         scanner_id = request.data.get("scaner_id")
+#         types = request.data.get("types")
 
-        # r_p check
-        rp_exists = BitcheckingPlyDetails.objects.using("demo").filter(
-            qr_id=scanner_id,
-            typ=types,
-            r_p=True
-        ).exists()
+#         # r_p check
+#         rp_exists = BitcheckingPlyDetails.objects.using("demo").filter(
+#             qr_id=scanner_id,
+#             typ=types,
+#             r_p=True
+#         ).exists()
 
-        if rp_exists:
-            with connections["demo"].cursor() as cursor:
-                cursor.execute("EXEC sp_GenerateBitCheckProduction")
+#         if rp_exists:
+#             with connections["demo"].cursor() as cursor:
+#                 cursor.execute("EXEC sp_GenerateBitCheckProduction")
 
-        return Response(
-            {
-                "status": True,
-                "message": "Completed Successfully"
-            },
-            status=status.HTTP_200_OK
-        )
+#         return Response(
+#             {
+#                 "status": True,
+#                 "message": "Completed Successfully"
+#             },
+#             status=status.HTTP_200_OK
+#         )
 
-    except Exception as e:
-        return Response(
-            {
-                "status": False,
-                "message": str(e)
-            },
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
+#     except Exception as e:
+#         return Response(
+#             {
+#                 "status": False,
+#                 "message": str(e)
+#             },
+#             status=status.HTTP_500_INTERNAL_SERVER_ERROR
+#         )
 
 
 
