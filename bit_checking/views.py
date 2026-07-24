@@ -60,9 +60,8 @@ def qr_api(request):
         return JsonResponse({
             "status": False,
             "message": prev_error,   # show SQL error
-        })
+            })
    
-
     data = (
         TrsCutstickerprodNew1.objects.using('demo')
         .filter(qrid=sl)
@@ -84,7 +83,7 @@ def qr_api(request):
         .values_list('det_part', flat=True)
     )
 
-    # START / END CHECK
+    # START / END CHECKF
     start_entry = bit_start_end_time.objects.filter(
         qrid=data['qrid'],
         types=data['t']
@@ -365,8 +364,8 @@ def bitchecking_final_data(request):
             for row in rows:
                 sticker_data.append(dict(zip(columns, row)))
         
-        with connections["demo"].cursor() as cursor:
-            cursor.execute("EXEC sp_GenerateBitCheckProduction")
+        # with connections["demo"].cursor() as cursor:
+        #     cursor.execute("EXEC sp_GenerateBitCheckProduction")
 
         # data  r_p=True
         if sticker_data:
@@ -398,6 +397,87 @@ def bitchecking_final_data(request):
                 "message": str(e)
             },
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+# @api_view(["POST"])
+# def generate_bitcheck_production(request):
+#     try:
+#         scanner_id = request.data.get("scaner_id")
+#         types = request.data.get("types")
+
+#         # r_p check
+#         rp_exists = BitcheckingPlyDetails.objects.using("demo").filter(
+#             qr_id=scanner_id,
+#             typ=types,
+#             r_p=True
+#         ).exists()
+
+#         if rp_exists:
+#             with connections["demo"].cursor() as cursor:
+#                 cursor.execute("EXEC sp_GenerateBitCheckProduction")
+
+#         return Response(
+#             {
+#                 "status": True,
+#                 "message": "Completed Successfully"
+#             },
+#             status=status.HTTP_200_OK
+#         )
+
+#     except Exception as e:
+#         return Response(
+#             {
+#                 "status": False,
+#                 "message": str(e)
+#             },
+#             status=status.HTTP_500_INTERNAL_SERVER_ERROR
+#         )
+
+@api_view(["POST"])
+def generate_bitcheck_production(request):
+
+    try:
+
+        scanner_id = request.data.get("scaner_id")
+        types = request.data.get("types")
+
+        print("scanner_id",scanner_id)
+        print("types",types)
+
+
+        with connections["demo"].cursor() as cursor:
+
+            cursor.execute(
+                "EXEC sp_GenerateBitCheckProduction"
+            )
+
+
+
+        return Response(
+
+            {
+                "status": True,
+                "message": "Completed Successfully"
+            },
+
+            status=status.HTTP_200_OK
+
+        )
+
+
+    except Exception as e:
+
+
+        return Response(
+
+            {
+                "status": False,
+                "message": str(e)
+            },
+
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+
         )
 
 

@@ -62,10 +62,13 @@ class dependency(models.Model):
     wsec = models.CharField(max_length=50)
     process_id = models.IntegerField()
     and_or = models.BooleanField(default=False)
+    verify = models.BooleanField(default=False)
 
 class dependency_data(models.Model):
     id = models.AutoField(primary_key=True)
     date = models.DateTimeField()
+    tb_id = models.IntegerField()
+    desc_ord_no = models.IntegerField()
     descriptions = models.CharField(max_length=50)
     dep_id = models.ForeignKey(dependency, on_delete=models.CASCADE, related_name='data_entries')
 
