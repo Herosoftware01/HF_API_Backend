@@ -50,6 +50,7 @@ class Assembly_data(models.Model):
     scan = models.BooleanField(default=False)
     lot =models.CharField(max_length=50)
 
+
 class dependency(models.Model):
     id = models.AutoField(primary_key=True)
     job_no = models.CharField(max_length=50)
