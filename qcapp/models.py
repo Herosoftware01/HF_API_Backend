@@ -511,3 +511,12 @@ class cut_sample_data_final(models.Model):
     bf_ironing = models.BooleanField(default=False)
     af_ironing = models.BooleanField(default=False)
     force_save = models.BooleanField(default=False)
+
+class VueUloginRole(models.Model):
+    login_id = models.BigIntegerField(primary_key=True)
+    username = models.CharField(max_length=150)
+    role = models.CharField(max_length=50)
+
+    class Meta:
+        managed = False
+        db_table = 'vue_ulogin_role'
