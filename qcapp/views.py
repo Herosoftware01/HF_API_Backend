@@ -295,7 +295,8 @@ def save_piece(request):
             category=defect.get("category", ""),
             mistake_name=defect.get("mistake_name", ""),
             mistake_count=defect.get("mistake_count", 0),
-            user_id=user_id
+            user_id=user_id,
+            date=timezone.now(),
         )
         saved_pieces.append(qc_piece)
 
@@ -443,6 +444,7 @@ def save_final_piece(request):
                 "force_save": force_save,
                 "user_id": user_id,
                 "machine_id": machine_id,
+                "date": timezone.now(),
             }
         )
 
@@ -2064,7 +2066,7 @@ def machine_attendance_api(request):
 
 def needle_report_api(request):
     if request.method == "GET":
-        today = timezone.localdate()
+        today = timezone.now()
 
         data = (
             Needle_change.objects.using('default')
@@ -2286,6 +2288,144 @@ def qcroving(request):
 
     return JsonResponse(result, safe=False)
 
+def qc_roving_summary(request):
+
+    date = request.GET.get("date")
+
+    if date:
+        selected_date = date
+    else:
+        selected_date = timezone.now().date()
+
+    # ---------------------------------------
+    # Latest Machine Allocation
+    # ---------------------------------------
+    allocations = (
+        MachineAllocation.objects
+        .select_related("machine", "unit")
+        .order_by("-allocated_at", "-id")
+    )
+
+    latest_allocations = []
+    seen = set()
+
+    for allocation in allocations:
+        if allocation.machine_id in seen:
+            continue
+
+        seen.add(allocation.machine_id)
+        latest_allocations.append(allocation)
+
+    # ---------------------------------------
+    # Machine -> Unit Map
+    # ---------------------------------------
+    machine_unit_map = {}
+    unit_machine = defaultdict(set)
+
+    for allocation in latest_allocations:
+
+        if allocation.machine and allocation.unit:
+
+            identity = allocation.machine.Identity
+            unit = allocation.unit.id
+
+            machine_unit_map[identity] = unit
+            unit_machine[unit].add(identity)
+
+    # ---------------------------------------
+    # QC Summary
+    # ---------------------------------------
+    qc_queryset = (
+        qc_piece_data.objects
+        .filter(date__date=selected_date)
+    )
+
+    qc_summary = (
+        qc_queryset
+        .values("machine_id", "date")
+        .annotate(
+            mistake_count=Sum("mistake_count")
+        )
+    )
+
+    # ---------------------------------------
+    # Machine Status
+    # ---------------------------------------
+    machine_status = {}
+
+    for row in qc_summary:
+
+        machine = row["machine_id"]
+
+        unit = machine_unit_map.get(machine)
+
+        if not unit:
+            continue
+
+        shift = get_shift(row["date"])
+
+        mistake = row["mistake_count"] or 0
+
+        if mistake == 0:
+            status = "Perfect"
+        elif mistake <= 2:
+            status = "Good"
+        else:
+            status = "Priority"
+
+        machine_status[(unit, shift, machine)] = status
+
+    # ---------------------------------------
+    # Final Summary
+    # ---------------------------------------
+    shifts = ["I", "II", "III", "IV", "V", "VI"]
+
+    result = []
+
+    for unit, machines in unit_machine.items():
+
+        total_machine = len(machines)
+
+        for shift in shifts:
+
+            priority = 0
+            good = 0
+            perfect = 0
+
+            checked = set()
+
+            for machine in machines:
+
+                status = machine_status.get((unit, shift, machine))
+
+                if not status:
+                    continue
+
+                checked.add(machine)
+
+                if status == "Priority":
+                    priority += 1
+
+                elif status == "Good":
+                    good += 1
+
+                elif status == "Perfect":
+                    perfect += 1
+
+            not_check = total_machine - len(checked)
+
+            result.append({
+                "unit": unit,
+                "timeline": shift,
+                "total_machine": total_machine,
+                "priority": priority,
+                "good": good,
+                "perfect": perfect,
+                "not_check": not_check
+            })
+
+    return JsonResponse(result, safe=False)
+
 
 def get_sign_display(sign_field):
     """Helper to safely read either an image URL or a plain text string."""
@@ -2302,8 +2442,6 @@ def get_sign_display(sign_field):
             return None
     return str(sign_field)
 
-
-
 def role_qc(request):
     roles = list(VueUloginRole.objects.values())
 
@@ -2314,6 +2452,8 @@ def role_qc(request):
         "data": roles
     })
 
+
+        
 @csrf_exempt
 def qc_hourly_signature(request):
     if request.method == "GET":

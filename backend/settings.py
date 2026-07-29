@@ -24,8 +24,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = 'django-insecure--jpqy*__tak#1#7_0u^g5gt=n@rlpjvp5mstua5m^&i7+!8uad'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
-# DEBUG = False
+DEBUG = os.getenv('DJANGO_DEBUG', 'False').lower() in ('1', 'true', 'yes')
 
 # ALLOWED_HOSTS = ['hfapi.herofashion.com','10.1.21.153','localhost','127.0.0.1','10.1.21.13','10.1.21.154','10.1.21.110']
 ALLOWED_HOSTS = ['*']
@@ -300,7 +299,7 @@ TIME_ZONE = 'Asia/Kolkata'
 
 USE_I18N = True
 
-USE_TZ = True
+USE_TZ = False
 # USE_TZ = True
 
 

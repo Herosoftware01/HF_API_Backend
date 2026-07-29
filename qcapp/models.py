@@ -136,7 +136,7 @@ class qc_piece_data(models.Model):
     mistake_percentage = models.CharField(max_length=20)
     qc_type = models.CharField(max_length=50)
     user_id = models.IntegerField()
-    date = models.DateTimeField(default=datetime.datetime.now)
+    date = models.DateTimeField()
     seq = models.CharField(max_length=100)
     machine_id = models.CharField(max_length=100)
     
@@ -155,7 +155,7 @@ class qc_piece_final(models.Model):
     force_save = models.BooleanField(default=False)
     qc_type = models.CharField(max_length=50)
     user_id = models.IntegerField()
-    date = models.DateTimeField(default=datetime.datetime.now)
+    date = models.DateTimeField()
     seq = models.CharField(max_length=100)
     machine_id = models.CharField(max_length=100)
 
@@ -511,7 +511,6 @@ class cut_sample_data_final(models.Model):
     bf_ironing = models.BooleanField(default=False)
     af_ironing = models.BooleanField(default=False)
     force_save = models.BooleanField(default=False)
-
 
 class VueUloginRole(models.Model):
     login_id = models.BigIntegerField(primary_key=True)

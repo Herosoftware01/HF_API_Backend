@@ -43,6 +43,7 @@ class TmpPrdprn(models.Model):
     o_styledesc = models.CharField(max_length=50, blank=True, null=True)
     buyer = models.CharField(max_length=50, blank=True, null=True)
     img = models.CharField(max_length=450, blank=True, null=True)
+    tbpic = models.CharField(max_length=500, blank=True, null=True)
 
     class Meta:
         managed = False

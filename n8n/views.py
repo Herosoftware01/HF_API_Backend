@@ -54,6 +54,7 @@ def liveprdn(request):
             "o_styledesc": rec.o_styledesc,
             "buyer": rec.buyer,
             "img": rec.img,
+            "tbpic": rec.tbpic
         })
     return JsonResponse(response_data, safe=False)
 
