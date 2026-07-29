@@ -295,7 +295,8 @@ def save_piece(request):
             category=defect.get("category", ""),
             mistake_name=defect.get("mistake_name", ""),
             mistake_count=defect.get("mistake_count", 0),
-            user_id=user_id
+            user_id=user_id,
+            date=timezone.now()
         )
         saved_pieces.append(qc_piece)
 
@@ -443,6 +444,7 @@ def save_final_piece(request):
                 "force_save": force_save,
                 "user_id": user_id,
                 "machine_id": machine_id,
+                "date": timezone.now(),
             }
         )
 

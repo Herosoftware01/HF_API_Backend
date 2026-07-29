@@ -407,11 +407,14 @@ def generate_bitcheck_production(request):
         scanner_id = request.data.get("scaner_id")
         types = request.data.get("types")
         r_p = request.data.get("r_p", False)
+        print("Raw r_p:", r_p, type(r_p))
 
         if isinstance(r_p, str):
             r_p = r_p.lower() == "true"
         else:
             r_p = bool(r_p)
+
+        print("Converted r_p:", r_p, type(r_p))
 
         BitcheckingPlyDetails.objects.using("demo").filter(
             qr_id=scanner_id,
@@ -420,20 +423,27 @@ def generate_bitcheck_production(request):
 
         with connections["demo"].cursor() as cursor:
             cursor.execute("EXEC sp_GenerateBitCheckProduction")
+            print("Executed sp_GenerateBitCheckProduction for scanner_id:", scanner_id, "with r_p:", r_p)
 
-        # r_p=False என்றால் மட்டும் Sticker SP run ஆகும்
+        # Print sticker only when r_p is False
         if not r_p:
-            with connections['demo'].cursor() as cursor:
+            print("R/P is True, PrintMistakeSticker...")
+            with connections["demo"].cursor() as cursor:
                 cursor.execute("""
                     EXEC sp_PrintBitCheckingSticker
                         @SL=%s,
                         @PrintCutSticker=%s,
                         @PrintMistakeSticker=%s
-                """, [
-                    scanner_id,
-                    1,
-                    1
-                ])
+                """, [scanner_id, 0, 1])
+        else:
+            print("R/P is False ")
+            with connections["demo"].cursor() as cursor:
+                cursor.execute("""
+                    EXEC sp_PrintBitCheckingSticker
+                        @SL=%s,
+                        @PrintCutSticker=%s,
+                        @PrintMistakeSticker=%s
+                """, [scanner_id, 1, 1])
         
         return Response(
             {

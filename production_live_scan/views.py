@@ -184,18 +184,128 @@ class UnitInputAPIView(APIView):
 from django.db.models.functions import TruncDate
 from datetime import datetime, timedelta
 
+
+def get_eligible_assembly_bundle_ids(job_no, process_des, top_bottom=None):
+    dependency_query = dependency.objects.filter(
+        job_no__iexact=job_no,
+        process_des__iexact=process_des,
+    )
+    if top_bottom:
+        top_bottom_filter = Q(tb_name__iexact=top_bottom)
+        if str(top_bottom).strip().isdigit():
+            top_bottom_filter |= Q(tb_id=int(str(top_bottom).strip()))
+        dependency_query = dependency_query.filter(top_bottom_filter)
+    process_dependency = dependency_query.order_by('-id').first()
+
+    if not process_dependency or not process_dependency.verify:
+        return False, None, "This process dependency is not verified."
+
+    if not process_dependency.and_or:
+        return True, None, None
+
+    required_descriptions = list(
+        process_dependency.data_entries.values_list('descriptions', flat=True)
+    )
+    if not required_descriptions:
+        return False, None, "Previous process dependency is not configured."
+
+    required_sequences = {
+        str(description).strip().casefold()
+        for description in required_descriptions
+        if str(description or '').strip()
+    }
+    if not required_sequences:
+        return False, None, "Previous process dependency is not configured."
+
+    completed_by_bundle = {}
+    completed_query = Assembly_data.objects.filter(job_no__iexact=job_no)
+    if top_bottom:
+        completed_query = completed_query.filter(tb_name__iexact=top_bottom)
+    completed_rows = completed_query.values_list('bundle_id', 'seq')
+    for bundle_id, sequence in completed_rows:
+        normalized_sequence = str(sequence or '').strip().casefold()
+        if normalized_sequence:
+            completed_by_bundle.setdefault(str(bundle_id), set()).add(normalized_sequence)
+
+    eligible_bundle_ids = {
+        bundle_id
+        for bundle_id, completed_sequences in completed_by_bundle.items()
+        if required_sequences.issubset(completed_sequences)
+    }
+    if not eligible_bundle_ids:
+        required_process_names = [
+            str(description).strip()
+            for description in required_descriptions
+            if str(description or '').strip()
+        ]
+        return (
+            False,
+            set(),
+            "Previous process is not complete for any bundle. Required processes: "
+            + ", ".join(required_process_names),
+        )
+
+    return True, eligible_bundle_ids, None
+
+
 class GetUnitDataAPIView(APIView):
     def get(self, request):
         unit = request.query_params.get('unit')
         line = request.query_params.get('line')
+        job_no = request.query_params.get('job_no')
+        process_des = request.query_params.get('process_des')
+        top_bottom = str(request.query_params.get('top_bottom', '') or '').strip()
         selected_date = request.query_params.get('date') 
 
         if selected_date:
             date_obj = datetime.strptime(selected_date, '%Y-%m-%d')
-            data = unit_input.objects.filter(unit=unit, line=line, entry_date__date=date_obj, scan=False)
+            data = unit_input.objects.filter(unit=unit, line=line, entry_date__date=date_obj)
         else:
             four_days_ago = datetime.now() - timedelta(days=4)
-            data = unit_input.objects.filter(unit=unit, line=line, entry_date__gte=four_days_ago, scan=False)
+            data = unit_input.objects.filter(unit=unit, line=line, entry_date__gte=four_days_ago)
+
+        if job_no is not None:
+            job_no = job_no.strip()
+            if not job_no:
+                return Response(
+                    {"error": "job_no is required to load assembly bundles"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            if process_des is not None:
+                process_des = process_des.strip()
+                if not top_bottom:
+                    return Response(
+                        {"error": "top_bottom is required to load assembly bundles"},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+                allowed, eligible_bundle_ids, error_message = get_eligible_assembly_bundle_ids(
+                    job_no, process_des, top_bottom
+                )
+                if not allowed:
+                    return Response(
+                        {"error": error_message},
+                        status=status.HTTP_409_CONFLICT
+                    )
+                already_scanned_ids = Assembly_data.objects.filter(
+                    job_no__iexact=job_no,
+                    seq__iexact=process_des,
+                ).values_list('bundle_id', flat=True)
+                data = data.filter(job_no__iexact=job_no)
+                if top_bottom:
+                    data = data.filter(tb_name__iexact=top_bottom)
+                data = data.exclude(bundle_id__in=already_scanned_ids)
+                if eligible_bundle_ids is not None:
+                    data = data.filter(bundle_id__in=eligible_bundle_ids)
+            else:
+                verified_tb_ids = dependency.objects.filter(
+                    job_no__iexact=job_no,
+                    verify=True
+                ).values_list('tb_id', flat=True)
+                data = data.filter(
+                    job_no__iexact=job_no,
+                    tb_id__in=verified_tb_ids,
+                    scan=False,
+                )
 
         # JSON response
         results = list(data.values('bundle_id','mbud', 'job_no','color','bdl_no','size','tb_name', 'pc', 'color', 'entry_date'))
@@ -307,14 +417,17 @@ class SaveAssemblyAPIView(APIView):
     def post(self, request):
         emp_code = str(request.data.get('emp_code', '')).strip()
         machine_id = request.data.get('machine_id')
+        job_no = str(request.data.get('job_no', '')).strip()
+        selected_seq = str(request.data.get('seq', '') or '').strip()
+        selected_top_bottom = str(request.data.get('top_bottom', '') or '').strip()
         unit = request.data.get('unit')
         line = request.data.get('line')
         bundle_ids = request.data.get('bundle_ids', [])
         raw_date = request.data.get('date')
 
-        if not emp_code or not machine_id or not unit or not line or not bundle_ids:
+        if not emp_code or not machine_id or not job_no or not selected_seq or not selected_top_bottom or not unit or not line or not bundle_ids:
             return Response(
-                {"error": "employee, machine, unit, line and bundles are required"},
+                {"error": "employee, machine, job no, sequence, top/bottom, unit, line and bundles are required"},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -322,28 +435,62 @@ class SaveAssemblyAPIView(APIView):
         allocation_date = selected_date.date() if selected_date else timezone.now().date()
         unit_obj = Unit.objects.filter(name__iexact=f"unit-{unit}").first()
         line_obj = Line.objects.filter(unit=unit_obj, line_number=line).first() if unit_obj else None
-        allocation = unit_obj and line_obj and emp_allocate.objects.select_related('machine').filter(
-            date__date=allocation_date,
-            unit=unit_obj.id,
-            line=line_obj.id,
-            emp_code=emp_code,
-            machine_id=machine_id
-        ).first()
+        allocation_query = emp_allocate.objects.none()
+        if unit_obj and line_obj:
+            allocation_query = emp_allocate.objects.select_related('machine').filter(
+                date__date=allocation_date,
+                unit=unit_obj.id,
+                line=line_obj.id,
+                emp_code=emp_code,
+                machine_id=machine_id,
+                jobno__iexact=job_no
+            )
+            if 'seq' in request.data:
+                allocation_query = allocation_query.filter(seq=selected_seq)
+            if 'top_bottom' in request.data:
+                allocation_query = allocation_query.filter(top_bottom__iexact=selected_top_bottom)
+        allocation = allocation_query.first()
 
         if not allocation:
             return Response(
-                {"error": "The selected employee is not allocated to this machine."},
+                {"error": "The selected employee is not allocated to this machine and job no."},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
+        process_des = str(allocation.seq or '').strip()
+
+        allowed, eligible_bundle_ids, error_message = get_eligible_assembly_bundle_ids(
+            job_no, process_des, selected_top_bottom
+        )
+        if not allowed:
+            return Response(
+                {"error": error_message},
+                status=status.HTTP_409_CONFLICT
+            )
+
         unique_ids = list(dict.fromkeys(str(value).strip() for value in bundle_ids if str(value).strip()))
+        if eligible_bundle_ids is not None:
+            ineligible_ids = [value for value in unique_ids if value not in eligible_bundle_ids]
+            if ineligible_ids:
+                return Response(
+                    {"error": "Previous process is not complete for some bundles.", "bundle_ids": ineligible_ids},
+                    status=status.HTTP_409_CONFLICT
+                )
+
         with transaction.atomic():
+            already_scanned_ids = Assembly_data.objects.filter(
+                job_no__iexact=job_no,
+                seq__iexact=process_des,
+            ).values_list('bundle_id', flat=True)
             bundle_queryset = unit_input.objects.select_for_update().filter(
                 unit=unit,
                 line=line,
+                job_no__iexact=job_no,
                 bundle_id__in=unique_ids,
-                scan=False
             )
+            if selected_top_bottom:
+                bundle_queryset = bundle_queryset.filter(tb_name__iexact=selected_top_bottom)
+            bundle_queryset = bundle_queryset.exclude(bundle_id__in=already_scanned_ids)
             bundles = list(bundle_queryset)
             found_ids = {bundle.bundle_id for bundle in bundles}
             missing_ids = [value for value in unique_ids if value not in found_ids]
@@ -362,6 +509,8 @@ class SaveAssemblyAPIView(APIView):
                     tb_id=bundle.tb_id,
                     tb_name=bundle.tb_name,
                     machine=allocation.machine.Identity,
+                    seq=process_des,
+                    # process_des=process_des,
                     date=selected_date or entry_date,
                     bundle_id=bundle.bundle_id,
                     bdl_no=bundle.bdl_no,
@@ -510,11 +659,31 @@ def get_process_details(request):
 
     return JsonResponse(result, safe=False)
 
+
+@require_GET
+def get_job_top_bottom(request):
+    """Return the valid Job No / Top-Bottom pairs used by dependency filters."""
+    with connections['demo'].cursor() as cursor:
+        cursor.execute("EXEC sp_GetJobTopBottom")
+        columns = [column[0] for column in cursor.description]
+        rows = cursor.fetchall()
+
+    return JsonResponse(
+        [dict(zip(columns, row)) for row in rows],
+        safe=False,
+    )
+
 @csrf_exempt
 def save_process_dependency(request):
     if request.method == "POST":
         try:
             data = json.loads(request.body)
+
+            def safe_integer(value, default=0):
+                try:
+                    return int(float(value))
+                except (TypeError, ValueError):
+                    return default
 
             if not isinstance(data, list):
                 data = [data]
@@ -552,7 +721,10 @@ def save_process_dependency(request):
                     dep.tb_name = row.get('tb_name')
                     dep.process_des = row.get('process_des')
                     dep.mc = row.get('mc')
-                    dep.thrd = row.get('thrd')
+                    # The procedure can return values such as "NIL", while the
+                    # model stores Thread as an integer. Treat non-numeric
+                    # thread values as zero instead of failing the whole save.
+                    dep.thrd = safe_integer(row.get('thrd'))
                     dep.wsec = row.get('wsec')
                     dep.and_or = bool(row.get('and_or', 0))
                     dep.verify = False
@@ -566,11 +738,20 @@ def save_process_dependency(request):
                         dependency_data(
                             dep_id=dep,
                             tb_id=dep.tb_id,
+                            process_id=safe_integer(
+                                selected.get('process_id')
+                                if isinstance(selected, dict)
+                                else dep.process_id
+                            ),
                             desc_ord_no=index,
-                            descriptions=desc,
+                            descriptions=(
+                                selected.get('description', '')
+                                if isinstance(selected, dict)
+                                else selected
+                            ),
                             date=timezone.now()
                         )
-                        for index, desc in enumerate(selected_processes, start=1)
+                        for index, selected in enumerate(selected_processes, start=1)
                     ])
                     saved_count += 1
             return JsonResponse(
