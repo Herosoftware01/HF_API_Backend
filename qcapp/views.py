@@ -17,7 +17,7 @@ from django.views.decorators.csrf import csrf_exempt
 import json
 from django.utils import timezone
 from django.utils.dateparse import parse_date
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from django.db.models import Q
 from datetime import time
 from django.db import connection
@@ -25,6 +25,7 @@ from datetime import datetime
 from django.utils import timezone
 from django.db.models import Case, When, Value, IntegerField,Sum
 from django.utils.timezone import localtime
+from production_live_scan.models import Assembly_data, dependency
 import os
 import glob
 import subprocess
@@ -1858,20 +1859,152 @@ def get_allocate_report(request):
     return JsonResponse(data, safe=False)
 
 
+
+def get_allocate_live(request):
+
+    unit_id = request.GET.get("unit")
+    line_id = request.GET.get("line")
+
+    selected_line = Line.objects.filter(id=line_id).only("line_number").first()
+    assembly_line = selected_line.line_number if selected_line else line_id
+
+    s_data = emp_allocate.objects.filter(
+        unit=unit_id,
+        line=line_id,
+        date__date=date.today()
+    ).values(
+        "emp_code",
+        "machine__Identity",
+        "date",
+        "seq",
+        "jobno",
+        "top_bottom"
+    )
+
+    # Use an explicit datetime range instead of __date.  The MSSQL backend can
+    # produce an unreliable date cast for high-precision datetime columns.
+    report_day = date.today()
+    day_start = datetime.combine(report_day, time.min)
+    day_end = day_start + timedelta(days=1)
+
+    # Assembly scans do not store the employee code. The report row is matched
+    # to scans by unit, line, machine, job number, top/bottom and operation.
+    scans = list(Assembly_data.objects.filter(
+        unit=unit_id,
+        line=assembly_line,
+        entry_date__gte=day_start,
+        entry_date__lt=day_end,
+    ).values("machine", "job_no", "tb_name", "seq", "pc", "entry_date"))
+
+    def normalized(value):
+        return str(value or "").strip().casefold()
+
+    def scan_key(machine, job_no, top_bottom, seq):
+        return tuple(normalized(value) for value in (machine, job_no, top_bottom, seq))
+
+    def operation_key(job_no, top_bottom, process_des):
+        return tuple(normalized(value) for value in (job_no, top_bottom, process_des))
+
+    def hourly_target(wsec):
+        value = str(wsec or "").strip()
+        if not value:
+            return ""
+        try:
+            minutes_text, seconds_text = (value.split(".", 1) + [""])[:2]
+            minutes = int(minutes_text or 0)
+            seconds = int((seconds_text + "00")[:2]) if seconds_text else 0
+            operation_seconds = (minutes * 60) + seconds
+            return int(3600 / operation_seconds) if operation_seconds > 0 else ""
+        except (TypeError, ValueError, ZeroDivisionError):
+            return ""
+
+    dependency_targets = {
+        operation_key(row["job_no"], row["tb_name"], row["process_des"]): row["wsec"]
+        for row in dependency.objects.filter(
+            job_no__in=[row["jobno"] for row in s_data]
+        ).values("job_no", "tb_name", "process_des", "wsec")
+    }
+
+    slot_ranges = (
+        (time(8, 30), time(10, 0)),
+        (time(10, 0), time(11, 0)),
+        (time(11, 0), time(12, 0)),
+        # Scan timestamps saved during the 1 PM production hour are recorded
+        # as 12:xx in this database, so include 12:00-13:00 in slot 4.
+        (time(12, 0), time(14, 0)),
+        (time(14, 0), time(15, 0)),
+        (time(15, 0), time(16, 0)),
+        (time(16, 0), time(17, 0)),
+        (time(17, 0), time(18, 0)),
+        (time(18, 0), time(19, 0)),
+        (time(19, 0), time(20, 0)),
+    )
+    hourly_totals = defaultdict(lambda: [0] * len(slot_ranges))
+
+    for scan in scans:
+        scan_datetime = scan["entry_date"]
+        if timezone.is_aware(scan_datetime):
+            scan_datetime = localtime(scan_datetime)
+        scan_time = scan_datetime.time().replace(tzinfo=None)
+        slot_index = next(
+            (index for index, (start, end) in enumerate(slot_ranges) if start <= scan_time < end),
+            None,
+        )
+        if slot_index is None:
+            continue
+        try:
+            pieces = int(scan["pc"] or 0)
+        except (TypeError, ValueError):
+            try:
+                pieces = int(float(scan["pc"]))
+            except (TypeError, ValueError):
+                pieces = 0
+        key = scan_key(scan["machine"], scan["job_no"], scan["tb_name"], scan["seq"])
+        hourly_totals[key][slot_index] += pieces
+
+    data = []
+
     for row in s_data:
         emp = Empwisesal.objects.using('main').filter(
             code=row["emp_code"]
         ).first()
 
+        allocation_key = scan_key(
+            row["machine__Identity"],
+            row["jobno"],
+            row["top_bottom"],
+            row["seq"],
+        )
+        employee_hours = hourly_totals[allocation_key]
+        allocation_datetime = row["date"]
+        if timezone.is_aware(allocation_datetime):
+            allocation_datetime = localtime(allocation_datetime)
+        allocation_time = allocation_datetime.time().replace(tzinfo=None)
+        allocation_slot = next(
+            (index + 1 for index, (start, end) in enumerate(slot_ranges)
+             if start <= allocation_time < end),
+            1,
+        )
+
         data.append({
             "emp_code": row["emp_code"],
+            "machine": row["machine__Identity"],
             "seq": row["seq"],
             "jobno": row["jobno"],
             "top_bottom": row["top_bottom"],
-            "name": emp.name if emp else ""
+            "name": emp.name if emp else "",
+            "allocation_slot": allocation_slot,
+            "target": hourly_target(dependency_targets.get(operation_key(
+                row["jobno"],
+                row["top_bottom"],
+                row["seq"],
+            ), "")),
+            "hours": employee_hours,
         })
 
     return JsonResponse(data, safe=False)
+
+
 
 def machine_allocation_api(request):
     selected_date = request.GET.get("date")

@@ -466,7 +466,6 @@ def generate_bitcheck_production(request):
 
 @api_view(["GET"])
 def check_final_saved(request):
-
     scanner_id = request.GET.get("scanner_id")
     types = request.GET.get("types")
 
@@ -479,7 +478,6 @@ def check_final_saved(request):
         "status": True,
         "final_saved": exists
     })
-
 
 
 @csrf_exempt
