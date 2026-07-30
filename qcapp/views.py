@@ -297,7 +297,8 @@ def save_piece(request):
             category=defect.get("category", ""),
             mistake_name=defect.get("mistake_name", ""),
             mistake_count=defect.get("mistake_count", 0),
-            user_id=user_id
+            user_id=user_id,
+            date=timezone.now()
         )
         saved_pieces.append(qc_piece)
 
@@ -445,6 +446,7 @@ def save_final_piece(request):
                 "force_save": force_save,
                 "user_id": user_id,
                 "machine_id": machine_id,
+                "date": timezone.now(),
             }
         )
 
@@ -2630,6 +2632,7 @@ def qc_hourly_signature(request):
 
         obj.save()
         return JsonResponse({"status": True, "message": "Signature Saved", "id": obj.id})
+<<<<<<< HEAD
 
 
 def qc_hourly_approval_api(request):
@@ -2639,3 +2642,5 @@ def qc_hourly_approval_api(request):
     datas=list(data.values())
     return JsonResponse(datas, safe=False)  
 
+=======
+>>>>>>> b1ae3fcd7b1bd0bf48f12032b174b2f123284b59

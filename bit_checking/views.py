@@ -25,6 +25,7 @@ from django.db import connections
 #             return row[0]
 #         return None
 
+
 from django.db import connections, DatabaseError
 
 def get_previous_entry_mode(qrid):
@@ -400,84 +401,65 @@ def bitchecking_final_data(request):
         )
 
 
-# @api_view(["POST"])
-# def generate_bitcheck_production(request):
-#     try:
-#         scanner_id = request.data.get("scaner_id")
-#         types = request.data.get("types")
-
-#         # r_p check
-#         rp_exists = BitcheckingPlyDetails.objects.using("demo").filter(
-#             qr_id=scanner_id,
-#             typ=types,
-#             r_p=True
-#         ).exists()
-
-#         if rp_exists:
-#             with connections["demo"].cursor() as cursor:
-#                 cursor.execute("EXEC sp_GenerateBitCheckProduction")
-
-#         return Response(
-#             {
-#                 "status": True,
-#                 "message": "Completed Successfully"
-#             },
-#             status=status.HTTP_200_OK
-#         )
-
-#     except Exception as e:
-#         return Response(
-#             {
-#                 "status": False,
-#                 "message": str(e)
-#             },
-#             status=status.HTTP_500_INTERNAL_SERVER_ERROR
-#         )
-
 @api_view(["POST"])
 def generate_bitcheck_production(request):
-
     try:
-
         scanner_id = request.data.get("scaner_id")
         types = request.data.get("types")
+        r_p = request.data.get("r_p", False)
+        print("Raw r_p:", r_p, type(r_p))
 
-        print("scanner_id",scanner_id)
-        print("types",types)
+        if isinstance(r_p, str):
+            r_p = r_p.lower() == "true"
+        else:
+            r_p = bool(r_p)
 
+        print("Converted r_p:", r_p, type(r_p))
+
+        BitcheckingPlyDetails.objects.using("demo").filter(
+            qr_id=scanner_id,
+            typ=types,
+        ).update(r_p=r_p)
 
         with connections["demo"].cursor() as cursor:
+            cursor.execute("EXEC sp_GenerateBitCheckProduction")
+            print("Executed sp_GenerateBitCheckProduction for scanner_id:", scanner_id, "with r_p:", r_p)
 
-            cursor.execute(
-                "EXEC sp_GenerateBitCheckProduction"
-            )
-
-
-
+        # Print sticker only when r_p is False
+        if not r_p:
+            print("R/P is True, PrintMistakeSticker...")
+            with connections["demo"].cursor() as cursor:
+                cursor.execute("""
+                    EXEC sp_PrintBitCheckingSticker
+                        @SL=%s,
+                        @PrintCutSticker=%s,
+                        @PrintMistakeSticker=%s
+                """, [scanner_id, 0, 1])
+        else:
+            print("R/P is False ")
+            with connections["demo"].cursor() as cursor:
+                cursor.execute("""
+                    EXEC sp_PrintBitCheckingSticker
+                        @SL=%s,
+                        @PrintCutSticker=%s,
+                        @PrintMistakeSticker=%s
+                """, [scanner_id, 1, 1])
+        
         return Response(
-
             {
                 "status": True,
                 "message": "Completed Successfully"
             },
-
             status=status.HTTP_200_OK
-
         )
 
-
     except Exception as e:
-
-
         return Response(
-
             {
                 "status": False,
                 "message": str(e)
             },
-
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
-
         )
 
 
