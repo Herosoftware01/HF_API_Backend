@@ -96,6 +96,7 @@ INSTALLED_APPS = [
     'chatbot',
     "channels",
     'n8n',
+    'dc_app',
     'bundle_tracking',
     'production_live_scan',
     'fashionr',
