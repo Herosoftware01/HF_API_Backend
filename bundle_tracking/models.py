@@ -127,7 +127,7 @@ class Bundlereport(models.Model):
 
     class Meta:
         managed = False
-        db_table = 'Unit_BundleReport'
+        db_table = 'unit_bundlereport'
 
     def __str__(self):
         return f"{self.job_no} - {self.mbundle_id}"

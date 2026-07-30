@@ -5,7 +5,7 @@ from rest_framework.decorators import api_view
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, permissions
-from .models import QcAdminMistake,cut_sample_data_final,Cont_employee,sequency_data,cut_sample_data,cut_sample_data_final,VueUser,Unit,Needle_change,Line,roving_qc_mistake,qc_piece_final, MachineAllocation, machine_details, emp_allocate, Empwisesal, VueProcessSequence,qc_hourly_approval,VueUloginRole
+from .models import QcAdminMistake,cut_sample_data_final,Cont_employee,sequency_data,cut_sample_data,cut_sample_data_final,VueUser,Unit,Needle_change,Line,roving_qc_mistake,qc_piece_final, MachineAllocation, machine_details, emp_allocate, Empwisesal, VueProcessSequence,qc_hourly_approval,VueUloginRole,QcHourlyApproval 
 from .serializers import QcAdminMistakeSerializer,UnitSerializer,MachineTrasnsferSerializer,MachineSerializer,LineSerializer, MachineAllocationSerializer, VueProcessSequenceSerializer
 from collections import defaultdict
 from django.shortcuts import get_object_or_404
@@ -29,6 +29,8 @@ import os
 import glob
 import subprocess
 from django.conf import settings
+from datetime import time as time_cls, datetime as datetime_cls, timedelta
+from collections import defaultdict
 
 
 
@@ -2286,49 +2288,120 @@ def qcroving(request):
 
     return JsonResponse(result, safe=False)
 
+SHIFT_WINDOWS = {
+    "I":   (time(8, 30),  time(10, 30)),
+    "II":  (time(10, 45), time(12, 45)),
+    "III": (time(13, 30), time(15, 30)),
+    "IV":  (time(15, 30), time(17, 30)),
+    "V":   (time(17, 45), time(20, 0)),
+    "VI":  (time(20, 45), time(23, 30)),
+}
+
+SHIFT_ALLOWANCE = timedelta(minutes=5)
+
+
+def get_shift_with_allowance(row_datetime):
+    if row_datetime is None:
+        return None
+
+    if timezone.is_aware(row_datetime):
+        row_datetime = timezone.localtime(row_datetime)
+
+    ref_date = row_datetime.date()
+    current_dt = datetime.combine(ref_date, row_datetime.time())
+
+    # Pass 1: exact (unbuffered) window match — shifts never overlap here,
+    # even when back-to-back like III (ends 15:30) / IV (starts 15:30)
+    for shift_name, (start, end) in SHIFT_WINDOWS.items():
+        start_dt = datetime.combine(ref_date, start)
+        end_dt = datetime.combine(ref_date, end)
+
+        if start_dt <= current_dt <= end_dt:
+            return shift_name
+
+    # Pass 2: outside every real window — apply the 5-min allowance,
+    # picking the closest shift if more than one buffer reaches this time
+    best_shift = None
+    best_distance = None
+
+    for shift_name, (start, end) in SHIFT_WINDOWS.items():
+        start_dt = datetime.combine(ref_date, start)
+        end_dt = datetime.combine(ref_date, end)
+
+        if current_dt < start_dt:
+            distance = start_dt - current_dt
+        else:
+            distance = current_dt - end_dt
+
+        if distance <= SHIFT_ALLOWANCE and (best_distance is None or distance < best_distance):
+            best_distance = distance
+            best_shift = shift_name
+
+    return best_shift
+
+
 def qc_roving_summary(request):
 
     date = request.GET.get("date")
+    requested_timeline = request.GET.get("timeline")
 
     if date:
         selected_date = date
     else:
         selected_date = timezone.now().date()
 
+    today = timezone.now().date()
+
+    ALL_SHIFTS = ["I", "II", "III", "IV", "V", "VI"]
+
+    if requested_timeline:
+        if requested_timeline not in ALL_SHIFTS:
+            return JsonResponse(
+                {"error": f"Invalid timeline '{requested_timeline}'. Must be one of {ALL_SHIFTS}"},
+                status=400
+            )
+        shifts = [requested_timeline]
+    else:
+        shifts = ALL_SHIFTS
+
     # ---------------------------------------
-    # Latest Machine Allocation
+    # Line.id -> line_number lookup
     # ---------------------------------------
-    allocations = (
-        MachineAllocation.objects
-        .select_related("machine", "unit")
-        .order_by("-allocated_at", "-id")
+    line_number_lookup = dict(Line.objects.values_list("id", "line_number"))
+
+    # ---------------------------------------
+    # Today's Machine Assignment (emp_allocate)
+    # ---------------------------------------
+    emp_allocations = (
+        emp_allocate.objects
+        .filter(date__date=today)
+        .select_related("machine")
+        .order_by("-date", "-id")
     )
 
-    latest_allocations = []
-    seen = set()
+    machine_unit_line_map = {}
+    unit_line_machine = defaultdict(set)
+    seen_machines = set()
 
-    for allocation in allocations:
-        if allocation.machine_id in seen:
+    for emp in emp_allocations:
+        if not emp.machine_id:
             continue
 
-        seen.add(allocation.machine_id)
-        latest_allocations.append(allocation)
+        identity = emp.machine.Identity
 
-    # ---------------------------------------
-    # Machine -> Unit Map
-    # ---------------------------------------
-    machine_unit_map = {}
-    unit_machine = defaultdict(set)
+        if identity in seen_machines:
+            continue
 
-    for allocation in latest_allocations:
+        seen_machines.add(identity)
 
-        if allocation.machine and allocation.unit:
+        unit = emp.unit
+        line_number = line_number_lookup.get(emp.line)
 
-            identity = allocation.machine.Identity
-            unit = allocation.unit.id
+        if line_number is None:
+            continue
 
-            machine_unit_map[identity] = unit
-            unit_machine[unit].add(identity)
+        machine_unit_line_map[identity] = (unit, line_number)
+        unit_line_machine[(unit, line_number)].add(identity)
 
     # ---------------------------------------
     # QC Summary
@@ -2340,7 +2413,7 @@ def qc_roving_summary(request):
 
     qc_summary = (
         qc_queryset
-        .values("machine_id", "date")
+        .values("machine_id", "line", "date")
         .annotate(
             mistake_count=Sum("mistake_count")
         )
@@ -2355,12 +2428,20 @@ def qc_roving_summary(request):
 
         machine = row["machine_id"]
 
-        unit = machine_unit_map.get(machine)
+        mapping = machine_unit_line_map.get(machine)
 
-        if not unit:
+        if not mapping:
             continue
 
-        shift = get_shift(row["date"])
+        unit, mapped_line = mapping
+
+        shift = get_shift_with_allowance(row["date"])
+
+        if shift is None:
+            continue
+
+        if requested_timeline and shift != requested_timeline:
+            continue
 
         mistake = row["mistake_count"] or 0
 
@@ -2376,11 +2457,9 @@ def qc_roving_summary(request):
     # ---------------------------------------
     # Final Summary
     # ---------------------------------------
-    shifts = ["I", "II", "III", "IV", "V", "VI"]
-
     result = []
 
-    for unit, machines in unit_machine.items():
+    for (unit, line_number), machines in unit_line_machine.items():
 
         total_machine = len(machines)
 
@@ -2403,19 +2482,20 @@ def qc_roving_summary(request):
 
                 if status == "Priority":
                     priority += 1
-
                 elif status == "Good":
                     good += 1
-
                 elif status == "Perfect":
                     perfect += 1
 
             not_check = total_machine - len(checked)
+            checked_count = len(checked)
 
             result.append({
                 "unit": unit,
+                "line": line_number,
                 "timeline": shift,
-                "total_machine": total_machine,
+                "assigned_machine": total_machine,
+                "checked_machine": checked_count,
                 "priority": priority,
                 "good": good,
                 "perfect": perfect,
@@ -2550,3 +2630,12 @@ def qc_hourly_signature(request):
 
         obj.save()
         return JsonResponse({"status": True, "message": "Signature Saved", "id": obj.id})
+
+
+def qc_hourly_approval_api(request):
+
+    data = QcHourlyApproval.objects.all()
+
+    datas=list(data.values())
+    return JsonResponse(datas, safe=False)  
+

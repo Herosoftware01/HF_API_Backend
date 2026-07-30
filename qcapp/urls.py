@@ -45,9 +45,10 @@ urlpatterns = [
     path("get-existing-measurements/", views.get_existing_measurements),
     path("get_cutting_measurements/", views.get_cutting_measurements),
     path("qcroving/", views.qcroving, name='qcroving'),
-    path("qc_roving_summary/", views.qc_roving_summary, name='qc_roving_summary'),
+    path("qc_roving_summary/", views.qc_roving_summary, name='qc_roving_summary~'),
     path("allocate-report/", views.get_allocate_report, name='qc_reports'),
     path("role_qc/", views.role_qc, name='role_qc'),
+    path("qc_hourly_approval_api/", views.qc_hourly_approval_api, name='qc_hourly_approval_api'),
 
 ]
 
