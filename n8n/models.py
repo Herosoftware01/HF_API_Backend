@@ -48,3 +48,4 @@ class TmpPrdprn(models.Model):
     class Meta:
         managed = False
         db_table = '_tmp_prdprn'
+  

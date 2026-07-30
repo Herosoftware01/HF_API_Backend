@@ -427,16 +427,7 @@ def generate_bitcheck_production(request):
 
         # Print sticker only when r_p is False
         if not r_p:
-            print("R/P is False, PrintMistakeSticker...")
-            with connections["demo"].cursor() as cursor:
-                cursor.execute("""
-                    EXEC sp_PrintBitCheckingSticker
-                        @SL=%s,
-                        @PrintCutSticker=%s,
-                        @PrintMistakeSticker=%s
-                """, [scanner_id, 1, 1])
-        else:
-            print("R/P is True ")
+            print("R/P is True, PrintMistakeSticker...")
             with connections["demo"].cursor() as cursor:
                 cursor.execute("""
                     EXEC sp_PrintBitCheckingSticker
@@ -444,6 +435,30 @@ def generate_bitcheck_production(request):
                         @PrintCutSticker=%s,
                         @PrintMistakeSticker=%s
                 """, [scanner_id, 0, 1])
+        else:
+            print("R/P is False ")
+            with connections["demo"].cursor() as cursor:
+                cursor.execute("""
+                    EXEC sp_PrintBitCheckingSticker
+                        @SL=%s,
+                        @PrintCutSticker=%s,
+                        @PrintMistakeSticker=%s
+                """, [scanner_id, 1, 1])
+
+        # if not r_p:
+        #     print("R/P is True, PrintMistakeSticker...")
+        #     with connections["demo"].cursor() as cursor:
+        #         cursor.execute("""
+        #             EXEC sp_PrintBitCheckingSticker_mist
+        #                 @SL=%s
+        #         """, [scanner_id])
+        # else:
+        #     print("R/P is False ")
+        #     with connections["demo"].cursor() as cursor:
+        #         cursor.execute("""
+        #             EXEC sp_PrintBitCheckingSticker_bdl
+        #                 @SL=%s
+        #         """, [scanner_id])
         
         return Response(
             {

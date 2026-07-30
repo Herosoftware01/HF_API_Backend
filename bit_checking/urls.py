@@ -6,8 +6,7 @@ from django.conf import settings
 
 from .import views
 
-urlpatterns = [
-   
+urlpatterns = [   
     path("qr_api", views.qr_api),
     path("emp_stick", views.emp_stick),
     path('save_checking/', views.save_checking),

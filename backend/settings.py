@@ -107,10 +107,13 @@ X_FRAME_OPTIONS = 'ALLOWALL'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-if DEBUG:
-    SECURE_CROSS_ORIGIN_OPENER_POLICY = None
-else:
-    SECURE_CROSS_ORIGIN_OPENER_POLICY = "same-origin"
+
+# if DEBUG:
+#     SECURE_CROSS_ORIGIN_OPENER_POLICY = None
+# else:
+#     SECURE_CROSS_ORIGIN_OPENER_POLICY = "same-origin"
+
+DEBUG = True
 
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',

@@ -296,7 +296,7 @@ def save_piece(request):
             mistake_name=defect.get("mistake_name", ""),
             mistake_count=defect.get("mistake_count", 0),
             user_id=user_id,
-            date=timezone.now(),
+            date=timezone.now()
         )
         saved_pieces.append(qc_piece)
 
@@ -2066,7 +2066,7 @@ def machine_attendance_api(request):
 
 def needle_report_api(request):
     if request.method == "GET":
-        today = timezone.now()
+        today = timezone.localdate()
 
         data = (
             Needle_change.objects.using('default')
