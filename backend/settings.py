@@ -38,7 +38,6 @@ CORS_ALLOWED_ORIGINS = [
     "https://hfapi.herofashion.com",
     "https://sync.herofashion.com",
     "https://dev.herofashion.com",
-    "http://10.1.21.13:3000",
     "http://10.1.21.80:3600",
     "https://hfempdtls.netlify.app",
     "http://10.1.21.110:7003",
@@ -54,7 +53,6 @@ CSRF_TRUSTED_ORIGINS = [
     "https://sync.herofashion.com",
     "https://web.herofashion.com",
     "https://dev.herofashion.com",
-    "http://10.1.21.13:3000",
     "https://hfempdtls.netlify.app",
     "http://10.1.21.110:7003",
     
