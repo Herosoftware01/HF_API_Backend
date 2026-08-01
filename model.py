@@ -8,28 +8,20 @@
 from django.db import models
 
 
-class ViewCuttingDelPrint(models.Model):
-    rowno = models.BigIntegerField(db_column='RowNo', blank=True, null=True)  # Field name made lowercase.
-    itemno = models.SmallIntegerField(db_column='ItemNo')  # Field name made lowercase.
-    name = models.CharField(max_length=35)
-    b = models.CharField(max_length=8000, blank=True, null=True)
-    comboclr = models.CharField(max_length=50, blank=True, null=True)
-    sizid = models.IntegerField(db_column='SizID')  # Field name made lowercase.
-    noofpcs = models.IntegerField(blank=True, null=True)
-    lotno = models.CharField(db_column='LotNo', max_length=10)  # Field name made lowercase.
-    frkg = models.DecimalField(db_column='FRKG', max_digits=18, decimal_places=3, blank=True, null=True)  # Field name made lowercase.
-    fdkg = models.DecimalField(db_column='FDKG', max_digits=18, decimal_places=3, blank=True, null=True)  # Field name made lowercase.
-    frmt = models.DecimalField(db_column='FRMT', max_digits=18, decimal_places=3, blank=True, null=True)  # Field name made lowercase.
-    fdmt = models.DecimalField(db_column='FDMT', max_digits=18, decimal_places=3, blank=True, null=True)  # Field name made lowercase.
-    mbud = models.CharField(db_column='MBUD', max_length=100, blank=True, null=True)  # Field name made lowercase.
-    dcaddres = models.CharField(max_length=750, blank=True, null=True)
-    del_field = models.CharField(db_column='del', max_length=750, blank=True, null=True)  # Field renamed because it was a Python reserved word.
-    id = models.IntegerField(db_column='ID')  # Field name made lowercase.
-    dt = models.DateTimeField(db_column='Dt')  # Field name made lowercase.
-    jobno = models.CharField(db_column='JobNo', max_length=50)  # Field name made lowercase.
-    topbottom_des = models.CharField(db_column='TopBottom_des', max_length=50, blank=True, null=True)  # Field name made lowercase.
-    sample_descr = models.CharField(db_column='Sample_Descr', max_length=50, blank=True, null=True)  # Field name made lowercase.
+class TrsGatemodule(models.Model):
+    module = models.CharField(db_column='Module', max_length=50, db_collation='SQL_Latin1_General_CP1_CI_AS')  # Field name made lowercase.
+    qr_code_dtls = models.CharField(db_column='Qr_Code_Dtls', max_length=500, db_collation='SQL_Latin1_General_CP1_CI_AS')  # Field name made lowercase.
+    companyid = models.IntegerField(db_column='CompanyID')  # Field name made lowercase.
+    year = models.IntegerField(db_column='Year')  # Field name made lowercase.
+    no = models.IntegerField(db_column='No')  # Field name made lowercase.
+    date = models.DateTimeField(db_column='Date')  # Field name made lowercase.
+    jobno = models.CharField(db_column='Jobno', max_length=50, db_collation='SQL_Latin1_General_CP1_CI_AS')  # Field name made lowercase.
+    suppliername = models.CharField(db_column='SupplierName', max_length=200, db_collation='SQL_Latin1_General_CP1_CI_AS')  # Field name made lowercase.
+    descr = models.CharField(db_column='Descr', max_length=500, db_collation='SQL_Latin1_General_CP1_CI_AS')  # Field name made lowercase.
+    rls_bdls = models.IntegerField()
+    kg = models.DecimalField(max_digits=18, decimal_places=3)
+    mtrs = models.DecimalField(max_digits=18, decimal_places=2)
 
     class Meta:
         managed = False
-        db_table = 'view_cutting_del_print'
+        db_table = 'Trs_Gatemodule'
