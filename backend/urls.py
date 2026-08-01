@@ -37,6 +37,7 @@ urlpatterns = [
     path('bundle_tracking/', include('bundle_tracking.urls')),
     path('production_live_scan/', include('production_live_scan.urls')),
     path('fashionr/', include('fashionr.urls')),
+    path('dcapp/', include('dc_app.urls')),
 ] 
 
 

@@ -5,7 +5,7 @@ from rest_framework.decorators import api_view
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, permissions
-from .models import QcAdminMistake,cut_sample_data_final,Cont_employee,sequency_data,cut_sample_data,cut_sample_data_final,VueUser,Unit,Needle_change,Line,roving_qc_mistake,qc_piece_final, MachineAllocation, machine_details, emp_allocate, Empwisesal, VueProcessSequence,qc_hourly_approval,VueUloginRole
+from .models import QcAdminMistake,cut_sample_data_final,Cont_employee,sequency_data,cut_sample_data,cut_sample_data_final,VueUser,Unit,Needle_change,Line,roving_qc_mistake,qc_piece_final, MachineAllocation, machine_details, emp_allocate, Empwisesal, VueProcessSequence,qc_hourly_approval,VueUloginRole,QcHourlyApproval 
 from .serializers import QcAdminMistakeSerializer,UnitSerializer,MachineTrasnsferSerializer,MachineSerializer,LineSerializer, MachineAllocationSerializer, VueProcessSequenceSerializer
 from collections import defaultdict
 from django.shortcuts import get_object_or_404
@@ -17,7 +17,7 @@ from django.views.decorators.csrf import csrf_exempt
 import json
 from django.utils import timezone
 from django.utils.dateparse import parse_date
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from django.db.models import Q
 from datetime import time
 from django.db import connection
@@ -25,10 +25,13 @@ from datetime import datetime
 from django.utils import timezone
 from django.db.models import Case, When, Value, IntegerField,Sum
 from django.utils.timezone import localtime
+from production_live_scan.models import Assembly_data, dependency
 import os
 import glob
 import subprocess
 from django.conf import settings
+from datetime import time as time_cls, datetime as datetime_cls, timedelta
+from collections import defaultdict
 
 
 
@@ -1858,20 +1861,152 @@ def get_allocate_report(request):
     return JsonResponse(data, safe=False)
 
 
+
+def get_allocate_live(request):
+
+    unit_id = request.GET.get("unit")
+    line_id = request.GET.get("line")
+
+    selected_line = Line.objects.filter(id=line_id).only("line_number").first()
+    assembly_line = selected_line.line_number if selected_line else line_id
+
+    s_data = emp_allocate.objects.filter(
+        unit=unit_id,
+        line=line_id,
+        date__date=date.today()
+    ).values(
+        "emp_code",
+        "machine__Identity",
+        "date",
+        "seq",
+        "jobno",
+        "top_bottom"
+    )
+
+    # Use an explicit datetime range instead of __date.  The MSSQL backend can
+    # produce an unreliable date cast for high-precision datetime columns.
+    report_day = date.today()
+    day_start = datetime.combine(report_day, time.min)
+    day_end = day_start + timedelta(days=1)
+
+    # Assembly scans do not store the employee code. The report row is matched
+    # to scans by unit, line, machine, job number, top/bottom and operation.
+    scans = list(Assembly_data.objects.filter(
+        unit=unit_id,
+        line=assembly_line,
+        entry_date__gte=day_start,
+        entry_date__lt=day_end,
+    ).values("machine", "job_no", "tb_name", "seq", "pc", "entry_date"))
+
+    def normalized(value):
+        return str(value or "").strip().casefold()
+
+    def scan_key(machine, job_no, top_bottom, seq):
+        return tuple(normalized(value) for value in (machine, job_no, top_bottom, seq))
+
+    def operation_key(job_no, top_bottom, process_des):
+        return tuple(normalized(value) for value in (job_no, top_bottom, process_des))
+
+    def hourly_target(wsec):
+        value = str(wsec or "").strip()
+        if not value:
+            return ""
+        try:
+            minutes_text, seconds_text = (value.split(".", 1) + [""])[:2]
+            minutes = int(minutes_text or 0)
+            seconds = int((seconds_text + "00")[:2]) if seconds_text else 0
+            operation_seconds = (minutes * 60) + seconds
+            return int(3600 / operation_seconds) if operation_seconds > 0 else ""
+        except (TypeError, ValueError, ZeroDivisionError):
+            return ""
+
+    dependency_targets = {
+        operation_key(row["job_no"], row["tb_name"], row["process_des"]): row["wsec"]
+        for row in dependency.objects.filter(
+            job_no__in=[row["jobno"] for row in s_data]
+        ).values("job_no", "tb_name", "process_des", "wsec")
+    }
+
+    slot_ranges = (
+        (time(8, 30), time(10, 0)),
+        (time(10, 0), time(11, 0)),
+        (time(11, 0), time(12, 0)),
+        # Scan timestamps saved during the 1 PM production hour are recorded
+        # as 12:xx in this database, so include 12:00-13:00 in slot 4.
+        (time(12, 0), time(14, 0)),
+        (time(14, 0), time(15, 0)),
+        (time(15, 0), time(16, 0)),
+        (time(16, 0), time(17, 0)),
+        (time(17, 0), time(18, 0)),
+        (time(18, 0), time(19, 0)),
+        (time(19, 0), time(20, 0)),
+    )
+    hourly_totals = defaultdict(lambda: [0] * len(slot_ranges))
+
+    for scan in scans:
+        scan_datetime = scan["entry_date"]
+        if timezone.is_aware(scan_datetime):
+            scan_datetime = localtime(scan_datetime)
+        scan_time = scan_datetime.time().replace(tzinfo=None)
+        slot_index = next(
+            (index for index, (start, end) in enumerate(slot_ranges) if start <= scan_time < end),
+            None,
+        )
+        if slot_index is None:
+            continue
+        try:
+            pieces = int(scan["pc"] or 0)
+        except (TypeError, ValueError):
+            try:
+                pieces = int(float(scan["pc"]))
+            except (TypeError, ValueError):
+                pieces = 0
+        key = scan_key(scan["machine"], scan["job_no"], scan["tb_name"], scan["seq"])
+        hourly_totals[key][slot_index] += pieces
+
+    data = []
+
     for row in s_data:
         emp = Empwisesal.objects.using('main').filter(
             code=row["emp_code"]
         ).first()
 
+        allocation_key = scan_key(
+            row["machine__Identity"],
+            row["jobno"],
+            row["top_bottom"],
+            row["seq"],
+        )
+        employee_hours = hourly_totals[allocation_key]
+        allocation_datetime = row["date"]
+        if timezone.is_aware(allocation_datetime):
+            allocation_datetime = localtime(allocation_datetime)
+        allocation_time = allocation_datetime.time().replace(tzinfo=None)
+        allocation_slot = next(
+            (index + 1 for index, (start, end) in enumerate(slot_ranges)
+             if start <= allocation_time < end),
+            1,
+        )
+
         data.append({
             "emp_code": row["emp_code"],
+            "machine": row["machine__Identity"],
             "seq": row["seq"],
             "jobno": row["jobno"],
             "top_bottom": row["top_bottom"],
-            "name": emp.name if emp else ""
+            "name": emp.name if emp else "",
+            "allocation_slot": allocation_slot,
+            "target": hourly_target(dependency_targets.get(operation_key(
+                row["jobno"],
+                row["top_bottom"],
+                row["seq"],
+            ), "")),
+            "hours": employee_hours,
         })
 
     return JsonResponse(data, safe=False)
+
+
 
 def machine_allocation_api(request):
     selected_date = request.GET.get("date")
@@ -2288,49 +2423,120 @@ def qcroving(request):
 
     return JsonResponse(result, safe=False)
 
+SHIFT_WINDOWS = {
+    "I":   (time(8, 30),  time(10, 30)),
+    "II":  (time(10, 45), time(12, 45)),
+    "III": (time(13, 30), time(15, 30)),
+    "IV":  (time(15, 30), time(17, 30)),
+    "V":   (time(17, 45), time(20, 0)),
+    "VI":  (time(20, 45), time(23, 30)),
+}
+
+SHIFT_ALLOWANCE = timedelta(minutes=5)
+
+
+def get_shift_with_allowance(row_datetime):
+    if row_datetime is None:
+        return None
+
+    if timezone.is_aware(row_datetime):
+        row_datetime = timezone.localtime(row_datetime)
+
+    ref_date = row_datetime.date()
+    current_dt = datetime.combine(ref_date, row_datetime.time())
+
+    # Pass 1: exact (unbuffered) window match — shifts never overlap here,
+    # even when back-to-back like III (ends 15:30) / IV (starts 15:30)
+    for shift_name, (start, end) in SHIFT_WINDOWS.items():
+        start_dt = datetime.combine(ref_date, start)
+        end_dt = datetime.combine(ref_date, end)
+
+        if start_dt <= current_dt <= end_dt:
+            return shift_name
+
+    # Pass 2: outside every real window — apply the 5-min allowance,
+    # picking the closest shift if more than one buffer reaches this time
+    best_shift = None
+    best_distance = None
+
+    for shift_name, (start, end) in SHIFT_WINDOWS.items():
+        start_dt = datetime.combine(ref_date, start)
+        end_dt = datetime.combine(ref_date, end)
+
+        if current_dt < start_dt:
+            distance = start_dt - current_dt
+        else:
+            distance = current_dt - end_dt
+
+        if distance <= SHIFT_ALLOWANCE and (best_distance is None or distance < best_distance):
+            best_distance = distance
+            best_shift = shift_name
+
+    return best_shift
+
+
 def qc_roving_summary(request):
 
     date = request.GET.get("date")
+    requested_timeline = request.GET.get("timeline")
 
     if date:
         selected_date = date
     else:
         selected_date = timezone.now().date()
 
+    today = timezone.now().date()
+
+    ALL_SHIFTS = ["I", "II", "III", "IV", "V", "VI"]
+
+    if requested_timeline:
+        if requested_timeline not in ALL_SHIFTS:
+            return JsonResponse(
+                {"error": f"Invalid timeline '{requested_timeline}'. Must be one of {ALL_SHIFTS}"},
+                status=400
+            )
+        shifts = [requested_timeline]
+    else:
+        shifts = ALL_SHIFTS
+
     # ---------------------------------------
-    # Latest Machine Allocation
+    # Line.id -> line_number lookup
     # ---------------------------------------
-    allocations = (
-        MachineAllocation.objects
-        .select_related("machine", "unit")
-        .order_by("-allocated_at", "-id")
+    line_number_lookup = dict(Line.objects.values_list("id", "line_number"))
+
+    # ---------------------------------------
+    # Today's Machine Assignment (emp_allocate)
+    # ---------------------------------------
+    emp_allocations = (
+        emp_allocate.objects
+        .filter(date__date=today)
+        .select_related("machine")
+        .order_by("-date", "-id")
     )
 
-    latest_allocations = []
-    seen = set()
+    machine_unit_line_map = {}
+    unit_line_machine = defaultdict(set)
+    seen_machines = set()
 
-    for allocation in allocations:
-        if allocation.machine_id in seen:
+    for emp in emp_allocations:
+        if not emp.machine_id:
             continue
 
-        seen.add(allocation.machine_id)
-        latest_allocations.append(allocation)
+        identity = emp.machine.Identity
 
-    # ---------------------------------------
-    # Machine -> Unit Map
-    # ---------------------------------------
-    machine_unit_map = {}
-    unit_machine = defaultdict(set)
+        if identity in seen_machines:
+            continue
 
-    for allocation in latest_allocations:
+        seen_machines.add(identity)
 
-        if allocation.machine and allocation.unit:
+        unit = emp.unit
+        line_number = line_number_lookup.get(emp.line)
 
-            identity = allocation.machine.Identity
-            unit = allocation.unit.id
+        if line_number is None:
+            continue
 
-            machine_unit_map[identity] = unit
-            unit_machine[unit].add(identity)
+        machine_unit_line_map[identity] = (unit, line_number)
+        unit_line_machine[(unit, line_number)].add(identity)
 
     # ---------------------------------------
     # QC Summary
@@ -2342,7 +2548,7 @@ def qc_roving_summary(request):
 
     qc_summary = (
         qc_queryset
-        .values("machine_id", "date")
+        .values("machine_id", "line", "date")
         .annotate(
             mistake_count=Sum("mistake_count")
         )
@@ -2357,12 +2563,20 @@ def qc_roving_summary(request):
 
         machine = row["machine_id"]
 
-        unit = machine_unit_map.get(machine)
+        mapping = machine_unit_line_map.get(machine)
 
-        if not unit:
+        if not mapping:
             continue
 
-        shift = get_shift(row["date"])
+        unit, mapped_line = mapping
+
+        shift = get_shift_with_allowance(row["date"])
+
+        if shift is None:
+            continue
+
+        if requested_timeline and shift != requested_timeline:
+            continue
 
         mistake = row["mistake_count"] or 0
 
@@ -2378,11 +2592,9 @@ def qc_roving_summary(request):
     # ---------------------------------------
     # Final Summary
     # ---------------------------------------
-    shifts = ["I", "II", "III", "IV", "V", "VI"]
-
     result = []
 
-    for unit, machines in unit_machine.items():
+    for (unit, line_number), machines in unit_line_machine.items():
 
         total_machine = len(machines)
 
@@ -2405,19 +2617,20 @@ def qc_roving_summary(request):
 
                 if status == "Priority":
                     priority += 1
-
                 elif status == "Good":
                     good += 1
-
                 elif status == "Perfect":
                     perfect += 1
 
             not_check = total_machine - len(checked)
+            checked_count = len(checked)
 
             result.append({
                 "unit": unit,
+                "line": line_number,
                 "timeline": shift,
-                "total_machine": total_machine,
+                "assigned_machine": total_machine,
+                "checked_machine": checked_count,
                 "priority": priority,
                 "good": good,
                 "perfect": perfect,
@@ -2552,3 +2765,12 @@ def qc_hourly_signature(request):
 
         obj.save()
         return JsonResponse({"status": True, "message": "Signature Saved", "id": obj.id})
+
+
+def qc_hourly_approval_api(request):
+
+    data = QcHourlyApproval.objects.all()
+
+    datas=list(data.values())
+    return JsonResponse(datas, safe=False)  
+
