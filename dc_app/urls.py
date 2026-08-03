@@ -12,4 +12,6 @@ urlpatterns = [
     path('knitting_del_print/<int:id>/', views.knitting_del_print, name='knitting_del_print'),
     path('acc_prod_del_print/', views.acc_prod_del_print, name='acc_prod_del_print'),
     path('acc_prod_del_print/<int:id>/', views.acc_prod_del_print, name='acc_prod_del_print'),
+    path('acc_proc_del_print/', views.acc_proc_del_print, name='acc_proc_del_print'),
+    path('acc_proc_del_print/<int:id>/', views.acc_proc_del_print, name='acc_proc_del_print'),
 ]

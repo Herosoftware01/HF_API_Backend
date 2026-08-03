@@ -1,6 +1,5 @@
 from django.http import JsonResponse
-from .models import ViewCuttingDelPrint, CuttingPrintembdel, ViewYarnProcessDelivery
-from .models import ViewCuttingDelPrint,ViewKnitDelivery,VueAccProdDel,TrsGatemodule
+from .models import ViewCuttingDelPrint,ViewKnitDelivery,VueAccProdDel,TrsGatemodule, CuttingPrintembdel, ViewYarnProcessDelivery,VueAccProcDel
 import json
 
 def cutting_del_print(request):
@@ -67,4 +66,20 @@ def acc_prod_del_print(request):
         "data": data
     })
 
+def acc_proc_del_print(request):
+    id = request.GET.get("id")  # Example: ?id=101
+
+    queryset = VueAccProcDel.objects.using('test').all()
+
+    if id:
+        queryset = queryset.filter(no=no)
+
+    data = list(queryset.values())
+
+    return JsonResponse({
+        "status": True,
+        "message": "Success",
+        "count": len(data),
+        "data": data
+    })
 
