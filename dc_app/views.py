@@ -31,6 +31,8 @@ def yarn_process_delivery(request, dcno):
     queryset = ViewYarnProcessDelivery.objects.using('test').filter(dcno=dcno)
     data = list(queryset.values())
     return JsonResponse(data, safe=False)
+
+
 def knitting_del_print(request):
     id = request.GET.get("id")  # Example: ?id=101
 

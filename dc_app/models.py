@@ -49,6 +49,7 @@ class CuttingPrintembdel(models.Model):
 class ViewYarnProcessDelivery(models.Model):
     sl = models.BigIntegerField(db_column='Sl', primary_key=True)
     itemno1 = models.SmallIntegerField()
+    companyid = models.SmallIntegerField()
     n = models.CharField(db_column='N', max_length=19, blank=True, null=True)
     companyname = models.CharField(db_column='CompanyName', max_length=12)
     address1 = models.CharField(db_column='Address1', max_length=50, blank=True, null=True)
