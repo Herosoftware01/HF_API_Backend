@@ -1,5 +1,5 @@
 from django.http import JsonResponse
-from .models import ViewCuttingDelPrint,ViewKnitDelivery,VueAccProdDel,TrsGatemodule, CuttingPrintembdel, ViewYarnProcessDelivery,VueAccProcDel
+from .models import ViewCuttingDelPrint,ViewKnitDelivery,VueAccProdDel,TrsGatemodule, CuttingPrintembdel, ViewYarnProcessDelivery,VueAccProcDel,ViewAccinwardVerification,ViewFabricDeliveryProcess
 import json
 
 def cutting_del_print(request):
@@ -83,3 +83,45 @@ def acc_proc_del_print(request):
         "data": data
     })
 
+
+
+def acc_inward_verification(request):
+    jobno = request.GET.get("jobno") 
+    supplier = request.GET.get("supplierdcno") 
+    pono = request.GET.get("pono") # Example: ?jobno=101 
+    billno = request.GET.get("billno")
+
+    queryset = ViewAccinwardVerification.objects.using('test').all()
+
+    if jobno:
+        queryset = queryset.filter(jobno=jobno)
+
+    if supplier:
+        queryset = queryset.filter(supplierdcno=supplier)
+
+    if pono:
+        queryset = queryset.filter(pono=pono)
+
+    if billno:
+        queryset = queryset.filter(billno=billno)
+
+    data = list(queryset.values())
+
+    return JsonResponse({
+        "status": True,
+        "message": "Success",
+        "count": len(data),
+        "data": data
+    })
+
+
+def fabric_process_delivery(request):
+    no = request.GET.get("dcno")  # Example: ?dcno=101
+
+    queryset = ViewFabricDeliveryProcess.objects.using('test').all()
+
+    if no:
+        queryset = queryset.filter(dcno=no)
+
+    data = list(queryset.values())
+    return JsonResponse(data, safe=False)
