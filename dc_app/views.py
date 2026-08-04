@@ -1,5 +1,6 @@
 from django.http import JsonResponse
-from .models import ViewCuttingDelPrint,ViewKnitDelivery,VueAccProdDel,TrsGatemodule, CuttingPrintembdel, ViewYarnProcessDelivery,VueAccProcDel
+from .models import ViewCuttingDelPrint,ViewKnitDelivery,VueAccProdDel,TrsGatemodule, CuttingPrintembdel, ViewYarnProcessDelivery
+from .models import VueAccProcDel,VueAccInhTransfer,ViewFabricDeliveryProcess, ViewUnitPcdelivery
 import json
 
 def cutting_del_print(request):
@@ -33,11 +34,11 @@ def yarn_process_delivery(request, dcno):
 
 
 def knitting_del_print(request):
-    id = request.GET.get("id")  # Example: ?id=101
+    dcno = request.GET.get("dcno")  # Example: ?id=101
 
     queryset = ViewKnitDelivery.objects.using('test').all()
 
-    if id:
+    if dcno:
         queryset = queryset.filter(dc=dcno)
 
     data = list(queryset.values())
@@ -50,12 +51,12 @@ def knitting_del_print(request):
     })
 
 def acc_prod_del_print(request):
-    id = request.GET.get("id")  # Example: ?id=101
+    no = request.GET.get("no")  # Example: ?id=101
 
     queryset = VueAccProdDel.objects.using('test').all()
 
-    if id:
-        queryset = queryset.filter(n=n)
+    if no:
+        queryset = queryset.filter(n=no)
 
     data = list(queryset.values())
 
@@ -67,11 +68,11 @@ def acc_prod_del_print(request):
     })
 
 def acc_proc_del_print(request):
-    id = request.GET.get("id")  # Example: ?id=101
+    no = request.GET.get("no")  # Example: ?id=101
 
     queryset = VueAccProcDel.objects.using('test').all()
 
-    if id:
+    if no:
         queryset = queryset.filter(no=no)
 
     data = list(queryset.values())
@@ -82,4 +83,45 @@ def acc_proc_del_print(request):
         "count": len(data),
         "data": data
     })
+
+
+def acc_inhouse_transfer(request):
+    no = request.GET.get("no")  # Example: ?id=101
+
+    queryset = VueAccInhTransfer.objects.using('test').all()
+
+    if no:
+        queryset = queryset.filter(no=no)
+
+    data = list(queryset.values())
+
+    return JsonResponse({
+        "status": True,
+        "message": "Success",
+        "count": len(data),
+        "data": data
+    })
+
+
+def fabric_proc_del_print(request):
+    no = request.GET.get("no")  # Example: ?id=101
+
+    queryset = ViewFabricDeliveryProcess.objects.using('test').all()
+
+    if no:
+        queryset = queryset.filter(no=no)
+
+    data = list(queryset.values())
+
+    return JsonResponse({
+        "status": True,
+        "message": "Success",
+        "count": len(data),
+        "data": data
+    })
+
+def unit_pc_delivery(request, dcno):
+    queryset = ViewUnitPcdelivery.objects.using('test').filter(dcno=dcno)
+    data = list(queryset.values())
+    return JsonResponse(data, safe=False)
 

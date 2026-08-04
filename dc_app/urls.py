@@ -14,4 +14,9 @@ urlpatterns = [
     path('acc_prod_del_print/<int:id>/', views.acc_prod_del_print, name='acc_prod_del_print'),
     path('acc_proc_del_print/', views.acc_proc_del_print, name='acc_proc_del_print'),
     path('acc_proc_del_print/<int:id>/', views.acc_proc_del_print, name='acc_proc_del_print'),
+    path('acc_inhouse_transfer/', views.acc_inhouse_transfer, name='acc_inhouse_transfer'),
+    path('acc_inhouse_transfer/<int:id>/', views.acc_inhouse_transfer, name='acc_inhouse_transfer'),
+    path('fabric_delivery_process/', views.fabric_proc_del_print, name='fabric_delivery_process'),
+    path('fabric_delivery_process/<int:id>/', views.fabric_proc_del_print, name='fabric_delivery_process'),
+    path('unit_pc_del/<int:dcno>/', views.unit_pc_delivery, name='UnitPCDelivery'),
 ]
