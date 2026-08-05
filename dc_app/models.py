@@ -284,3 +284,20 @@ class ViewFabricDeliveryProcess(models.Model):
     class Meta:
         managed = False
         db_table = 'view_fabric_delivery_process'
+
+class ViewMistakeqtyPrint(models.Model):
+    frm = models.CharField(max_length=750, blank=True, null=True)
+    toad = models.CharField(max_length=750, blank=True, null=True)
+    dcno = models.IntegerField(primary_key=True)
+    dt = models.DateTimeField()
+    jobno = models.CharField(db_column='Jobno', max_length=50)  # Field name made lowercase.
+    topbottom_des = models.CharField(db_column='TopBottom_des', max_length=50, blank=True, null=True)  # Field name made lowercase.
+    mistake_des = models.CharField(db_column='Mistake_des', max_length=50, blank=True, null=True)  # Field name made lowercase.
+    color = models.CharField(db_column='Color', max_length=50)  # Field name made lowercase.
+    lotno = models.CharField(db_column='Lotno', max_length=50)  # Field name made lowercase.
+    qty = models.IntegerField(db_column='Qty')  # Field name made lowercase.
+    trstype = models.CharField(db_column='Trstype', max_length=50)  # Field name made lowercase.
+
+    class Meta:
+        managed = False
+        db_table = 'view_mistakeqty_print'

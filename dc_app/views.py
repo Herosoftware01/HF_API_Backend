@@ -1,5 +1,5 @@
 from django.http import JsonResponse
-from .models import ViewCuttingDelPrint,ViewKnitDelivery,VueAccProdDel,TrsGatemodule, CuttingPrintembdel, ViewYarnProcessDelivery,VueAccProcDel,ViewAccinwardVerification,ViewFabricDeliveryProcess
+from .models import ViewCuttingDelPrint,ViewKnitDelivery,VueAccProdDel,TrsGatemodule, CuttingPrintembdel, ViewYarnProcessDelivery,VueAccProcDel,ViewAccinwardVerification,ViewFabricDeliveryProcess,ViewMistakeqtyPrint
 import json
 
 def cutting_del_print(request):
@@ -125,3 +125,20 @@ def fabric_process_delivery(request):
 
     data = list(queryset.values())
     return JsonResponse(data, safe=False)
+
+def mistake_qty_print(request):
+    dcno = request.GET.get("dcno")  # Example: ?id=101
+
+    queryset = ViewMistakeqtyPrint.objects.using('demo').all()
+
+    if dcno:
+        queryset = queryset.filter(dcno=dcno)
+
+    data = list(queryset.values())
+
+    return JsonResponse({
+        "status": True,
+        "message": "Success",
+        "count": len(data),
+        "data": data
+    })
