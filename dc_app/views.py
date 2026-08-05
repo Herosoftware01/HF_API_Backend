@@ -1,6 +1,5 @@
 from django.http import JsonResponse
-from .models import ViewCuttingDelPrint,ViewKnitDelivery,VueAccProdDel,TrsGatemodule, CuttingPrintembdel, ViewYarnProcessDelivery
-from .models import VueAccProcDel,VueAccInhTransfer,ViewFabricDeliveryProcess, ViewUnitPcdelivery
+from .models import ViewCuttingDelPrint,ViewKnitDelivery,VueAccProdDel,TrsGatemodule, CuttingPrintembdel, ViewYarnProcessDelivery,VueAccProcDel,VueAccInhTransfer,ViewAccinwardVerification,ViewFabricDeliveryProcess
 import json
 
 def cutting_del_print(request):
@@ -93,6 +92,26 @@ def acc_inhouse_transfer(request):
     if no:
         queryset = queryset.filter(no=no)
 
+def acc_inward_verification(request):
+    jobno = request.GET.get("jobno") 
+    supplier = request.GET.get("supplierdcno") 
+    pono = request.GET.get("pono") # Example: ?jobno=101 
+    billno = request.GET.get("billno")
+
+    queryset = ViewAccinwardVerification.objects.using('test').all()
+
+    if jobno:
+        queryset = queryset.filter(jobno=jobno)
+
+    if supplier:
+        queryset = queryset.filter(supplierdcno=supplier)
+
+    if pono:
+        queryset = queryset.filter(pono=pono)
+
+    if billno:
+        queryset = queryset.filter(billno=billno)
+
     data = list(queryset.values())
 
     return JsonResponse({
@@ -103,25 +122,18 @@ def acc_inhouse_transfer(request):
     })
 
 
-def fabric_proc_del_print(request):
-    no = request.GET.get("no")  # Example: ?id=101
+def fabric_process_delivery(request):
+    no = request.GET.get("dcno")  # Example: ?dcno=101
 
     queryset = ViewFabricDeliveryProcess.objects.using('test').all()
 
     if no:
-        queryset = queryset.filter(no=no)
+        queryset = queryset.filter(dcno=no)
 
     data = list(queryset.values())
-
     return JsonResponse({
         "status": True,
         "message": "Success",
         "count": len(data),
         "data": data
     })
-
-def unit_pc_delivery(request, dcno):
-    queryset = ViewUnitPcdelivery.objects.using('test').filter(dcno=dcno)
-    data = list(queryset.values())
-    return JsonResponse(data, safe=False)
-
