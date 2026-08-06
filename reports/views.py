@@ -2459,7 +2459,6 @@ def labour_attendance_api(request):
 
 
 def bitcheckhour(request):
-    # Get date from query params (YYYY-MM-DD)
     date_str = request.GET.get("date")
 
     if date_str:
@@ -2471,8 +2470,7 @@ def bitcheckhour(request):
                 status=400
             )
     else:
-        # Default to today's date
-        filter_date = timezone.localdate()
+        filter_date = timezone.now().date()
 
     data = (
         BitcheckHour.objects.using("demo")

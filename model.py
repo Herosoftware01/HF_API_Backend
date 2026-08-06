@@ -8,19 +8,22 @@
 from django.db import models
 
 
-class ViewMistakeqtyPrint(models.Model):
-    frm = models.CharField(max_length=750, blank=True, null=True)
-    toad = models.CharField(max_length=750, blank=True, null=True)
+class ViewGdwnFabricDeliveryPlan(models.Model):
+    slno = models.BigIntegerField(db_column='SlNo', blank=True, null=True)  # Field name made lowercase.
+    frm = models.CharField(max_length=11)
+    todept = models.CharField(max_length=12)
     dcno = models.IntegerField()
-    dt = models.DateTimeField()
-    jobno = models.CharField(db_column='Jobno', max_length=50)  # Field name made lowercase.
-    topbottom_des = models.CharField(db_column='TopBottom_des', max_length=50, blank=True, null=True)  # Field name made lowercase.
-    mistake_des = models.CharField(db_column='Mistake_des', max_length=50, blank=True, null=True)  # Field name made lowercase.
-    color = models.CharField(db_column='Color', max_length=50)  # Field name made lowercase.
-    lotno = models.CharField(db_column='Lotno', max_length=50)  # Field name made lowercase.
-    qty = models.IntegerField(db_column='Qty')  # Field name made lowercase.
-    trstype = models.CharField(db_column='Trstype', max_length=50)  # Field name made lowercase.
+    dt = models.DateTimeField(db_column='Dt')  # Field name made lowercase.
+    jobno = models.CharField(db_column='JobNo', max_length=50)  # Field name made lowercase.
+    markerno = models.IntegerField(db_column='MarkerNo')  # Field name made lowercase.
+    lotno = models.CharField(max_length=50)
+    colour = models.CharField(db_column='Colour', max_length=50, blank=True, null=True)  # Field name made lowercase.
+    dia = models.CharField(db_column='Dia', max_length=35)  # Field name made lowercase.
+    rls = models.IntegerField(blank=True, null=True)
+    kg = models.DecimalField(max_digits=38, decimal_places=3, blank=True, null=True)
+    mtr = models.DecimalField(max_digits=38, decimal_places=2, blank=True, null=True)
+    rlno = models.CharField(max_length=8000, blank=True, null=True)
 
     class Meta:
         managed = False
-        db_table = 'view_mistakeqty_print'
+        db_table = 'view_gdwn_fabric_delivery_plan'
