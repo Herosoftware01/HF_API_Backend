@@ -17,4 +17,5 @@ urlpatterns = [
     path('acc_inward_verification/', views.acc_inward_verification, name='acc_inward_verification'),
     path('fabric_process_delivery/', views.fabric_process_delivery, name='FabricProcessDelivery'),
     path('fabric_process_delivery/<int:dcno>/', views.fabric_process_delivery, name='FabricProcessDelivery'),
+    path('unit_pc_del/<int:dcno>/', views.unit_pc_delivery, name='UnitPCDelivery'),
 ]

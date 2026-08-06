@@ -1,5 +1,6 @@
 from django.http import JsonResponse
-from .models import ViewCuttingDelPrint,ViewKnitDelivery,VueAccProdDel,TrsGatemodule, CuttingPrintembdel, ViewYarnProcessDelivery,VueAccProcDel,VueAccInhTransfer,ViewAccinwardVerification,ViewFabricDeliveryProcess
+from .models import ViewCuttingDelPrint,ViewKnitDelivery,VueAccProdDel,TrsGatemodule, CuttingPrintembdel, ViewUnitPcdelivery
+from .models import ViewYarnProcessDelivery,VueAccProcDel,VueAccInhTransfer,ViewAccinwardVerification,ViewFabricDeliveryProcess
 import json
 
 def cutting_del_print(request):
@@ -137,3 +138,8 @@ def fabric_process_delivery(request):
         "count": len(data),
         "data": data
     })
+
+def unit_pc_delivery(request, dcno):
+    queryset = ViewUnitPcdelivery.objects.using('test').filter(dcno=dcno)
+    data = list(queryset.values())
+    return JsonResponse(data, safe=False)

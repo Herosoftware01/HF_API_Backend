@@ -49,5 +49,8 @@ urlpatterns = [
     path("upload/", views.upload_to_drive, name="upload_file"),
     path("uploadss/", views.service_to_drive, name="upload_files"),
     path('fashionr_results/', views.fashionr_results, name='fashionr_results'),
-    path('duedate/', views.DueDateList, name='duedate')
+    path('duedate/', views.DueDateList, name='duedate'),
+
+    path('accessory_poinward/', views.AccessoryPoinward, name='AccessoryPoinward'),
+    path('accessory_del/', views.AccessoryDel, name='AccessoryDel'),
 ]

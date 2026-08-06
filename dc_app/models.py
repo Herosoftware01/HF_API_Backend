@@ -50,6 +50,7 @@ class ViewYarnProcessDelivery(models.Model):
     sl = models.BigIntegerField(db_column='Sl', primary_key=True)
     itemno1 = models.SmallIntegerField()
     companyid = models.SmallIntegerField()
+    year = models.SmallIntegerField()
     n = models.CharField(db_column='N', max_length=19, blank=True, null=True)
     companyname = models.CharField(db_column='CompanyName', max_length=12)
     address1 = models.CharField(db_column='Address1', max_length=50, blank=True, null=True)
@@ -283,8 +284,8 @@ class ViewUnitPcdelivery(models.Model):
     tou = models.CharField(max_length=750, blank=True, null=True)
     dcno = models.IntegerField()
     dt = models.DateTimeField(blank=True, null=True)
-    jobno = models.CharField(db_column='JobNo', max_length=50, blank=True, null=True)  # Field name made lowercase.
-    topbottom_des = models.CharField(db_column='TopBottom_des', max_length=50, blank=True, null=True)  # Field name made lowercase.
+    jobno = models.CharField(db_column='JobNo', max_length=50, blank=True, null=True)
+    topbottom_des = models.CharField(db_column='TopBottom_des', max_length=50, blank=True, null=True)
     trstype = models.CharField(max_length=50, blank=True, null=True)
     clr = models.CharField(max_length=50, blank=True, null=True)
     lotno = models.CharField(max_length=10, blank=True, null=True)
@@ -298,7 +299,7 @@ class ViewUnitPcdelivery(models.Model):
         db_table = 'view_unit_pcdelivery'
 
 class TrsGatemodule(models.Model):
-    module = models.CharField(db_column='Module', max_length=50, db_collation='SQL_Latin1_General_CP1_CI_AS')  # Field name made lowercase.
+    module = models.CharField(db_column='Module', max_length=50, db_collation='SQL_Latin1_General_CP1_CI_AS')
     qr_code_dtls = models.CharField(db_column='Qr_Code_Dtls', max_length=500, db_collation='SQL_Latin1_General_CP1_CI_AS')  # Field name made lowercase.
     companyid = models.IntegerField(db_column='CompanyID')  # Field name made lowercase.
     year = models.IntegerField(db_column='Year')  # Field name made lowercase.
