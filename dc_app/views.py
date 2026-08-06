@@ -1,7 +1,9 @@
 from django.http import JsonResponse
-from .models import ViewCuttingDelPrint,ViewKnitDelivery,VueAccProdDel,TrsGatemodule, CuttingPrintembdel, ViewUnitPcdelivery
-from .models import ViewYarnProcessDelivery,VueAccProcDel,VueAccInhTransfer,ViewAccinwardVerification,ViewFabricDeliveryProcess
+from .models import ViewCuttingDelPrint,ViewKnitDelivery,VueAccInhTransfer,VueAccProdDel,TrsGatemodule, CuttingPrintembdel, ViewYarnProcessDelivery,VueAccProcDel,ViewAccinwardVerification,ViewFabricDeliveryProcess,ViewMistakeqtyPrint,ViewUnitPcdelivery,VueRibDeliveryDetails,ViewGdwnFabricDeliveryPlan
 import json
+from django.views.decorators.csrf import csrf_exempt
+from django.forms.models import model_to_dict
+from django.utils.dateparse import parse_datetime
 
 def cutting_del_print(request):
     id = request.GET.get("id")  # Example: ?id=101
@@ -132,6 +134,18 @@ def fabric_process_delivery(request):
         queryset = queryset.filter(dcno=no)
 
     data = list(queryset.values())
+    return JsonResponse(data, safe=False)
+
+def mistake_qty_print(request):
+    dcno = request.GET.get("dcno")  # Example: ?id=101
+
+    queryset = ViewMistakeqtyPrint.objects.using('demo').all()
+
+    if dcno:
+        queryset = queryset.filter(dcno=dcno)
+
+    data = list(queryset.values())
+
     return JsonResponse({
         "status": True,
         "message": "Success",
@@ -143,3 +157,169 @@ def unit_pc_delivery(request, dcno):
     queryset = ViewUnitPcdelivery.objects.using('test').filter(dcno=dcno)
     data = list(queryset.values())
     return JsonResponse(data, safe=False)
+
+def rib_delivery_print(request):
+    dcno = request.GET.get("dc")  # Example: ?id=101
+
+    queryset = VueRibDeliveryDetails.objects.using('test').all()
+
+    if dcno:
+        queryset = queryset.filter(dcno=dcno)
+
+    data = list(queryset.values())
+
+    return JsonResponse({
+        "status": True,
+        "message": "Success",
+        "count": len(data),
+        "data": data
+    })
+
+
+def godown_fabric_delivery_plan(request):
+    dcno = request.GET.get("dcno")  # Example: ?id=101
+
+    queryset = ViewGdwnFabricDeliveryPlan.objects.using('test').all()
+
+    if dcno:
+        queryset = queryset.filter(dcno=dcno)
+
+    data = list(queryset.values())
+
+    return JsonResponse({
+        "status": True,
+        "message": "Success",
+        "count": len(data),
+        "data": data
+    })
+
+
+
+@csrf_exempt
+def gate_module_api(request, pk=None):
+    # ---------------- GET ----------------
+    if request.method == "GET":
+
+        # Single Record
+        if pk:
+            try:
+                obj = TrsGatemodule.objects.get(pk=pk)
+                data = model_to_dict(obj)
+
+                data["date"] = obj.date.strftime("%Y-%m-%d %H:%M:%S")
+
+                return JsonResponse({
+                    "status": True,
+                    "data": data
+                })
+
+            except TrsGatemodule.DoesNotExist:
+                return JsonResponse({
+                    "status": False,
+                    "message": "Record not found"
+                }, status=404)
+
+        # All Records
+        objs = TrsGatemodule.objects.all().order_by("-date")
+
+        data = []
+
+        for obj in objs:
+            item = model_to_dict(obj)
+            item["date"] = obj.date.strftime("%Y-%m-%d %H:%M:%S")
+            data.append(item)
+
+        return JsonResponse({
+            "status": True,
+            "count": len(data),
+            "data": data
+        })
+
+
+    # ---------------- POST ----------------
+    elif request.method == "POST":
+
+        try:
+            body = json.loads(request.body)
+
+            obj = TrsGatemodule.objects.create(
+                module=body.get("module"),
+                qr_code_dtls=body.get("qr_code_dtls"),
+                companyid=body.get("companyid"),
+                year=body.get("year"),
+                no=body.get("no"),
+                date=parse_datetime(body.get("date")),
+                jobno=body.get("jobno"),
+                suppliername=body.get("suppliername"),
+                descr=body.get("descr"),
+                rls_bdls=body.get("rls_bdls"),
+                kg=body.get("kg"),
+                mtrs=body.get("mtrs"),
+            )
+
+            return JsonResponse({
+                "status": True,
+                "message": "Created Successfully",
+                "id": obj.pk
+            })
+
+        except Exception as e:
+            return JsonResponse({
+                "status": False,
+                "message": str(e)
+            }, status=400)
+
+
+    # ---------------- PUT (UPDATE) ----------------
+    elif request.method == "PUT":
+
+        if not pk:
+            return JsonResponse({
+                "status": False,
+                "message": "ID required"
+            }, status=400)
+
+        try:
+            obj = TrsGatemodule.objects.get(pk=pk)
+
+            body = json.loads(request.body)
+
+            obj.module = body.get("module", obj.module)
+            obj.qr_code_dtls = body.get("qr_code_dtls", obj.qr_code_dtls)
+            obj.companyid = body.get("companyid", obj.companyid)
+            obj.year = body.get("year", obj.year)
+            obj.no = body.get("no", obj.no)
+
+            if body.get("date"):
+                obj.date = parse_datetime(body.get("date"))
+
+            obj.jobno = body.get("jobno", obj.jobno)
+            obj.suppliername = body.get("suppliername", obj.suppliername)
+            obj.descr = body.get("descr", obj.descr)
+            obj.rls_bdls = body.get("rls_bdls", obj.rls_bdls)
+            obj.kg = body.get("kg", obj.kg)
+            obj.mtrs = body.get("mtrs", obj.mtrs)
+
+            obj.save()
+
+            return JsonResponse({
+                "status": True,
+                "message": "Updated Successfully"
+            })
+
+        except TrsGatemodule.DoesNotExist:
+            return JsonResponse({
+                "status": False,
+                "message": "Record not found"
+            }, status=404)
+
+        except Exception as e:
+            return JsonResponse({
+                "status": False,
+                "message": str(e)
+            }, status=400)
+
+    return JsonResponse({
+        "status": False,
+        "message": "Method not allowed"
+    }, status=405)

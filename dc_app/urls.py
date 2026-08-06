@@ -4,6 +4,8 @@ from django.conf.urls.static import static
 from django.conf import settings
 
 urlpatterns = [
+    path("gate_module_api/", views.gate_module_api, name="gate_module_api"),
+    path("gate_module_api/<int:pk>/", views.gate_module_api, name="gate_module_api_detail"),
     path('cutting_del_print/', views.cutting_del_print, name='cutting_del_print'),
     path('cutting_del_print/<int:id>/', views.cutting_del_print, name='cutting_del_print'),
     path('cutting_bit_print/<int:id>/', views.cutting_bit_print, name='CuttingBitPrint'),
@@ -18,4 +20,11 @@ urlpatterns = [
     path('fabric_process_delivery/', views.fabric_process_delivery, name='FabricProcessDelivery'),
     path('fabric_process_delivery/<int:dcno>/', views.fabric_process_delivery, name='FabricProcessDelivery'),
     path('unit_pc_del/<int:dcno>/', views.unit_pc_delivery, name='UnitPCDelivery'),
+    path('mistake_qty_print/', views.mistake_qty_print, name='mistake_qty_print'),
+    path('mistake_qty_print/<int:id>/', views.mistake_qty_print, name='mistake_qty_print'),
+    path('rib_delivery_print/', views.rib_delivery_print, name='rib_delivery_print'),
+    path('rib_delivery_print/<int:id>/', views.rib_delivery_print, name='rib_delivery_print'),
+    path('godown_fabric_delivery_plan/', views.godown_fabric_delivery_plan, name='godown_fabric_delivery_plan'),
+
+    
 ]
