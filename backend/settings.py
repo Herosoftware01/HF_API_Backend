@@ -181,7 +181,7 @@ DATABASES = {
         'NAME': 'hfapi',
         'USER': 'sa',
         'PASSWORD': 'Fashion@01',
-        'HOST': '10.1.21.10',
+        'HOST': '10.1.21.11',
         'PORT': '1433',
         'OPTIONS': {
             'driver': 'ODBC Driver 17 for SQL Server',
@@ -195,7 +195,7 @@ DATABASES = {
         'NAME': 'Tally2sql',
         'USER': 'sa',
         'PASSWORD': 'Fashion@01',
-        'HOST': '10.1.21.10',
+        'HOST': '10.1.21.11',
         'PORT': '1433',
         'OPTIONS': {
             'driver': 'ODBC Driver 17 for SQL Server',
@@ -208,7 +208,7 @@ DATABASES = {
         'NAME': 'Garmentrk',
         'USER': 'sa',
         'PASSWORD': 'Fashion@01',
-        'HOST': '10.1.21.10',
+        'HOST': '10.1.21.11',
         'PORT': '1433',
         'OPTIONS': {
             'driver': 'ODBC Driver 17 for SQL Server',
@@ -221,7 +221,7 @@ DATABASES = {
         'NAME': 'demo',
         'USER': 'sa',
         'PASSWORD': 'Fashion@01',
-        'HOST': '10.1.21.10',
+        'HOST': '10.1.21.11',
         'PORT': '1433',
         'OPTIONS': {
                 'driver': 'ODBC Driver 17 for SQL Server',
@@ -234,7 +234,7 @@ DATABASES = {
         'NAME': 'Django',
         'USER': 'sa',
         'PASSWORD': 'Fashion@01',
-        'HOST': '10.1.21.10',
+        'HOST': '10.1.21.11',
         'PORT': '1433',
         'OPTIONS': {
                 'driver': 'ODBC Driver 17 for SQL Server',
@@ -247,7 +247,7 @@ DATABASES = {
             'NAME': 'NewPowerBi',
             'USER': 'sa',
             'PASSWORD': 'Fashion@01',
-            'HOST': '10.1.21.10',
+            'HOST': '10.1.21.11',
             'PORT': '1433',
             'OPTIONS': {
                 'driver': 'ODBC Driver 17 for SQL Server',
@@ -260,7 +260,7 @@ DATABASES = {
             'NAME': 'testerphero',
             'USER': 'sa',
             'PASSWORD': 'Fashion@01',
-            'HOST': '10.1.21.10',
+            'HOST': '10.1.21.11',
             'PORT': '1433',
             'OPTIONS': {
                 'driver': 'ODBC Driver 17 for SQL Server',
@@ -319,7 +319,7 @@ MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 STAFF_IMAGES_URL = '/staff_images/'
-STAFF_IMAGES_ROOT = r'\\10.1.21.10\e\Staff_Employee_Images'
+STAFF_IMAGES_ROOT = r'\\10.1.21.11\e\Staff_Employee_Images'
 
 PDF_STORAGE_PATH = r"\\adminserver\File Sharing\AAAA Hero\Syncfusion Pdf Reports"
 

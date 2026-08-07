@@ -1,32 +1,18 @@
 from django.shortcuts import render
 from django.http import JsonResponse
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
-from .models import  Stickemp,VueMistakePartDetails,TrsCutstickerprodNew1, bit_checking_updates, BitcheckingPlyDetails, TrsCutstickerprodNew, bit_start_end_time
+from .models import  Stickemp,VueMistakePartDetails,TrsCutstickerprodNew1, bit_checking_updates, BitcheckingPlyDetails, TrsCutstickerprodNew, bit_start_end_time,ViewAccinwardVerification,Accessory_Verification,user_accessory_verification
 from django.views.decorators.csrf import csrf_exempt
 import json
 from django.utils.dateparse import parse_datetime
 from django.utils import timezone
 from django.db import connections
-
-
-
-# def get_previous_entry_mode(qrid):
-#     with connections['demo'].cursor() as cursor:
-#         cursor.execute(
-#             "EXEC sp_GetPreviousEntryMode @QR_ID=%s",
-#             [qrid]
-#         )
-
-#         row = cursor.fetchone()
-
-#         if row:
-#             return row[0]
-#         return None
-
-
 from django.db import connections, DatabaseError
+from django.contrib.auth import get_user_model
+
 
 def get_previous_entry_mode(qrid):
     try:
@@ -817,3 +803,188 @@ def merge_images(request):
 
     return HttpResponse(output.getvalue(), content_type="image/png")
 
+
+
+##################### Accessories API #####################
+
+
+def user_permission_list(request):
+    permission_by_user = {
+        permission.user_id: permission
+        for permission in user_accessory_verification.objects.all()
+    }
+
+    data = []
+    for user in get_user_model().objects.all().order_by("username"):
+        permission = permission_by_user.get(user.id)
+        data.append({
+            "permission_id": permission.id if permission else None,
+            "user_id": user.id,
+            "user_name": user.username,
+            "verify1": permission.verify1 if permission else False,
+            "verify2": permission.verify2 if permission else False,
+            "is_saved": permission is not None,
+        })
+
+    return JsonResponse(data, safe=False)
+
+
+# -------------------------
+# Save Permission
+# -------------------------
+@csrf_exempt
+def save_permission(request):
+
+    if request.method == "POST":
+
+        body = json.loads(request.body)
+
+        obj, created = user_accessory_verification.objects.get_or_create(
+            user_id=body["user_id"]
+        )
+
+        obj.user_name = body["user_name"]
+        obj.verify1 = body["verify1"]
+        obj.verify2 = body["verify2"]
+        obj.save()
+
+        return JsonResponse({
+            "status": True,
+            "message": "Permission Saved" if created else "Permission Updated"
+        })
+
+    return JsonResponse({"status": False, "message": "Method not allowed"}, status=405)
+
+
+@csrf_exempt
+def delete_permission(request):
+    if request.method == "POST":
+        body = json.loads(request.body)
+        deleted, _ = user_accessory_verification.objects.filter(
+            user_id=body.get("user_id")
+        ).delete()
+
+        if not deleted:
+            return JsonResponse(
+                {"status": False, "message": "Permission not found"}, status=404
+            )
+
+        return JsonResponse({"status": True, "message": "Permission Deleted"})
+
+    return JsonResponse({"status": False, "message": "Method not allowed"}, status=405)
+
+
+# -------------------------
+# Verification Table
+# -------------------------
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def verification_table(request):
+    permission = user_accessory_verification.objects.filter(
+        user_id=request.user.id
+    ).first()
+
+    show_verify1 = permission.verify1 if permission else False
+    show_verify2 = permission.verify2 if permission else False
+    view_rows = ViewAccinwardVerification.objects.using('test').values(
+        "slno", "date", "record_pk", "name", "supplierdcno", "pono",
+        "jobno", "items", "clr_siz", "quantity", "uom", "bill_rate",
+        "gst", "billno", "billdate"
+    )
+    # The source view's record_pk is the verification business key.
+    rows_with_keys = [(row, row["record_pk"]) for row in view_rows]
+    record_keys = [record_key for _, record_key in rows_with_keys]
+    verification_by_key = {
+        item.pk_name: item
+        for item in Accessory_Verification.objects.filter(pk_name__in=record_keys)
+    }
+
+    data = []
+    for row, record_key in rows_with_keys:
+        verify = verification_by_key.get(record_key)
+        data.append({
+            "pk": record_key,
+            "slno": row["slno"],
+            "date": row["date"].strftime("%d-%m-%Y") if row["date"] else "",
+            "supplier": row["name"],
+            "supplierdcno": row["supplierdcno"],
+            "pono": row["pono"],
+            "jobno": row["jobno"],
+            "item": row["items"],
+            "clr_siz": row["clr_siz"],
+            "qty": float(row["quantity"]) if row["quantity"] is not None else 0,
+            "uom": row["uom"],
+            "bill_rate": float(row["bill_rate"]) if row["bill_rate"] is not None else None,
+            "gst": row["gst"],
+            "billno": row["billno"],
+            "billdate": row["billdate"].strftime("%d-%m-%Y") if row["billdate"] else "",
+            "verify1_status": verify.verify1 if verify else False,
+            "verify2_status": verify.verify2 if verify else False,
+        })
+
+    return Response({
+        "user": {"id": request.user.id, "username": request.user.username},
+        "permissions": {"verify1": show_verify1, "verify2": show_verify2},
+        "data": data,
+    })
+
+
+# -------------------------
+# Verify
+# -------------------------
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def verify_accessory(request):
+    body = request.data
+    verify_type = body.get("type")
+    permission = user_accessory_verification.objects.filter(
+        user_id=request.user.id
+    ).first()
+
+    allowed = permission and (
+        (verify_type == "verify1" and permission.verify1)
+        or (verify_type == "verify2" and permission.verify2)
+    )
+    if not allowed:
+        return Response(
+            {"status": False, "message": "You do not have this verification permission"},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
+    record_key = body.get("pk")
+    if not record_key:
+        return Response(
+            {"status": False, "message": "Inward record key is required"},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    obj, _ = Accessory_Verification.objects.get_or_create(pk_name=record_key)
+    value = bool(body.get("value"))
+    if verify_type == "verify1":
+        if obj.verify1 and not value:
+            return Response(
+                {"status": False, "message": "Verify 1 is already completed and cannot be edited"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        obj.verify1 = value
+        obj.verify1_date = timezone.now() if value else None
+        # Verify 2 cannot remain completed when Verify 1 is removed.
+        if not value:
+            obj.verify2 = False
+            obj.verify2_date = None
+    else:
+        if obj.verify2 and not value:
+            return Response(
+                {"status": False, "message": "Verify 2 is already completed and cannot be edited"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if value and not obj.verify1:
+            return Response(
+                {"status": False, "message": "Please verify 1 first"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        obj.verify2 = value
+        obj.verify2_date = timezone.now() if value else None
+    obj.save()
+
+    return Response({"status": True, "message": "Updated Successfully"})
