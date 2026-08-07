@@ -17,8 +17,6 @@ class GridSetting(models.Model):
         return self.name
     
 
-
-
 class DiWasg(models.Model):
     asgby_code = models.CharField(db_column='ASGBY_CODE', max_length=50, blank=True, null=True)
     asgby_name = models.CharField(db_column='ASGBY_NAME', max_length=100, primary_key=True)
@@ -191,3 +189,43 @@ class ViewAccinwpend(models.Model):
     class Meta:
         managed = False
         db_table = 'view_accinwpend'
+
+
+class VueAccessoryPoinward(models.Model):
+    slno = models.BigIntegerField(primary_key=True)
+    cuttingdate = models.DateTimeField(db_column='CuttingDate', blank=True, null=True)
+    jobno = models.CharField(db_column='JobNo', max_length=50, blank=True, null=True)
+    color_combo = models.CharField(db_column='color/combo', max_length=8000, blank=True, null=True)  
+    pono = models.IntegerField(db_column='PONO')
+    po_supplier = models.CharField(db_column='PO Supplier', max_length=35, blank=True, null=True)
+    po_date = models.DateTimeField(db_column='PO_Date')
+    po_due_date = models.DateTimeField(db_column='PO Due DATE', blank=True, null=True)
+    accessory_item = models.CharField(db_column='Accessory Item', max_length=71, blank=True, null=True)
+    colour_size = models.CharField(db_column='Colour_Size', max_length=137)
+    po_quantity = models.DecimalField(db_column='Po_Quantity', max_digits=18, decimal_places=4)
+    uom = models.CharField(db_column='Uom', max_length=25)
+    inward_date = models.DateTimeField(db_column='Inward_Date', blank=True, null=True)
+    inward_quantity = models.DecimalField(db_column='Inward_Quantity', max_digits=38, decimal_places=4)
+    order_quantity = models.DecimalField(db_column='Order_Quantity', max_digits=18, decimal_places=4, blank=True, null=True)
+    inwdiff = models.IntegerField()
+    balancequantity = models.DecimalField(db_column='BalanceQuantity', max_digits=38, decimal_places=4, blank=True, null=True)
+    leadtime = models.CharField(max_length=10, blank=True, null=True)
+
+    class Meta:
+        managed = False
+        db_table = 'vue_accessory_poinward'
+
+class VueAccessoryDel(models.Model):
+    slno = models.BigIntegerField(primary_key=True)
+    jobno = models.CharField(db_column='JobNo', max_length=50)
+    accessory_item = models.CharField(db_column='Accessory_Item', max_length=71, blank=True, null=True)
+    color_size = models.CharField(db_column='Color_Size', max_length=137)
+    deliverydate = models.DateTimeField(db_column='DeliveryDate', blank=True, null=True)
+    unit = models.CharField(db_column='Unit', max_length=4000, blank=True, null=True)
+    qty = models.DecimalField(db_column='Qty', max_digits=38, decimal_places=4, blank=True, null=True)
+    uom = models.CharField(db_column='UOM', max_length=25)
+    remarks = models.CharField(max_length=1)
+
+    class Meta:
+        managed = False
+        db_table = 'vue_accessory_del'

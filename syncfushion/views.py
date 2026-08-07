@@ -8,6 +8,7 @@ from django.http import JsonResponse
 from rest_framework import status
 from rest_framework import viewsets
 from .models import GridSetting,DiWasg,DiWasg_img,TrsMaildtls, SyncfushionKanban, SyncfusionGantt, BlockEditor, FashionrResult, ViewAccinwpend
+from .models import VueAccessoryDel, VueAccessoryPoinward
 from .serializers import GridSettingSerializer,TrsMaildtlsSerializer
 from rest_framework.permissions import IsAuthenticated  # optional
 import json
@@ -807,4 +808,12 @@ def DueDateList(request):
         return JsonResponse({"message": "Method not allowed"}, status=405)
 
     data = list(ViewAccinwpend.objects.using('test').all().values()) 
+    return JsonResponse(data, safe=False)
+
+def AccessoryPoinward(request):
+    data = list(VueAccessoryPoinward.objects.using('test').all().values())
+    return JsonResponse(data, safe=False)
+
+def AccessoryDel(request):
+    data = list(VueAccessoryDel.objects.using('test').all().values())
     return JsonResponse(data, safe=False)

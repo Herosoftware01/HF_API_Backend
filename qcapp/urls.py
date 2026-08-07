@@ -33,7 +33,10 @@ urlpatterns = [
     path('api/employees/', EmployeeAPIView.as_view(), name='employees'),
     path('api/employees_and_staff/', Employee_and_staffAPIView.as_view(), name='employees_and_staff'),
     path('api/employees_and_staff_login/', Employee_and_staff_login_APIView.as_view(), name='employees_and_staff_login'),
+<<<<<<< HEAD
     # Allocate employee to machine
+=======
+>>>>>>> 0f9b79dfe5474dbb6242b4ae4b44c2f73fa29ea6
     path('api/emp_allocate/', EmpAllocateAPIView.as_view(), name='emp-allocate'),
     path('api/process-sequence/', views.get_process_sequence, name='process-sequence'),
     path('api/machine/<path:identity>/', views.get_machine_employee),
