@@ -95,6 +95,15 @@ def acc_inhouse_transfer(request):
     if no:
         queryset = queryset.filter(no=no)
 
+    data = list(queryset.values())
+
+    return JsonResponse({
+        "status": True,
+        "message": "Success",
+        "count": len(data),
+        "data": data
+    })
+
 def acc_inward_verification(request):
     jobno = request.GET.get("jobno") 
     supplier = request.GET.get("supplierdcno") 
@@ -161,7 +170,7 @@ def unit_pc_delivery(request, dcno):
 def rib_delivery_print(request):
     dcno = request.GET.get("dc")  # Example: ?id=101
 
-    queryset = VueRibDeliveryDetails.objects.using('test').all()
+    queryset = VueRibDeliveryDetails.objects.using('demo').all()
 
     if dcno:
         queryset = queryset.filter(dcno=dcno)
@@ -179,7 +188,7 @@ def rib_delivery_print(request):
 def godown_fabric_delivery_plan(request):
     dcno = request.GET.get("dcno")  # Example: ?id=101
 
-    queryset = ViewGdwnFabricDeliveryPlan.objects.using('test').all()
+    queryset = ViewGdwnFabricDeliveryPlan.objects.using('demo').all()
 
     if dcno:
         queryset = queryset.filter(dcno=dcno)
@@ -203,7 +212,7 @@ def gate_module_api(request, pk=None):
         # Single Record
         if pk:
             try:
-                obj = TrsGatemodule.objects.get(pk=pk)
+                obj = TrsGatemodule.objects.using('demo').get(pk=pk)
                 data = model_to_dict(obj)
 
                 data["date"] = obj.date.strftime("%Y-%m-%d %H:%M:%S")
@@ -220,7 +229,7 @@ def gate_module_api(request, pk=None):
                 }, status=404)
 
         # All Records
-        objs = TrsGatemodule.objects.all().order_by("-date")
+        objs = TrsGatemodule.objects.using('demo').all().order_by("-date")
 
         data = []
 
@@ -238,13 +247,25 @@ def gate_module_api(request, pk=None):
 
     # ---------------- POST ----------------
     elif request.method == "POST":
-
         try:
             body = json.loads(request.body)
 
-            obj = TrsGatemodule.objects.create(
-                module=body.get("module"),
-                qr_code_dtls=body.get("qr_code_dtls"),
+            module = body.get("module")
+            qr_code_dtls = body.get("qr_code_dtls")
+
+            # Duplicate check
+            if TrsGatemodule.objects.using("demo").filter(
+                module=module,
+                qr_code_dtls=qr_code_dtls
+            ).exists():
+                return JsonResponse({
+                    "status": True,
+                    "message": "DcNo Already Saved"
+                }, status=201)
+
+            obj = TrsGatemodule.objects.using("demo").create(
+                module=module,
+                qr_code_dtls=qr_code_dtls,
                 companyid=body.get("companyid"),
                 year=body.get("year"),
                 no=body.get("no"),
@@ -259,9 +280,8 @@ def gate_module_api(request, pk=None):
 
             return JsonResponse({
                 "status": True,
-                "message": "Created Successfully",
-                "id": obj.pk
-            })
+                "message": "Dc Created Successfully",
+            }, status=200)
 
         except Exception as e:
             return JsonResponse({
@@ -280,7 +300,7 @@ def gate_module_api(request, pk=None):
             }, status=400)
 
         try:
-            obj = TrsGatemodule.objects.get(pk=pk)
+            obj = TrsGatemodule.objects.using('demo').get(pk=pk)
 
             body = json.loads(request.body)
 
