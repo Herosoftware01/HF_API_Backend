@@ -32,13 +32,10 @@ import subprocess
 from django.conf import settings
 from datetime import time as time_cls, datetime as datetime_cls, timedelta
 from collections import defaultdict
-<<<<<<< HEAD
 from herofashion.models import User
 
 
 
-=======
->>>>>>> 0f9b79dfe5474dbb6242b4ae4b44c2f73fa29ea6
 from rest_framework import viewsets, filters
 # from django_filters.rest_framework import DjangoFilterBackend
 from .serializers import CutSampleSerializer
@@ -797,7 +794,6 @@ class Employee_and_staffAPIView(APIView):
         return Response(data)
 
 
-<<<<<<< HEAD
 # class Employee_and_staff_login_APIView(APIView):
 #     def get(self, request):
 #         employees = VueUser.objects.using('main').values('code', 'name', 'photo', 'wunit')
@@ -866,10 +862,6 @@ class Employee_and_staff_login_APIView(APIView):
             })
 
         return Response(data)
-=======
-class Employee_and_staff_login_APIView(APIView):
-    def get(self, request):
->>>>>>> 0f9b79dfe5474dbb6242b4ae4b44c2f73fa29ea6
 
         usernames = (
             User.objects
