@@ -1,5 +1,5 @@
 from django.http import JsonResponse
-from .models import ViewCuttingDelPrint,ViewKnitDelivery,VueAccInhTransfer,VueAccProdDel,TrsGatemodule, CuttingPrintembdel, ViewYarnProcessDelivery,VueAccProcDel,ViewAccinwardVerification,ViewFabricDeliveryProcess,ViewMistakeqtyPrint,ViewUnitPcdelivery,VueRibDeliveryDetails,ViewGdwnFabricDeliveryPlan
+from .models import ViewCuttingDelPrint,ViewKnitDelivery,VueAccInhTransfer,VueAccProdDel,TrsGatemodule, CuttingPrintembdel, ViewYarnProcessDelivery,VueAccProcDel,ViewAccinwardVerification,ViewFabricDeliveryProcess,ViewMistakeqtyPrint,ViewUnitPcdelivery,VueRibDeliveryDetails,ViewGdwnFabricDeliveryPlan,TrsApidtls
 import json
 from django.views.decorators.csrf import csrf_exempt
 from django.forms.models import model_to_dict
@@ -94,6 +94,15 @@ def acc_inhouse_transfer(request):
 
     if no:
         queryset = queryset.filter(no=no)
+
+    data = list(queryset.values())
+
+    return JsonResponse({
+        "status": True,
+        "message": "Success",
+        "count": len(data),
+        "data": data
+    })
 
 def acc_inward_verification(request):
     jobno = request.GET.get("jobno") 
@@ -323,3 +332,17 @@ def gate_module_api(request, pk=None):
         "status": False,
         "message": "Method not allowed"
     }, status=405)
+
+
+def gate_module_api_details(request):
+
+    data = TrsApidtls.objects.using('demo').all()
+
+    data1 = list(data.values())
+
+    return JsonResponse({
+        "status": True,
+        "message": "Success",
+        "count": len(data1),
+        "data": data1
+    })
