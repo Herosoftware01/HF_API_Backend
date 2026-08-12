@@ -276,6 +276,10 @@ def gate_module_api(request, pk=None):
                 rls_bdls=body.get("rls_bdls"),
                 kg=body.get("kg"),
                 mtrs=body.get("mtrs"),
+                verify=body.get("verify"),
+                print_delivery_date=body.get("print_delivery_date"),
+                gate_delivery_date=body.get("gate_delivery_date"),
+
             )
 
             return JsonResponse({

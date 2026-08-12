@@ -94,6 +94,7 @@ class ViewKnitDelivery(models.Model):
     itemno1 = models.SmallIntegerField()
     n = models.CharField(db_column='N', max_length=19, blank=True, null=True)  # Field name made lowercase.
     companyname = models.CharField(db_column='CompanyName', max_length=12)  # Field name made lowercase.
+    companyid = models.IntegerField(db_column='CompanyID') 
     address1 = models.CharField(db_column='Address1', max_length=50, blank=True, null=True)  # Field name made lowercase.
     address2 = models.CharField(db_column='Address2', max_length=50, blank=True, null=True)  # Field name made lowercase.
     address3 = models.CharField(db_column='Address3', max_length=50, blank=True, null=True)  # Field name made lowercase.
@@ -304,7 +305,7 @@ class ViewUnitPcdelivery(models.Model):
 
 
 class ViewGdwnFabricDeliveryPlan(models.Model):
-    slno = models.BigIntegerField(db_column='SlNo', blank=True, null=True)  # Field name made lowercase.
+    slno = models.BigIntegerField(db_column='SlNo', primary_key=True)  # Field name made lowercase.
     frm = models.CharField(max_length=11)
     todept = models.CharField(max_length=12)
     dcno = models.IntegerField()
@@ -346,7 +347,7 @@ class VueRibDeliveryDetails(models.Model):
 
 
 class TrsGatemodule(models.Model):
-    module = models.CharField(db_column='Module', max_length=50, db_collation='SQL_Latin1_General_CP1_CI_AS')
+    module = models.CharField(db_column='Module', max_length=50, db_collation='SQL_Latin1_General_CP1_CI_AS')  # Field name made lowercase.
     qr_code_dtls = models.CharField(db_column='Qr_Code_Dtls', max_length=500, db_collation='SQL_Latin1_General_CP1_CI_AS')  # Field name made lowercase.
     companyid = models.IntegerField(db_column='CompanyID')  # Field name made lowercase.
     year = models.IntegerField(db_column='Year')  # Field name made lowercase.
@@ -358,10 +359,14 @@ class TrsGatemodule(models.Model):
     rls_bdls = models.IntegerField()
     kg = models.DecimalField(max_digits=18, decimal_places=3)
     mtrs = models.DecimalField(max_digits=18, decimal_places=2)
+    gate_delivery_date = models.DateTimeField(db_column='Gate_Delivery_date', blank=True, null=True)  # Field name made lowercase.
+    print_delivery_date = models.DateTimeField(db_column='Print_Delivery_date', blank=True, null=True)  # Field name made lowercase.
+    verify = models.CharField(db_column='Verify', max_length=50, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)  # Field name made lowercase.
 
     class Meta:
         managed = False
         db_table = 'Trs_Gatemodule'
+
 
 
 class ViewAccinwardVerification(models.Model):
@@ -405,22 +410,4 @@ class ViewMistakeqtyPrint(models.Model):
         db_table = 'view_mistakeqty_print'
 
 
-class ViewGdwnFabricDeliveryPlan(models.Model):
-    slno = models.BigIntegerField(db_column='SlNo', primary_key=True)  # Field name made lowercase.
-    frm = models.CharField(max_length=11)
-    todept = models.CharField(max_length=12)
-    dcno = models.IntegerField()
-    dt = models.DateTimeField(db_column='Dt')  # Field name made lowercase.
-    jobno = models.CharField(db_column='JobNo', max_length=50)  # Field name made lowercase.
-    markerno = models.IntegerField(db_column='MarkerNo')  # Field name made lowercase.
-    lotno = models.CharField(max_length=50)
-    colour = models.CharField(db_column='Colour', max_length=50, blank=True, null=True)  # Field name made lowercase.
-    dia = models.CharField(db_column='Dia', max_length=35)  # Field name made lowercase.
-    rls = models.IntegerField(blank=True, null=True)
-    kg = models.DecimalField(max_digits=38, decimal_places=3, blank=True, null=True)
-    mtr = models.DecimalField(max_digits=38, decimal_places=2, blank=True, null=True)
-    rlno = models.CharField(max_length=8000, blank=True, null=True)
 
-    class Meta:
-        managed = False
-        db_table = 'view_gdwn_fabric_delivery_plan'

@@ -32,6 +32,10 @@ import subprocess
 from django.conf import settings
 from datetime import time as time_cls, datetime as datetime_cls, timedelta
 from collections import defaultdict
+from herofashion.models import User
+
+
+
 from rest_framework import viewsets, filters
 # from django_filters.rest_framework import DjangoFilterBackend
 from .serializers import CutSampleSerializer
@@ -790,8 +794,74 @@ class Employee_and_staffAPIView(APIView):
         return Response(data)
 
 
+# class Employee_and_staff_login_APIView(APIView):
+#     def get(self, request):
+#         employees = VueUser.objects.using('main').values('code', 'name', 'photo', 'wunit')
+        
+#         staff_url = settings.STAFF_IMAGES_URL.rstrip('/')
+
+#         data = []
+#         for emp in employees:
+#             photo_url = None
+#             if emp.get('photo'):
+#                 filename = emp['photo'].split('\\')[-1]
+#                 photo_url = f"https://hfapi.herofashion.com/{staff_url}/{filename}"
+
+#             data.append({
+#                 "code": emp['code'],
+#                 "name": emp['name'],
+#                 "dept": emp['wunit'],
+#                 "photo": photo_url,
+#             })
+
+#         return Response(data)
+
+
+from django.conf import settings
+from django.contrib.auth import get_user_model
+from rest_framework.views import APIView
+from rest_framework.response import Response
+
+from .models import VueUser
+
+User = get_user_model()
+
+
 class Employee_and_staff_login_APIView(APIView):
     def get(self, request):
+
+        usernames = (
+            User.objects
+            .values_list("username", flat=True)
+        )
+
+        # Numeric usernames மட்டும்
+        employee_codes = [int(u) for u in usernames if str(u).isdigit()]
+
+        employees = (
+            VueUser.objects.using("main")
+            .exclude(code__in=employee_codes)
+            .values("code", "name", "photo", "wunit")
+        )
+
+        staff_url = settings.STAFF_IMAGES_URL.rstrip("/")
+
+        data = []
+        for emp in employees:
+            photo_url = None
+
+            if emp.get("photo"):
+                filename = emp["photo"].split("\\")[-1]
+                photo_url = f"https://hfapi.herofashion.com/{staff_url}/{filename}"
+
+            data.append({
+                "code": emp["code"],
+                "name": emp["name"],
+                "dept": emp["wunit"],
+                "photo": photo_url,
+            })
+
+        return Response(data)
 
         usernames = (
             User.objects

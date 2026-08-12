@@ -54,7 +54,11 @@ def liveprdn(request):
             "o_styledesc": rec.o_styledesc,
             "buyer": rec.buyer,
             "img": rec.img,
-            "tbpic": rec.tbpic
+            "tbpic": (
+                f"https://app.herofashion.com/order_image/"
+                f"{str(rec.tbpic).replace(chr(92), '/').split('/')[-1]}"
+                if rec.tbpic else ""
+            )
         })
     return JsonResponse(response_data, safe=False)
 

@@ -1,14 +1,17 @@
 from django.urls import path
 from . import views
-from .views import UnitInputAPIView,GetUnitDataAPIView,GetUnitAssemply
+from .views import UnitInputAPIView,EndUnitDataAPIView,EndUnitInputAPIView,GetUnitDataAPIView,GetUnitAssemply
 
 urlpatterns = [
     
     path('live_scan_data/', views.live_scan_data, name='live_scan_data'),
+    path('end-live_scan_data/', views.end_live_scan_data, name='end-live_scan_data'),
     path('assembly_emp/', views.assembly_emp, name='assembly_emp'),
     path('save-assembly/', views.save_assembly, name='save-assembly'),
     path('save-bundles/', UnitInputAPIView.as_view(), name='save-bundles'),
+    path('end-save-bundles/', EndUnitInputAPIView.as_view(), name='end-save-bundles'),
     path('get_input_scan_bundles/', GetUnitDataAPIView.as_view(), name='get_input_scan_bundles'),
+    path('get_end_scan_bundles/', EndUnitDataAPIView.as_view(), name='get_end_scan_bundles'),
     path('get_assembly_bundles/', GetUnitAssemply.as_view(), name='get_assembly_bundles'),
     path("process-details/",views.get_process_details,name="get_process_details"),
     path("job-top-bottom/", views.get_job_top_bottom, name="get_job_top_bottom"),
