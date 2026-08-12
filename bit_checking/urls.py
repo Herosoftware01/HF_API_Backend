@@ -21,7 +21,34 @@ urlpatterns = [
     path("print-sticker/",views.print_bit_checking_sticker),
     path("merge-images/", views.merge_images),
     path("generate_bitcheck_production/",views.generate_bitcheck_production,name="generate_bitcheck_production"),
-    
+    path(
+        "user_permission/",
+        views.user_permission_list,
+        name="user_permission"
+    ),
+
+    path(
+        "save_permission/",
+        views.save_permission,
+        name="save_permission"
+    ),
+    path(
+        "delete_permission/",
+        views.delete_permission,
+        name="delete_permission"
+    ),
+
+    path(
+        "verification_table/",
+        views.verification_table,
+        name="verification_table"
+    ),
+
+    path(
+        "verify_accessory/",
+        views.verify_accessory,
+        name="verify_accessory"
+    ),
 ]
 
 if settings.DEBUG:

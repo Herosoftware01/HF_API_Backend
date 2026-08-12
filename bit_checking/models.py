@@ -137,3 +137,37 @@ class bit_start_end_time(models.Model):
     types = models.CharField(max_length=50, db_collation='Latin1_General_CI_AI', blank=True, null=True)
     
 
+class ViewAccinwardVerification(models.Model):
+    slno = models.BigIntegerField(db_column='SlNo', blank=True, null=True)  # Field name made lowercase.
+    date = models.DateTimeField(db_column='Date')  # Field name made lowercase.
+    record_pk = models.CharField(db_column='pk', max_length=319, blank=True, null=True)
+    name = models.CharField(db_column='Name', max_length=35, blank=True, null=True)  # Field name made lowercase.
+    supplierdcno = models.CharField(db_column='SupplierDCNo', max_length=50)  # Field name made lowercase.
+    pono = models.IntegerField(db_column='PONo', blank=True, null=True)  # Field name made lowercase.
+    jobno = models.CharField(db_column='JobNo', max_length=50, blank=True, null=True)  # Field name made lowercase.
+    items = models.CharField(db_column='Items', max_length=71, blank=True, null=True)  # Field name made lowercase.
+    clr_siz = models.CharField(max_length=101)
+    quantity = models.DecimalField(db_column='Quantity', max_digits=18, decimal_places=4)  # Field name made lowercase.
+    uom = models.CharField(db_column='UOM', max_length=25)  # Field name made lowercase.
+    bill_rate = models.DecimalField(db_column='Bill_Rate', max_digits=19, decimal_places=4, blank=True, null=True)  # Field name made lowercase.
+    gst = models.CharField(db_column='GST', max_length=50, blank=True, null=True)  # Field name made lowercase.
+    billno = models.CharField(db_column='BillNo', max_length=50, blank=True, null=True)  # Field name made lowercase.
+    billdate = models.DateTimeField(db_column='BillDate', blank=True, null=True)  # Field name made lowercase.
+
+    class Meta:
+        managed = False
+        db_table = 'view_accinward_verification'
+
+
+class Accessory_Verification(models.Model): 
+    pk_name = models.CharField(max_length=400, blank=True, null=True)
+    verify1 = models.BooleanField(default=False)
+    verify2 = models.BooleanField(default=False)
+    verify1_date = models.DateTimeField(blank=True, null=True)
+    verify2_date = models.DateTimeField(blank=True, null=True)
+
+class user_accessory_verification(models.Model):
+    user_id = models.IntegerField()
+    user_name = models.CharField(max_length=100)
+    verify1 = models.BooleanField(default=False)
+    verify2 = models.BooleanField(default=False)
