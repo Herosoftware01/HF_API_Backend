@@ -2,6 +2,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from django.shortcuts import render
+from django.views.decorators.csrf import ensure_csrf_cookie
 import json
 from asgiref.sync import async_to_sync
 
@@ -9,6 +10,7 @@ from .serializers import ChatRequestSerializer
 from .services import ai_service
 # from .services.mcp_client import call_mcp_tool
 
+@ensure_csrf_cookie
 def index(request):
     """Serve the frontend chat UI."""
     return render(request, 'chatbot.html')

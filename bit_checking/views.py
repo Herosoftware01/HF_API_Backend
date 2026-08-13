@@ -13,6 +13,8 @@ from datetime import timedelta
 from django.db import connections
 from django.db import connections, DatabaseError
 from django.contrib.auth import get_user_model
+from datetime import datetime, time, timedelta
+
 
 
 def get_previous_entry_mode(qrid):
@@ -238,7 +240,23 @@ def emp_stick(request):
         )
     )
 
-    queryset = Stickemp.objects.using("main").values()
+    # Current server datetime
+    now = datetime.now()
+    print("CURRENT DATE & TIME:", now)
+    current_date = now.date()
+
+    # 12 AM to 7:59 AM -> previous date
+    if time(0, 0) <= now.time() < time(8, 0):
+        target_date = current_date - timedelta(days=1)
+    else:
+        target_date = current_date
+    print("TARGET DATE:", target_date)
+
+    queryset = (
+        Stickemp.objects.using("main")
+        .filter(attdt__date=target_date)
+        .values()
+    )
 
     data = []
 
@@ -247,7 +265,9 @@ def emp_stick(request):
 
         if raw_path:
             filename = raw_path.split("\\")[-1]
-            obj["photo"] = f"https://hfapi.herofashion.com/staff_images/{filename}"
+            obj["photo"] = (
+                f"https://hfapi.herofashion.com/staff_images/{filename}"
+            )
         else:
             obj["photo"] = ""
 
