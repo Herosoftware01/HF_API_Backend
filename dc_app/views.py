@@ -1,5 +1,5 @@
 from django.http import JsonResponse
-from .models import ViewCuttingDelPrint,ViewKnitDelivery,VueAccInhTransfer,VueAccProdDel,TrsGatemodule, CuttingPrintembdel, ViewYarnProcessDelivery,VueAccProcDel,ViewAccinwardVerification,ViewFabricDeliveryProcess,ViewMistakeqtyPrint,ViewUnitPcdelivery,VueRibDeliveryDetails,ViewGdwnFabricDeliveryPlan,TrsApidtls
+from .models import ViewCuttingDelPrint,ViewKnitDelivery,VueAccInhTransfer,VueAccProdDel,TrsGatemodule, CuttingPrintembdel, ViewYarnProcessDelivery,VueAccProcDel,ViewAccinwardVerification,ViewFabricDeliveryProcess,ViewMistakeqtyPrint,ViewUnitPcdelivery,VueRibDeliveryDetails,ViewGdwnFabricDeliveryPlan,TrsApidtls,ViewFabricDeliveryRepl,HerofashionUser
 import json
 from django.views.decorators.csrf import csrf_exempt
 from django.forms.models import model_to_dict
@@ -203,7 +203,26 @@ def godown_fabric_delivery_plan(request):
     })
 
 
+def fabric_delivery_repl(request):
+    dcno = request.GET.get("dcno")  # Example: ?id=101
 
+    queryset = ViewFabricDeliveryRepl.objects.using('demo').all()
+
+    if dcno:
+        queryset = queryset.filter(dcno=dcno)
+
+    data = list(queryset.values())
+
+    return JsonResponse({
+        "status": True,
+        "message": "Success",
+        "count": len(data),
+        "data": data
+    })
+
+
+
+# --- VIEW ---
 @csrf_exempt
 def gate_module_api(request, pk=None):
     # ---------------- GET ----------------
@@ -215,7 +234,8 @@ def gate_module_api(request, pk=None):
                 obj = TrsGatemodule.objects.using('demo').get(pk=pk)
                 data = model_to_dict(obj)
 
-                data["date"] = obj.date.strftime("%Y-%m-%d %H:%M:%S")
+                if obj.date:
+                    data["date"] = obj.date.strftime("%Y-%m-%d %H:%M:%S")
 
                 return JsonResponse({
                     "status": True,
@@ -230,12 +250,12 @@ def gate_module_api(request, pk=None):
 
         # All Records
         objs = TrsGatemodule.objects.using('demo').all().order_by("-date")
-
         data = []
 
         for obj in objs:
             item = model_to_dict(obj)
-            item["date"] = obj.date.strftime("%Y-%m-%d %H:%M:%S")
+            if obj.date:
+                item["date"] = obj.date.strftime("%Y-%m-%d %H:%M:%S")
             data.append(item)
 
         return JsonResponse({
@@ -243,7 +263,6 @@ def gate_module_api(request, pk=None):
             "count": len(data),
             "data": data
         })
-
 
     # ---------------- POST ----------------
     elif request.method == "POST":
@@ -259,9 +278,14 @@ def gate_module_api(request, pk=None):
                 qr_code_dtls=qr_code_dtls
             ).exists():
                 return JsonResponse({
-                    "status": True,
+                    "status": False,
                     "message": "DcNo Already Saved"
-                }, status=201)
+                }, status=409)
+
+            # Safely parse dates if they exist in the payload
+            date_val = body.get("date")
+            print_date_val = body.get("print_delivery_date")
+            gate_date_val = body.get("gate_delivery_date")
 
             obj = TrsGatemodule.objects.using("demo").create(
                 module=module,
@@ -269,7 +293,7 @@ def gate_module_api(request, pk=None):
                 companyid=body.get("companyid"),
                 year=body.get("year"),
                 no=body.get("no"),
-                date=parse_datetime(body.get("date")),
+                date=parse_datetime(date_val) if date_val else None,
                 jobno=body.get("jobno"),
                 suppliername=body.get("suppliername"),
                 descr=body.get("descr"),
@@ -277,15 +301,14 @@ def gate_module_api(request, pk=None):
                 kg=body.get("kg"),
                 mtrs=body.get("mtrs"),
                 verify=body.get("verify"),
-                print_delivery_date=body.get("print_delivery_date"),
-                gate_delivery_date=body.get("gate_delivery_date"),
-
+                print_delivery_date=parse_datetime(print_date_val) if print_date_val else None,
+                gate_delivery_date=parse_datetime(gate_date_val) if gate_date_val else None,
             )
 
             return JsonResponse({
                 "status": True,
                 "message": "Dc Created Successfully",
-            }, status=200)
+            }, status=201)
 
         except Exception as e:
             return JsonResponse({
@@ -293,56 +316,47 @@ def gate_module_api(request, pk=None):
                 "message": str(e)
             }, status=400)
 
-
-    # ---------------- PUT (UPDATE) ----------------
+    # ---------------- PUT (Handles React Verification Updates) ----------------
     elif request.method == "PUT":
-
         if not pk:
             return JsonResponse({
-                "status": False,
-                "message": "ID required"
+                "status": False, 
+                "message": "Record ID is required for updates"
             }, status=400)
-
+            
         try:
-            obj = TrsGatemodule.objects.using('demo').get(pk=pk)
-
             body = json.loads(request.body)
+            obj = TrsGatemodule.objects.using('demo').get(pk=pk)
+            
+            # If 'verify' is in the request payload, update the field
+            if "verify" in body:
+                obj.verify = body["verify"]
 
-            obj.module = body.get("module", obj.module)
-            obj.qr_code_dtls = body.get("qr_code_dtls", obj.qr_code_dtls)
-            obj.companyid = body.get("companyid", obj.companyid)
-            obj.year = body.get("year", obj.year)
-            obj.no = body.get("no", obj.no)
-
-            if body.get("date"):
-                obj.date = parse_datetime(body.get("date"))
-
-            obj.jobno = body.get("jobno", obj.jobno)
-            obj.suppliername = body.get("suppliername", obj.suppliername)
-            obj.descr = body.get("descr", obj.descr)
-            obj.rls_bdls = body.get("rls_bdls", obj.rls_bdls)
-            obj.kg = body.get("kg", obj.kg)
-            obj.mtrs = body.get("mtrs", obj.mtrs)
-
-            obj.save()
-
+            # 2. Update the 'gate_delivery_date' (THIS WAS MISSING)
+            if "gate_delivery_date" in body:
+                date_str = body["gate_delivery_date"]
+                obj.gate_delivery_date = parse_datetime(date_str) if date_str else None
+                
+            # Save the updated record
+            obj.save(using='demo')
+            
             return JsonResponse({
                 "status": True,
-                "message": "Updated Successfully"
-            })
+                "message": "Verification saved successfully"
+            }, status=200)
 
         except TrsGatemodule.DoesNotExist:
             return JsonResponse({
-                "status": False,
+                "status": False, 
                 "message": "Record not found"
             }, status=404)
-
         except Exception as e:
             return JsonResponse({
-                "status": False,
+                "status": False, 
                 "message": str(e)
             }, status=400)
 
+    # ---------------- METHOD NOT ALLOWED ----------------
     return JsonResponse({
         "status": False,
         "message": "Method not allowed"
@@ -354,6 +368,20 @@ def gate_module_api_details(request):
     data = TrsApidtls.objects.using('demo').all()
 
     data1 = list(data.values())
+
+    return JsonResponse({
+        "status": True,
+        "message": "Success",
+        "count": len(data1),
+        "data": data1
+    })
+
+
+def get_user_by_username(request, id):
+    
+    data = HerofashionUser.objects.all()
+
+    data1 = list(data.values('id', 'username', 'role__name'))
 
     return JsonResponse({
         "status": True,

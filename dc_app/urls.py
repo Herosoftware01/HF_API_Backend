@@ -7,6 +7,7 @@ urlpatterns = [
     path("gate_module_api/", views.gate_module_api, name="gate_module_api"),
     path("gate_module_api/<int:pk>/", views.gate_module_api, name="gate_module_api_detail"),
     path("gate_module_api_dtls/", views.gate_module_api_details, name="gate_module_api_details"),
+    path("get_user_by_username/<int:id>/", views.get_user_by_username, name="get_user_by_username"),
     path('cutting_del_print/', views.cutting_del_print, name='cutting_del_print'),
     path('cutting_del_print/<int:id>/', views.cutting_del_print, name='cutting_del_print'),
     path('cutting_bit_print/<int:id>/', views.cutting_bit_print, name='CuttingBitPrint'),
@@ -29,6 +30,6 @@ urlpatterns = [
     path('rib_delivery_print/', views.rib_delivery_print, name='rib_delivery_print'),
     path('rib_delivery_print/<int:id>/', views.rib_delivery_print, name='rib_delivery_print'),
     path('godown_fabric_delivery_plan/', views.godown_fabric_delivery_plan, name='godown_fabric_delivery_plan'),
-
-    
+    path('fabric_delivery_repl/', views.fabric_delivery_repl, name='fabric_delivery_repl'),
+    path('fabric_delivery_repl/<int:dcno>/', views.fabric_delivery_repl, name='fabric_delivery_repl'),
 ]

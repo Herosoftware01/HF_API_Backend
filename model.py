@@ -8,34 +8,21 @@
 from django.db import models
 
 
-<<<<<<< HEAD
-class TrsApidtls(models.Model):
-    sl = models.AutoField(primary_key=True)
-    api = models.CharField(max_length=150, db_collation='SQL_Latin1_General_CP1_CI_AS')
-    module = models.CharField(max_length=50, db_collation='SQL_Latin1_General_CP1_CI_AS')
+class HerofashionUser(models.Model):
+    id = models.BigAutoField(primary_key=True)
+    password = models.CharField(max_length=128, db_collation='Latin1_General_CI_AI')
+    last_login = models.DateTimeField(blank=True, null=True)
+    is_superuser = models.BooleanField()
+    username = models.CharField(unique=True, max_length=150, db_collation='Latin1_General_CI_AI')
+    first_name = models.CharField(max_length=150, db_collation='Latin1_General_CI_AI')
+    last_name = models.CharField(max_length=150, db_collation='Latin1_General_CI_AI')
+    email = models.CharField(max_length=254, db_collation='Latin1_General_CI_AI')
+    is_staff = models.BooleanField()
+    is_active = models.BooleanField()
+    date_joined = models.DateTimeField()
+    role = models.ForeignKey('herofashion.Role', models.DO_NOTHING, blank=True, null=True)
+    default_submenu = models.ForeignKey('herofashion.SubMenu', models.DO_NOTHING, blank=True, null=True)
 
     class Meta:
         managed = False
-        db_table = 'Trs_APIdtls'
-=======
-class TrsGatemodule(models.Model):
-    module = models.CharField(db_column='Module', max_length=50, db_collation='SQL_Latin1_General_CP1_CI_AS')  # Field name made lowercase.
-    qr_code_dtls = models.CharField(db_column='Qr_Code_Dtls', max_length=500, db_collation='SQL_Latin1_General_CP1_CI_AS')  # Field name made lowercase.
-    companyid = models.IntegerField(db_column='CompanyID')  # Field name made lowercase.
-    year = models.IntegerField(db_column='Year')  # Field name made lowercase.
-    no = models.IntegerField(db_column='No')  # Field name made lowercase.
-    date = models.DateTimeField(db_column='Date')  # Field name made lowercase.
-    jobno = models.CharField(db_column='Jobno', max_length=50, db_collation='SQL_Latin1_General_CP1_CI_AS')  # Field name made lowercase.
-    suppliername = models.CharField(db_column='SupplierName', max_length=200, db_collation='SQL_Latin1_General_CP1_CI_AS')  # Field name made lowercase.
-    descr = models.CharField(db_column='Descr', max_length=500, db_collation='SQL_Latin1_General_CP1_CI_AS')  # Field name made lowercase.
-    rls_bdls = models.IntegerField()
-    kg = models.DecimalField(max_digits=18, decimal_places=3)
-    mtrs = models.DecimalField(max_digits=18, decimal_places=2)
-    gate_delivery_date = models.DateTimeField(db_column='Gate_Delivery_date', blank=True, null=True)  # Field name made lowercase.
-    print_delivery_date = models.DateTimeField(db_column='Print_Delivery_date', blank=True, null=True)  # Field name made lowercase.
-    verify = models.CharField(db_column='Verify', max_length=50, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)  # Field name made lowercase.
-
-    class Meta:
-        managed = False
-        db_table = 'Trs_Gatemodule'
->>>>>>> 05ac4a4ba0b42229de5305def715458f02db7cbb
+        db_table = 'herofashion_user'
