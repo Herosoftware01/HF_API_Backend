@@ -26,6 +26,7 @@ class TrsStickerdtls(models.Model):
 
 class Stickemp(models.Model):
     code = models.IntegerField(primary_key=True)
+    attdt = models.DateTimeField(db_column='AttDt', blank=True, null=True)  # Field name made lowercase.
     date = models.CharField(db_column='Date', max_length=4000, blank=True, null=True)  # Field name made lowercase.
     employee = models.CharField(db_column='Employee', max_length=100, blank=True, null=True)  # Field name made lowercase.
     category = models.CharField(db_column='Category', max_length=50, blank=True, null=True)  # Field name made lowercase.

@@ -37,7 +37,7 @@ CORS_ALLOWED_ORIGINS = [
     "https://hfapi.herofashion.com",
     "https://sync.herofashion.com",
     "https://dev.herofashion.com",
-    "http://10.1.21.80:3600",
+    "http://10.1.21.80:3000",
     "https://hfempdtls.netlify.app",
     "http://10.1.21.110:7003",
     
@@ -54,6 +54,7 @@ CSRF_TRUSTED_ORIGINS = [
     "https://dev.herofashion.com",
     "https://hfempdtls.netlify.app",
     "http://10.1.21.110:7003",
+    "http://10.1.21.80:3000",
     
 ]
 # settings.py
@@ -324,7 +325,6 @@ STAFF_IMAGES_ROOT = r'\\10.1.21.11\d\Staff_Employee_Images'
 PDF_STORAGE_PATH = r"\\adminserver\File Sharing\AAAA Hero\Syncfusion Pdf Reports"
 
 # Email configurationcmd
-
 
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = 'smtp.gmail.com'
