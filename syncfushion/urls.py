@@ -53,4 +53,5 @@ urlpatterns = [
 
     path('accessory_poinward/', views.AccessoryPoinward, name='AccessoryPoinward'),
     path('accessory_del/', views.AccessoryDel, name='AccessoryDel'),
+    path('cutbalpend/', views.CutBalpend, name='CutBalpend'),
 ]

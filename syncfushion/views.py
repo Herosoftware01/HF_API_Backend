@@ -8,7 +8,7 @@ from django.http import JsonResponse
 from rest_framework import status
 from rest_framework import viewsets
 from .models import GridSetting,DiWasg,DiWasg_img,TrsMaildtls, SyncfushionKanban, SyncfusionGantt, BlockEditor, FashionrResult, ViewAccinwpend
-from .models import VueAccessoryDel, VueAccessoryPoinward
+from .models import VueAccessoryDel, VueAccessoryPoinward, ViewCutBalpend
 from .serializers import GridSettingSerializer,TrsMaildtlsSerializer
 from rest_framework.permissions import IsAuthenticated  # optional
 import json
@@ -817,3 +817,16 @@ def AccessoryPoinward(request):
 def AccessoryDel(request):
     data = list(VueAccessoryDel.objects.using('test').all().values())
     return JsonResponse(data, safe=False)
+
+def CutBalpend(request):
+    queryset = list(ViewCutBalpend.objects.using('demo').all().values())
+    
+    for obj in queryset:
+        raw_path = obj['tbimg'] if obj.get('tbimg') else None
+        if raw_path:
+            filename = raw_path.split('\\')[-1]
+            obj['tbimg'] = f"https://app.herofashion.com/order_image/{filename}"
+        else:
+            obj['tbimg'] = ""
+
+    return JsonResponse(queryset, safe=False)

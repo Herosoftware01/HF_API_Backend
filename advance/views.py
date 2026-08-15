@@ -27,7 +27,7 @@ def request_advance(request):
         smon  = request.GET.get('smon')
         syear = request.GET.get('syear')
 
-        qs = Adreq.objects.using('demo').all().order_by('-entryno')
+        qs = Adreq.objects.using('mssql1').all().order_by('-entryno')
 
         if empid:
             qs = qs.filter(empid=empid)
@@ -49,9 +49,9 @@ def request_advance(request):
 
             # The validation check that blocked multiple submissions has been removed here.
 
-            last = Adreq.objects.using('demo').aggregate(Max('entryno'))['entryno__max'] or 0
+            last = Adreq.objects.using('mssql1').aggregate(Max('entryno'))['entryno__max'] or 0
 
-            obj = Adreq.objects.using('demo').create(
+            obj = Adreq.objects.using('mssql1').create(
                 entryno=last + 1,
                 dt=data.get('dt'),
                 empid=empid,
@@ -117,7 +117,7 @@ def request_advance(request):
             data = json.loads(request.body)
             obj_id = data.get('id')
 
-            obj = Adreq.objects.using('demo').get(entryno=obj_id)  # ✅ FIXED
+            obj = Adreq.objects.using('mssql1').get(entryno=obj_id)  # ✅ FIXED
             obj.delete()
 
             return JsonResponse({"message": "Deleted"}, status=200)
@@ -254,7 +254,7 @@ def send_approval_mail(request):
             status = data.get('status')
 
             # FAST DB
-            obj = Adreq.objects.using('demo').only('empid', 'amt', 'remarks').get(entryno=entryno)
+            obj = Adreq.objects.using('mssql1').only('empid', 'amt', 'remarks').get(entryno=entryno)
 
             # CACHE API
             api_url = "https://app.herofashion.com/incentive/api/emp/"
@@ -307,7 +307,7 @@ def ad_approve(request):
             data = json.loads(request.body)
             obj_id = data.get('id')
 
-            obj = Adreq.objects.using('demo').get(entryno=obj_id)
+            obj = Adreq.objects.using('mssql1').get(entryno=obj_id)
             obj.status = data.get('status')
             obj.status_dt = data.get('status_dt')
             obj.save()
@@ -410,7 +410,7 @@ def empwisesal(request):
 @csrf_exempt
 def state(request):
     if request.method == 'GET':
-        data = Adreq.objects.using('demo').all().order_by('-entryno')
+        data = Adreq.objects.using('mssql1').all().order_by('-entryno')
 
         # 🔍 Get query params
         empid = request.GET.get('empid')

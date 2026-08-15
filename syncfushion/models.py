@@ -229,3 +229,26 @@ class VueAccessoryDel(models.Model):
     class Meta:
         managed = False
         db_table = 'vue_accessory_del'
+
+class ViewCutBalpend(models.Model):
+    slno = models.BigIntegerField(primary_key=True)
+    itemno = models.SmallIntegerField(db_column='ItemNo')
+    ordno = models.CharField(max_length=50, blank=True, null=True)
+    o_finaldelvdate = models.DateTimeField(db_column='o_FinalDelvdate', blank=True, null=True)
+    sl = models.IntegerField(blank=True, null=True)
+    topbottom_des = models.CharField(db_column='TopBottom_des', max_length=50, blank=True, null=True)
+    tbimg = models.CharField(max_length=1550, blank=True, null=True)
+    clr = models.CharField(max_length=50, blank=True, null=True)
+    siz = models.CharField(max_length=50, blank=True, null=True)
+    order_qty = models.IntegerField(blank=True, null=True)
+    rejection_qty = models.IntegerField(blank=True, null=True)
+    required_qty = models.IntegerField(db_column='Required_Qty', blank=True, null=True)
+    plan_qty = models.IntegerField(db_column='Plan_Qty', blank=True, null=True)
+    plan_bal_pers = models.DecimalField(db_column='Plan_Bal_pers', max_digits=18, decimal_places=2, blank=True, null=True)
+    actual_cut_qty = models.IntegerField(db_column='Actual_Cut_Qty', blank=True, null=True)
+    hand_cutting = models.IntegerField(db_column='Hand_Cutting', blank=True, null=True)
+    cutting_bal_pers = models.DecimalField(db_column='Cutting_Bal_pers', max_digits=18, decimal_places=2, blank=True, null=True)
+
+    class Meta:
+        managed = False
+        db_table = 'view_cut_balpend'
