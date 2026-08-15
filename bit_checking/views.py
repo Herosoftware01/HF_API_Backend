@@ -9,6 +9,62 @@ from django.views.decorators.csrf import csrf_exempt
 import json
 from django.utils.dateparse import parse_datetime
 from django.utils import timezone
+from datetime import timedelta
+from django.db import connections
+from django.db import connections, DatabaseError
+from django.contrib.auth import get_user_model
+from datetime import datetime, time, timedelta
+
+
+
+def get_previous_entry_mode(qrid):
+    try:
+        with connections['demo'].cursor() as cursor:
+            cursor.execute(
+                "EXEC sp_GetPreviousEntryMode @QR_ID=%s",
+                [qrid]
+            )
+            row = cursor.fetchone()
+
+            if not row:
+                return None, None
+
+            entry_mode = row[0]
+            message = row[1] if len(row) > 1 else None
+
+            return entry_mode, message
+
+    except Exception as e:
+        return None, str(e)
+
+
+# --- HELPER FUNCTION FOR SHIFT DATE ---
+def get_shift_date():
+    """
+    If the current time is between 12:00 AM and 7:59 AM, 
+    consider it as yesterday's date.
+    """
+    # Make sure to use localtime so it matches your server's timezone
+    current_time = timezone.localtime(timezone.now())
+    
+    if 0 <= current_time.hour < 8:
+        return (current_time - timedelta(days=1)).date()
+    return current_time.date()
+# ---------------------------------------
+
+
+from django.shortcuts import render
+from django.http import JsonResponse
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from rest_framework import status
+from .models import  Stickemp,VueMistakePartDetails,TrsCutstickerprodNew1, bit_checking_updates, BitcheckingPlyDetails, TrsCutstickerprodNew, bit_start_end_time,ViewAccinwardVerification,Accessory_Verification,user_accessory_verification
+from django.views.decorators.csrf import csrf_exempt
+import json
+from django.utils.dateparse import parse_datetime
+from django.utils import timezone
+from datetime import timedelta
 from django.db import connections
 from django.db import connections, DatabaseError
 from django.contrib.auth import get_user_model
@@ -34,6 +90,21 @@ def get_previous_entry_mode(qrid):
 
     except Exception as e:
         return None, str(e)
+
+
+# --- HELPER FUNCTION FOR SHIFT DATE ---
+def get_shift_date():
+    """
+    If the current time is between 12:00 AM and 7:59 AM, 
+    consider it as yesterday's date.
+    """
+    # Make sure to use localtime so it matches your server's timezone
+    current_time = timezone.localtime(timezone.now())
+    
+    if 0 <= current_time.hour < 8:
+        return (current_time - timedelta(days=1)).date()
+    return current_time.date()
+# ---------------------------------------
 
 
 @api_view(["GET"])
@@ -431,7 +502,6 @@ def generate_bitcheck_production(request):
             cursor.execute("EXEC sp_GenerateBitCheckProduction")
             print("Executed sp_GenerateBitCheckProduction for scanner_id:", scanner_id, "with r_p:", r_p)
 
-        # Print sticker only when r_p is False
         if not r_p:
             print("R/P is False, PrintMistakeSticker...")
             with connections["demo"].cursor() as cursor:
@@ -941,7 +1011,595 @@ def verification_table(request):
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def verify_accessory(request):
-    body = request.data
+    body = request.dataf
+    verify_type = body.get("type")
+    permission = user_accessory_verification.objects.filter(
+        user_id=request.user.id
+    ).first()
+
+    allowed = permission and (
+        (verify_type == "verify1" and permission.verify1)
+        or (verify_type == "verify2" and permission.verify2)
+    )
+    if not allowed:
+        return Response(
+            {"status": False, "message": "You do not have this verification permission"},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
+    record_key = body.get("pk")
+    if not record_key:
+        return Response(
+            {"status": False, "message": "Inward record key is required"},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    obj, _ = Accessory_Verification.objects.get_or_create(pk_name=record_key)
+    value = bool(body.get("value"))
+    if verify_type == "verify1":
+        if obj.verify1 and not value:
+            return Response(
+                {"status": False, "message": "Verify 1 is already completed and cannot be edited"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        obj.verify1 = value
+        obj.verify1_date = timezone.now() if value else None
+        # Verify 2 cannot remain completed when Verify 1 is removed.
+        if not value:
+            obj.verify2 = False
+            obj.verify2_date = None
+    else:
+        if obj.verify2 and not value:
+            return Response(
+                {"status": False, "message": "Verify 2 is already completed and cannot be edited"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if value and not obj.verify1:
+            return Response(
+                {"status": False, "message": "Please verify 1 first"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        obj.verify2 = value
+        obj.verify2_date = timezone.now() if value else None
+    obj.save()
+
+    return Response({"status": True, "message": "Updated Successfully"})
+
+
+
+@api_view(["POST"])
+def generate_bitcheck_production(request):
+    try:
+        scanner_id = request.data.get("scaner_id")
+        types = request.data.get("types")
+        r_p = request.data.get("r_p", False)
+        print("Raw r_p:", r_p, type(r_p))
+
+        if isinstance(r_p, str):
+            r_p = r_p.lower() == "true"
+        else:
+            r_p = bool(r_p)
+
+        print("Converted r_p:", r_p, type(r_p))
+
+        BitcheckingPlyDetails.objects.using("demo").filter(
+            qr_id=scanner_id,
+            typ=types,
+        ).update(r_p=r_p)
+
+        with connections["demo"].cursor() as cursor:
+            cursor.execute("EXEC sp_GenerateBitCheckProduction")
+            print("Executed sp_GenerateBitCheckProduction for scanner_id:", scanner_id, "with r_p:", r_p)
+
+        if not r_p:
+            print("R/P is False, PrintMistakeSticker...")
+            with connections["demo"].cursor() as cursor:
+                cursor.execute("""
+                    EXEC sp_PrintBitCheckingSticker
+                        @SL=%s,
+                        @PrintCutSticker=%s,
+                        @PrintMistakeSticker=%s
+                """, [scanner_id, 1, 1])
+        else:
+            print("R/P is True ")
+            with connections["demo"].cursor() as cursor:
+                cursor.execute("""
+                    EXEC sp_PrintBitCheckingSticker
+                        @SL=%s,
+                        @PrintCutSticker=%s,
+                        @PrintMistakeSticker=%s
+                """, [scanner_id, 0, 1])
+
+        return Response(
+            {
+                "status": True,
+                "message": "Completed Successfully"
+            },
+            status=status.HTTP_200_OK
+        )
+
+    except Exception as e:
+        return Response(
+            {
+                "status": False,
+                "message": str(e)
+            },
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+
+@api_view(["GET"])
+def check_final_saved(request):
+    scanner_id = request.GET.get("scanner_id")
+    types = request.GET.get("types")
+
+    exists = BitcheckingPlyDetails.objects.using('demo').filter(
+        qr_id=scanner_id,
+        typ = types
+    ).exists()
+
+    return Response({
+        "status": True,
+        "final_saved": exists
+    })
+
+
+@csrf_exempt
+def delete_checking(request):
+
+    if request.method != "DELETE":
+        return JsonResponse({
+            "status": False,
+            "message": "Invalid Request"
+        })
+
+    try:
+        # plan_no = request.GET.get("plan_no")
+        qrid = request.GET.get("qrid")
+        types = request.GET.get("types")
+
+        if not qrid:
+            return JsonResponse({
+                "status": False,
+                "message": "plan_no required"
+            })
+
+        update_records = bit_checking_updates.objects.filter(scaner_id=qrid, types=types)
+
+        if not update_records.exists():
+            return JsonResponse({
+                "status": False,
+                "message": "No records found"
+            })
+
+        scanner_ids = list(
+            update_records.values_list(
+                "scaner_id",
+                flat=True
+            )
+        )
+
+        with connections['demo'].cursor() as cursor:
+            for qr in scanner_ids:
+                print("Qr id :", qr)
+                cursor.execute(
+                    "EXEC sp_Delete_BitcheckProd @qr_id = %s",
+                    (qr,)
+                )
+
+        BitcheckingPlyDetails.objects.using('demo').filter(
+            qr_id__in=scanner_ids,
+            typ=types
+        ).delete()
+
+        bit_start_end_time.objects.filter(qrid__in=scanner_ids, types=types).delete()
+
+        update_records.delete()
+
+        return JsonResponse({
+            "status": True,
+            "message": "Deleted Successfully"
+        })
+
+    except Exception as e:
+
+        return JsonResponse({
+            "status": False,
+            "message": str(e)
+        })
+    
+
+@csrf_exempt
+def delete_single_checking(request):
+
+    if request.method != "POST":
+        return JsonResponse({
+            "status": False
+        })
+
+    try:
+
+        body = json.loads(request.body)
+
+        plan_no = body.get("plan_no")
+        descriptions = body.get("descriptions")
+        scaner_id = body.get("scaner_id")
+        types = body.get("types")
+
+    
+        final_exists = BitcheckingPlyDetails.objects.using('demo').filter(
+            qr_id=scaner_id,
+            typ=types
+        ).exists()
+
+        if final_exists:
+
+            return JsonResponse({
+                "status": False,
+                "message":
+                "Final data already saved. Use main DELETE button."
+            })
+
+   
+        bit_checking_updates.objects.filter(
+            plan_no=plan_no,
+            descriptions=descriptions,
+            scaner_id=scaner_id,
+            types=types
+        ).delete()
+
+        return JsonResponse({
+            "status": True,
+            "message": "Deleted Successfully"
+        })
+
+    except Exception as e:
+
+        return JsonResponse({
+            "status": False,
+            "message": str(e)
+        })
+    
+
+
+def pending_scaner_ids(request):
+
+    from_date = parse_datetime("2026-05-18 06:13:27.396456")
+
+    existing_qr_ids = list(
+        BitcheckingPlyDetails.objects.using('demo').values_list(
+            'qr_id',
+            flat=True
+        )
+    )
+
+    queryset = bit_start_end_time.objects.filter(
+        start__gte=from_date
+    ).exclude(
+        qrid__in=existing_qr_ids,
+    ).order_by('qrid', 'start')
+
+    seen = set()
+    unique_data = []
+
+    for row in queryset:
+        if row.qrid not in seen:
+            seen.add(row.qrid)
+            has_update = bit_checking_updates.objects.filter(
+                scaner_id=row.qrid
+            ).exists()
+            unique_data.append({
+                "scaner_id": row.qrid,
+                "emp_id": row.empid,
+                "date": row.start,
+                "has_update": has_update
+            })
+
+    return JsonResponse({
+        "status": "success",
+        "count": len(unique_data),
+        "data": unique_data
+    })
+
+
+from django.utils import timezone
+
+@csrf_exempt
+def qc_start(request):
+
+    if request.method == "POST":
+
+        data = json.loads(request.body)
+
+        qrid = data.get("qrid")
+        empid = data.get("empid")
+        types = data.get("types")
+        print("Received Data:", qrid, empid, types)
+
+        already_exists = bit_start_end_time.objects.filter(
+            qrid=qrid,
+            types=types
+        ).exists()
+
+        if already_exists:
+
+            return JsonResponse({
+                "status": False,
+                "message": "QRID already exists"
+            })
+
+        ist_time = timezone.now()
+
+        obj = bit_start_end_time.objects.create(
+            qrid=qrid,
+            empid=empid,
+            types=types,
+            start=ist_time
+        )
+
+        return JsonResponse({
+            "status": True,
+            "id": obj.id
+        })
+
+    return JsonResponse({
+        "status": False
+    })
+
+
+@csrf_exempt
+def delete_pending_scanner(request):
+
+    if request.method == "POST":
+
+        try:
+
+            body = json.loads(request.body)
+
+            qrid = body.get("qrid")
+            types = body.get("types")
+
+            if not qrid:
+                return JsonResponse({
+                    "status": False,
+                    "message": "QR ID missing"
+                })
+
+            deleted_count, _ = bit_start_end_time.objects.filter(
+                qrid=qrid,
+                types=types
+            ).delete()
+
+            if deleted_count > 0:
+
+                return JsonResponse({
+                    "status": True,
+                    "message": "Deleted Successfully"
+                })
+
+            return JsonResponse({
+                "status": False,
+                "message": "No matching record found"
+            })
+
+        except Exception as e:
+
+            return JsonResponse({
+                "status": False,
+                "message": str(e)
+            })
+
+    return JsonResponse({
+        "status": False,
+        "message": "Invalid Request"
+    })
+
+
+
+@csrf_exempt
+def print_bit_checking_sticker(request):
+    if request.method == "POST":
+        data = json.loads(request.body)
+
+        sl = data["sl"]
+        print_cut = data["print_cut_sticker"]
+        print_mistake = data["print_mistake_sticker"]
+
+        print("Printing Sticker for SL:", sl)
+        print("Print Cut Sticker:", print_cut)
+        print("Print Mistake Sticker:", print_mistake)
+
+        with connections['demo'].cursor() as cursor:
+            cursor.execute("""
+                EXEC sp_PrintBitCheckingSticker
+                    @SL=%s,
+                    @PrintCutSticker=%s,
+                    @PrintMistakeSticker=%s
+            """, [
+                sl,
+                int(print_cut),
+                int(print_mistake)
+            ])
+
+        return JsonResponse({
+            "status": "success"
+        })
+    
+
+
+
+from io import BytesIO
+from PIL import Image
+from django.http import HttpResponse
+from rest_framework.decorators import api_view, parser_classes
+from rest_framework.parsers import MultiPartParser, FormParser
+
+@api_view(["POST"])
+@parser_classes([MultiPartParser, FormParser])
+def merge_images(request):
+    image1 = request.FILES.get("image1")
+    image2 = request.FILES.get("image2")
+
+    if not image1 or not image2:
+        return HttpResponse("Both images are required.", status=400)
+
+    # Open images
+    bg = Image.open(image1).convert("RGBA")
+    overlay = Image.open(image2).convert("RGBA")
+
+    # Resize overlay (25% of background width)
+    overlay_width = int(bg.width * 0.25)
+    ratio = overlay_width / overlay.width
+    overlay_height = int(overlay.height * ratio)
+
+    overlay = overlay.resize((overlay_width, overlay_height))
+
+    # Position (Bottom Right)
+    x = 20
+    y = 20
+
+    bg.paste(overlay, (x, y), overlay)
+
+    output = BytesIO()
+    bg.save(output, format="PNG")
+    output.seek(0)
+
+    return HttpResponse(output.getvalue(), content_type="image/png")
+
+
+
+##################### Accessories API #####################
+
+
+def user_permission_list(request):
+    permission_by_user = {
+        permission.user_id: permission
+        for permission in user_accessory_verification.objects.all()
+    }
+
+    data = []
+    for user in get_user_model().objects.all().order_by("username"):
+        permission = permission_by_user.get(user.id)
+        data.append({
+            "permission_id": permission.id if permission else None,
+            "user_id": user.id,
+            "user_name": user.username,
+            "verify1": permission.verify1 if permission else False,
+            "verify2": permission.verify2 if permission else False,
+            "is_saved": permission is not None,
+        })
+
+    return JsonResponse(data, safe=False)
+
+
+# -------------------------
+# Save Permission
+# -------------------------
+@csrf_exempt
+def save_permission(request):
+
+    if request.method == "POST":
+
+        body = json.loads(request.body)
+
+        obj, created = user_accessory_verification.objects.get_or_create(
+            user_id=body["user_id"]
+        )
+
+        obj.user_name = body["user_name"]
+        obj.verify1 = body["verify1"]
+        obj.verify2 = body["verify2"]
+        obj.save()
+
+        return JsonResponse({
+            "status": True,
+            "message": "Permission Saved" if created else "Permission Updated"
+        })
+
+    return JsonResponse({"status": False, "message": "Method not allowed"}, status=405)
+
+
+@csrf_exempt
+def delete_permission(request):
+    if request.method == "POST":
+        body = json.loads(request.body)
+        deleted, _ = user_accessory_verification.objects.filter(
+            user_id=body.get("user_id")
+        ).delete()
+
+        if not deleted:
+            return JsonResponse(
+                {"status": False, "message": "Permission not found"}, status=404
+            )
+
+        return JsonResponse({"status": True, "message": "Permission Deleted"})
+
+    return JsonResponse({"status": False, "message": "Method not allowed"}, status=405)
+
+
+# -------------------------
+# Verification Table
+# -------------------------
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def verification_table(request):
+    permission = user_accessory_verification.objects.filter(
+        user_id=request.user.id
+    ).first()
+
+    show_verify1 = permission.verify1 if permission else False
+    show_verify2 = permission.verify2 if permission else False
+    view_rows = ViewAccinwardVerification.objects.using('test').values(
+        "slno", "date", "record_pk", "name", "supplierdcno", "pono",
+        "jobno", "items", "clr_siz", "quantity", "uom", "bill_rate",
+        "gst", "billno", "billdate"
+    )
+    # The source view's record_pk is the verification business key.
+    rows_with_keys = [(row, row["record_pk"]) for row in view_rows]
+    record_keys = [record_key for _, record_key in rows_with_keys]
+    verification_by_key = {
+        item.pk_name: item
+        for item in Accessory_Verification.objects.filter(pk_name__in=record_keys)
+    }
+
+    data = []
+    for row, record_key in rows_with_keys:
+        verify = verification_by_key.get(record_key)
+        data.append({
+            "pk": record_key,
+            "slno": row["slno"],
+            "date": row["date"].strftime("%d-%m-%Y") if row["date"] else "",
+            "supplier": row["name"],
+            "supplierdcno": row["supplierdcno"],
+            "pono": row["pono"],
+            "jobno": row["jobno"],
+            "item": row["items"],
+            "clr_siz": row["clr_siz"],
+            "qty": float(row["quantity"]) if row["quantity"] is not None else 0,
+            "uom": row["uom"],
+            "bill_rate": float(row["bill_rate"]) if row["bill_rate"] is not None else None,
+            "gst": row["gst"],
+            "billno": row["billno"],
+            "billdate": row["billdate"].strftime("%d-%m-%Y") if row["billdate"] else "",
+            "verify1_status": verify.verify1 if verify else False,
+            "verify2_status": verify.verify2 if verify else False,
+        })
+
+    return Response({
+        "user": {"id": request.user.id, "username": request.user.username},
+        "permissions": {"verify1": show_verify1, "verify2": show_verify2},
+        "data": data,
+    })
+
+
+# -------------------------
+# Verify
+# -------------------------
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def verify_accessory(request):
+    body = request.dataf
     verify_type = body.get("type")
     permission = user_accessory_verification.objects.filter(
         user_id=request.user.id

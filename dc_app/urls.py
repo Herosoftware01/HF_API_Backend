@@ -6,6 +6,8 @@ from django.conf import settings
 urlpatterns = [
     path("gate_module_api/", views.gate_module_api, name="gate_module_api"),
     path("gate_module_api/<int:pk>/", views.gate_module_api, name="gate_module_api_detail"),
+    path("gate_module_api_dtls/", views.gate_module_api_details, name="gate_module_api_details"),
+    path("get_user_by_username/<int:id>/", views.get_user_by_username, name="get_user_by_username"),
     path('cutting_del_print/', views.cutting_del_print, name='cutting_del_print'),
     path('cutting_del_print/<int:id>/', views.cutting_del_print, name='cutting_del_print'),
     path('cutting_bit_print/<int:id>/', views.cutting_bit_print, name='CuttingBitPrint'),
@@ -13,9 +15,12 @@ urlpatterns = [
     path('knitting_del_print/', views.knitting_del_print, name='knitting_del_print'),
     path('knitting_del_print/<int:id>/', views.knitting_del_print, name='knitting_del_print'),
     path('acc_prod_del_print/', views.acc_prod_del_print, name='acc_prod_del_print'),
-    path('acc_prod_del_print/<int:id>/', views.acc_prod_del_print, name='acc_prod_del_print'),
+    path('acc_prod_del_print/<int:no/', views.acc_prod_del_print, name='acc_prod_del_print'),
     path('acc_proc_del_print/', views.acc_proc_del_print, name='acc_proc_del_print'),
+    path('acc_inhouse_transfer/<int:id>/', views.acc_inhouse_transfer, name='acc_inhouse_transfer'),
     path('acc_proc_del_print/<int:id>/', views.acc_proc_del_print, name='acc_proc_del_print'),
+    path('acc_inhouse_transfer/', views.acc_inhouse_transfer, name='acc_inhouse_transfer'),
+    path('acc_inhouse_transfer/<int:id>/', views.acc_inhouse_transfer, name='acc_inhouse_transfer'),
     path('acc_inward_verification/', views.acc_inward_verification, name='acc_inward_verification'),
     path('fabric_process_delivery/', views.fabric_process_delivery, name='FabricProcessDelivery'),
     path('fabric_process_delivery/<int:dcno>/', views.fabric_process_delivery, name='FabricProcessDelivery'),
@@ -25,6 +30,6 @@ urlpatterns = [
     path('rib_delivery_print/', views.rib_delivery_print, name='rib_delivery_print'),
     path('rib_delivery_print/<int:id>/', views.rib_delivery_print, name='rib_delivery_print'),
     path('godown_fabric_delivery_plan/', views.godown_fabric_delivery_plan, name='godown_fabric_delivery_plan'),
-
-    
+    path('fabric_delivery_repl/', views.fabric_delivery_repl, name='fabric_delivery_repl'),
+    path('fabric_delivery_repl/<int:dcno>/', views.fabric_delivery_repl, name='fabric_delivery_repl'),
 ]

@@ -8,22 +8,21 @@
 from django.db import models
 
 
-class ViewGdwnFabricDeliveryPlan(models.Model):
-    slno = models.BigIntegerField(db_column='SlNo', blank=True, null=True)  # Field name made lowercase.
-    frm = models.CharField(max_length=11)
-    todept = models.CharField(max_length=12)
-    dcno = models.IntegerField()
-    dt = models.DateTimeField(db_column='Dt')  # Field name made lowercase.
-    jobno = models.CharField(db_column='JobNo', max_length=50)  # Field name made lowercase.
-    markerno = models.IntegerField(db_column='MarkerNo')  # Field name made lowercase.
-    lotno = models.CharField(max_length=50)
-    colour = models.CharField(db_column='Colour', max_length=50, blank=True, null=True)  # Field name made lowercase.
-    dia = models.CharField(db_column='Dia', max_length=35)  # Field name made lowercase.
-    rls = models.IntegerField(blank=True, null=True)
-    kg = models.DecimalField(max_digits=38, decimal_places=3, blank=True, null=True)
-    mtr = models.DecimalField(max_digits=38, decimal_places=2, blank=True, null=True)
-    rlno = models.CharField(max_length=8000, blank=True, null=True)
+class HerofashionUser(models.Model):
+    id = models.BigAutoField(primary_key=True)
+    password = models.CharField(max_length=128, db_collation='Latin1_General_CI_AI')
+    last_login = models.DateTimeField(blank=True, null=True)
+    is_superuser = models.BooleanField()
+    username = models.CharField(unique=True, max_length=150, db_collation='Latin1_General_CI_AI')
+    first_name = models.CharField(max_length=150, db_collation='Latin1_General_CI_AI')
+    last_name = models.CharField(max_length=150, db_collation='Latin1_General_CI_AI')
+    email = models.CharField(max_length=254, db_collation='Latin1_General_CI_AI')
+    is_staff = models.BooleanField()
+    is_active = models.BooleanField()
+    date_joined = models.DateTimeField()
+    role = models.ForeignKey('herofashion.Role', models.DO_NOTHING, blank=True, null=True)
+    default_submenu = models.ForeignKey('herofashion.SubMenu', models.DO_NOTHING, blank=True, null=True)
 
     class Meta:
         managed = False
-        db_table = 'view_gdwn_fabric_delivery_plan'
+        db_table = 'herofashion_user'
