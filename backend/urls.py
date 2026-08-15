@@ -38,6 +38,7 @@ urlpatterns = [
     path('production_live_scan/', include('production_live_scan.urls')),
     path('fashionr/', include('fashionr.urls')),
     path('dcapp/', include('dc_app.urls')),
+    path('accessory/', include('bit_checking.urls')) ,
 ] 
 
 

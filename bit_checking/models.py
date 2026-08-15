@@ -26,6 +26,7 @@ class TrsStickerdtls(models.Model):
 
 class Stickemp(models.Model):
     code = models.IntegerField(primary_key=True)
+    attdt = models.DateTimeField(db_column='AttDt', blank=True, null=True)  # Field name made lowercase.
     date = models.CharField(db_column='Date', max_length=4000, blank=True, null=True)  # Field name made lowercase.
     employee = models.CharField(db_column='Employee', max_length=100, blank=True, null=True)  # Field name made lowercase.
     category = models.CharField(db_column='Category', max_length=50, blank=True, null=True)  # Field name made lowercase.
@@ -34,6 +35,7 @@ class Stickemp(models.Model):
     class Meta:
         managed = False
         db_table = 'stickemp'
+
 
 class VueMistakePartDetails(models.Model):
     rownum = models.BigIntegerField(db_column='RowNum', primary_key=True)  # Field name made lowercase.
@@ -166,8 +168,12 @@ class Accessory_Verification(models.Model):
     verify1_date = models.DateTimeField(blank=True, null=True)
     verify2_date = models.DateTimeField(blank=True, null=True)
 
+
 class user_accessory_verification(models.Model):
     user_id = models.IntegerField()
     user_name = models.CharField(max_length=100)
     verify1 = models.BooleanField(default=False)
     verify2 = models.BooleanField(default=False)
+
+
+

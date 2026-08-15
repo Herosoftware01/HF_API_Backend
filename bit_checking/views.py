@@ -12,6 +12,7 @@ from django.utils import timezone
 from django.db import connections
 from django.db import connections, DatabaseError
 from django.contrib.auth import get_user_model
+from datetime import datetime, time, timedelta
 
 
 def get_previous_entry_mode(qrid):
@@ -169,7 +170,23 @@ def emp_stick(request):
         )
     )
 
-    queryset = Stickemp.objects.using("main").values()
+    # Current server datetime
+    now = datetime.now()
+    print("CURRENT DATE & TIME:", now)
+    current_date = now.date()
+
+    # 12 AM to 7:59 AM -> previous date
+    if time(0, 0) <= now.time() < time(8, 0):
+        target_date = current_date - timedelta(days=1)
+    else:
+        target_date = current_date
+    print("TARGET DATE:", target_date)
+
+    queryset = (
+        Stickemp.objects.using("main")
+        .filter(attdt__date=target_date)
+        .values()
+    )
 
     data = []
 
@@ -178,11 +195,14 @@ def emp_stick(request):
 
         if raw_path:
             filename = raw_path.split("\\")[-1]
-            obj["photo"] = f"https://hfapi.herofashion.com/staff_images/{filename}"
+            obj["photo"] = (
+                f"https://hfapi.herofashion.com/staff_images/{filename}"
+            )
         else:
             obj["photo"] = ""
 
         data.append(obj)
+
 
     return JsonResponse(data, safe=False)
 
@@ -413,16 +433,7 @@ def generate_bitcheck_production(request):
 
         # Print sticker only when r_p is False
         if not r_p:
-            print("R/P is True, PrintMistakeSticker...")
-            with connections["demo"].cursor() as cursor:
-                cursor.execute("""
-                    EXEC sp_PrintBitCheckingSticker
-                        @SL=%s,
-                        @PrintCutSticker=%s,
-                        @PrintMistakeSticker=%s
-                """, [scanner_id, 0, 1])
-        else:
-            print("R/P is False ")
+            print("R/P is False, PrintMistakeSticker...")
             with connections["demo"].cursor() as cursor:
                 cursor.execute("""
                     EXEC sp_PrintBitCheckingSticker
@@ -430,21 +441,15 @@ def generate_bitcheck_production(request):
                         @PrintCutSticker=%s,
                         @PrintMistakeSticker=%s
                 """, [scanner_id, 1, 1])
-
-        # if not r_p:
-        #     print("R/P is True, PrintMistakeSticker...")
-        #     with connections["demo"].cursor() as cursor:
-        #         cursor.execute("""
-        #             EXEC sp_PrintBitCheckingSticker_mist
-        #                 @SL=%s
-        #         """, [scanner_id])
-        # else:
-        #     print("R/P is False ")
-        #     with connections["demo"].cursor() as cursor:
-        #         cursor.execute("""
-        #             EXEC sp_PrintBitCheckingSticker_bdl
-        #                 @SL=%s
-        #         """, [scanner_id])
+        else:
+            print("R/P is True ")
+            with connections["demo"].cursor() as cursor:
+                cursor.execute("""
+                    EXEC sp_PrintBitCheckingSticker
+                        @SL=%s,
+                        @PrintCutSticker=%s,
+                        @PrintMistakeSticker=%s
+                """, [scanner_id, 0, 1])
         
         return Response(
             {
@@ -878,8 +883,9 @@ def delete_permission(request):
 # Verification Table
 # -------------------------
 @api_view(["GET"])
-@permission_classes([IsAuthenticated])
+# @permission_classes([IsAuthenticated])
 def verification_table(request):
+    
     permission = user_accessory_verification.objects.filter(
         user_id=request.user.id
     ).first()
