@@ -323,6 +323,9 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 STAFF_IMAGES_URL = '/staff_images/'
 STAFF_IMAGES_ROOT = r'\\10.1.21.11\d\Staff_Employee_Images'
 
+ORDER_IMAGES_URL = '/Order_images/'
+ORDER_IMAGES_ROOT = r'\\10.1.21.11\d\Order_Images'
+
 PDF_STORAGE_PATH = r"\\adminserver\File Sharing\AAAA Hero\Syncfusion Pdf Reports"
 
 # Email configurationcmd

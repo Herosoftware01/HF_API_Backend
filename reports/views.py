@@ -2565,7 +2565,7 @@ def dyeing_order_details(request):
         if raw_path:
             filename = raw_path.replace("\\", "/").split("/")[-1]
             obj["mainimagepath"] = (
-                f"https://hfapi.herofashion.com/all_image/{filename}"
+                f"https://hfapi.herofashion.com/Order_images/{filename}"
             )
         else:
             obj["mainimagepath"] = ""

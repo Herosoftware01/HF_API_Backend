@@ -34,10 +34,8 @@ from datetime import time as time_cls, datetime as datetime_cls, timedelta
 from collections import defaultdict
 from herofashion.models import User
 
-
-
 from rest_framework import viewsets, filters
-# from django_filters.rest_framework import DjangoFilterBackend
+
 from .serializers import CutSampleSerializer
 
 from django.contrib.auth import get_user_model
@@ -214,12 +212,6 @@ def get_bundle_data(request):
             str(item.get('bundid')) for item in results if item.get('bundid') is not None
         ]
 
-        # checked_bundle_ids = set(
-        #     qc_piece_final.objects.filter(
-        #         bundle_id__in=bundle_ids_from_api
-        #     ).values_list('bundle_id', flat=True)
-        # )
-
         checked_bundle_ids = set(
             qc_piece_final.objects.filter(
                 bundle_id__in=bundle_ids_from_api
@@ -322,73 +314,6 @@ def save_piece(request):
 
     return Response({"status": "success"})
 
-
-
-# @api_view(["POST"])
-# def save_final_piece(request):
-#     try:
-#         bundle_no = request.data.get("bundle_no")
-#         bundle_id = request.data.get("bundle_id")
-#         jobno = request.data.get("jobno")
-#         product = request.data.get("product")
-#         color = request.data.get("color")
-#         size = request.data.get("size")
-#         unit = request.data.get("unit")
-#         line = request.data.get("line")
-#         machine_id = request.data.get("machineId")
-#         user_id = request.data.get("userId", None)
-#         seq = request.data.get("seq")
-#         qc_type = request.data.get("qc_type")
-#         total_pieces = int(request.data.get("total_pieces", 0))
-#         checked_piece = int(request.data.get("checked_piece", 0))
-#         force_save = request.data.get("force_save", False)
-
-#         if not bundle_id:
-#             return Response({"error": "bundle_id is required"}, status=400)
-
-#         if total_pieces == 0:
-#             return Response({"error": "total_pieces cannot be 0"}, status=400)
-
-#         if checked_piece < total_pieces and not force_save:
-#             return Response(
-#                 {
-#                     "error": "All pieces not checked. Enable force save to continue.",
-#                     "checked_piece": checked_piece,
-#                     "total_pieces": total_pieces,
-#                 },
-#                 status=status.HTTP_400_BAD_REQUEST,
-#             )
-
-#         qc_piece_final.objects.create(
-#             bundle_no=bundle_no,
-#             bundle_id=bundle_id,
-#             jobno=jobno,
-#             product=product,
-#             color=color,
-#             size=size,
-#             line=line,
-#             unit=unit,
-#             qc_type=qc_type,
-#             total_pieces=total_pieces,
-#             checked_piece=checked_piece,
-#             force_save=force_save,
-#             user_id=user_id,
-#             seq=seq,
-#             machine_id=machine_id
-#         )
-
-#         return Response(
-#             {
-#                 "message": "Saved successfully",
-#                 "checked_piece": checked_piece,
-#                 "total_pieces": total_pieces,
-#                 "force_save": force_save,
-#             },
-#             status=status.HTTP_201_CREATED,
-#         )
-
-#     except Exception as e:
-#         return Response({"error": str(e)}, status=500)
 
 @api_view(["POST"])
 def save_final_piece(request):
@@ -1291,61 +1216,6 @@ class MachineTransferDetailAPIView(APIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
-# @csrf_exempt
-# def machine_status_api(request):
-    
-#     if request.method == "POST":
-#         try:
-#             data = json.loads(request.body)
-#             identity = data.get("machine_id")
-#         except:
-#             return JsonResponse({"error": "Invalid JSON"}, status=400)
-
-#     elif request.method == "GET":
-#         identity = request.GET.get("Identity")
-
-#     else:
-#         return JsonResponse({"error": "Only GET and POST allowed"}, status=405)
-
-#     if not identity:
-#         return JsonResponse({"error": "Identity is required"}, status=400)
-
-#     identity = identity.strip()
-
-#     try:
-#         machine = machine_details.objects.get(Identity__iexact=identity)
-#     except machine_details.DoesNotExist:
-#         return JsonResponse({"error": "Machine not found"}, status=404)
-
-#     # today = date.today()
-#     today = timezone.now().date()
-
-#     allocation = emp_allocate.objects.filter(
-#         machine=machine,
-#         date__date=today
-#     ).order_by('-id').first()
-
-    
-
-#     if not allocation:
-#         return JsonResponse({
-#             "message": "Machine not allocated today"
-#         })
-
-#     if not allocation.status:
-#         return JsonResponse({
-#             "message": "Machine is offline"
-#         })
-
-#     return JsonResponse({
-#         "message": "Machine is online",
-#         "emp_code": allocation.emp_code,
-#         "unit": allocation.unit,
-#         "line": allocation.line
-#     })
-
-
-
 @csrf_exempt
 def machine_status_api(request):
 
@@ -1714,18 +1584,252 @@ def get_allocate_report(request):
 
 
 
+# def get_allocate_live(request):
+
+#     unit_id = request.GET.get("unit")
+#     line_id = request.GET.get("line")
+#     selected_date = request.GET.get("date")
+
+#     # Date இல்லையென்றால் today
+#     if selected_date:
+#         try:
+#             report_day = datetime.strptime(selected_date, "%Y-%m-%d").date()
+#         except ValueError:
+#             report_day = date.today()
+#     else:
+#         report_day = date.today()
+
+#     selected_line = Line.objects.filter(id=line_id).only("line_number").first()
+#     assembly_line = selected_line.line_number if selected_line else line_id
+
+#     s_data = emp_allocate.objects.filter(
+#         unit=unit_id,
+#         line=line_id,
+#         date__date=report_day
+#     ).values(
+#         "emp_code",
+#         "machine__Identity",
+#         "date",
+#         "seq",
+#         "jobno",
+#         "top_bottom"
+#     )
+
+#     # report_day = date.today()
+#     day_start = datetime.combine(report_day, time.min)
+#     day_end = day_start + timedelta(days=1)
+
+#     scans = list(Assembly_data.objects.filter(
+#         unit=unit_id,
+#         line=assembly_line,
+#         entry_date__gte=day_start,
+#         entry_date__lt=day_end,
+#     ).values("machine", "job_no", "tb_name", "seq", "pc", "entry_date"))
+
+#     def normalized(value):
+#         return str(value or "").strip().casefold()
+
+#     def scan_key(machine, job_no, top_bottom, seq):
+#         return tuple(normalized(value) for value in (machine, job_no, top_bottom, seq))
+
+#     def operation_key(job_no, top_bottom, process_des):
+#         return tuple(normalized(value) for value in (job_no, top_bottom, process_des))
+
+#     def hourly_target(wsec):
+#         value = str(wsec or "").strip()
+#         if not value:
+#             return ""
+#         try:
+#             minutes_text, seconds_text = (value.split(".", 1) + [""])[:2]
+#             minutes = int(minutes_text or 0)
+#             seconds = int((seconds_text + "00")[:2]) if seconds_text else 0
+#             operation_seconds = (minutes * 60) + seconds
+#             return int(3600 / operation_seconds) if operation_seconds > 0 else ""
+#         except (TypeError, ValueError, ZeroDivisionError):
+#             return ""
+
+#     dependency_targets = {
+#         operation_key(row["job_no"], row["tb_name"], row["process_des"]): row["wsec"]
+#         for row in dependency.objects.filter(
+#             job_no__in=[row["jobno"] for row in s_data]
+#         ).values("job_no", "tb_name", "process_des", "wsec")
+#     }
+
+#     slot_ranges = (
+#         (time(8, 30), time(9, 30)),
+#         (time(9, 30), time(10, 30)),
+#         (time(10, 45), time(11, 45)),
+#         # Scan timestamps saved during the 1 PM production hour are recorded
+#         # as 12:xx in this database, so include 12:00-13:00 in slot 4.
+#         (time(11, 45), time(12, 45)),
+#         (time(13, 30), time(14, 30)),
+#         (time(2, 30), time(3, 30)),
+#         (time(3, 30), time(4, 30)),
+#         (time(4, 30), time(5, 30)),
+#         (time(5, 45), time(6, 45)),
+#         (time(6, 45), time(8, 00)),
+#     )
+#     hourly_totals = defaultdict(lambda: [0] * len(slot_ranges))
+
+#     for scan in scans:
+#         scan_datetime = scan["entry_date"]
+#         if timezone.is_aware(scan_datetime):
+#             scan_datetime = localtime(scan_datetime)
+#         scan_time = scan_datetime.time().replace(tzinfo=None)
+#         slot_index = next(
+#             (index for index, (start, end) in enumerate(slot_ranges) if start <= scan_time < end),
+#             None,
+#         )
+#         if slot_index is None:
+#             continue
+#         try:
+#             pieces = int(scan["pc"] or 0)
+#         except (TypeError, ValueError):
+#             try:
+#                 pieces = int(float(scan["pc"]))
+#             except (TypeError, ValueError):
+#                 pieces = 0
+#         key = scan_key(scan["machine"], scan["job_no"], scan["tb_name"], scan["seq"])
+#         hourly_totals[key][slot_index] += pieces
+
+#     data = []
+
+#     for row in s_data:
+#         emp = Empwisesal.objects.using('main').filter(
+#             code=row["emp_code"]
+#         ).first()
+
+#         allocation_key = scan_key(
+#             row["machine__Identity"],
+#             row["jobno"],
+#             row["top_bottom"],
+#             row["seq"],
+#         )
+#         employee_hours = hourly_totals[allocation_key]
+#         allocation_datetime = row["date"]
+#         if timezone.is_aware(allocation_datetime):
+#             allocation_datetime = localtime(allocation_datetime)
+#         allocation_time = allocation_datetime.time().replace(tzinfo=None)
+#         allocation_slot = next(
+#             (index + 1 for index, (start, end) in enumerate(slot_ranges)
+#              if start <= allocation_time < end),
+#             1,
+#         )
+#         allocation_time_display = allocation_datetime.strftime("%I:%M %p")
+
+
+
+
+#         data.append({
+#             "emp_code": row["emp_code"],
+#             "machine": row["machine__Identity"],
+#             "seq": row["seq"],
+#             "jobno": row["jobno"],
+#             "top_bottom": row["top_bottom"],
+#             "name": emp.name if emp else "",
+#             "allocation_slot": allocation_slot,
+#             "allocation_time": allocation_time_display,
+#             "target": hourly_target(dependency_targets.get(operation_key(
+#                 row["jobno"],
+#                 row["top_bottom"],
+#                 row["seq"],
+#             ), "")),
+#             "hours": employee_hours,
+#         })
+
+#     return JsonResponse(data, safe=False)
+
 def get_allocate_live(request):
 
     unit_id = request.GET.get("unit")
     line_id = request.GET.get("line")
+    selected_date = request.GET.get("date")
+    selected_shift = request.GET.get("shift", "day")
 
-    selected_line = Line.objects.filter(id=line_id).only("line_number").first()
-    assembly_line = selected_line.line_number if selected_line else line_id
+    # --------------------------------
+    # REPORT DATE
+    # --------------------------------
+    if selected_date:
+        try:
+            report_day = datetime.strptime(
+                selected_date,
+                "%Y-%m-%d"
+            ).date()
+        except ValueError:
+            report_day = date.today()
+    else:
+        report_day = date.today()
 
+    # --------------------------------
+    # LINE
+    # --------------------------------
+    selected_line = Line.objects.filter(
+        id=line_id
+    ).only("line_number").first()
+
+    assembly_line = (
+        selected_line.line_number
+        if selected_line
+        else line_id
+    )
+
+
+    if selected_shift == "night":
+
+        shift_start = datetime.combine(
+            report_day - timedelta(days=1),
+            time(20, 48)
+        )
+
+        shift_end = datetime.combine(
+            report_day,
+            time(8, 0)
+        )
+
+        slot_ranges = (
+            (time(20, 48), time(21, 30)),
+            (time(21, 30), time(22, 30)),
+            (time(22, 30), time(23, 30)),
+            (time(0, 0), time(1, 0)),
+            (time(1, 0), time(2, 0)),
+            (time(2, 0), time(3, 0)),
+            (time(3, 0), time(4, 0)),
+            (time(4, 0), time(5, 0)),
+            (time(5, 0), time(6, 0)),
+            (time(6, 0), time(7, 0)),
+            (time(7, 0), time(8, 0)),
+        )
+
+    else:
+
+        shift_start = datetime.combine(
+            report_day,
+            time.min
+        )
+
+        shift_end = shift_start + timedelta(days=1)
+
+        slot_ranges = (
+            (time(8, 30), time(9, 30)),
+            (time(9, 30), time(10, 30)),
+            (time(10, 45), time(11, 45)),
+            (time(11, 45), time(12, 45)),
+            (time(13, 30), time(14, 30)),
+            (time(14, 30), time(15, 30)),
+            (time(15, 30), time(16, 30)),
+            (time(16, 30), time(17, 30)),
+            (time(17, 45), time(18, 45)),
+            (time(18, 45), time(20, 0)),
+        )
+
+    # --------------------------------
+    # EMP ALLOCATION
+    # --------------------------------
     s_data = emp_allocate.objects.filter(
         unit=unit_id,
         line=line_id,
-        date__date=date.today()
+        date__gte=shift_start,
+        date__lt=shift_end
     ).values(
         "emp_code",
         "machine__Identity",
@@ -1735,91 +1839,178 @@ def get_allocate_live(request):
         "top_bottom"
     )
 
-    # Use an explicit datetime range instead of __date.  The MSSQL backend can
-    # produce an unreliable date cast for high-precision datetime columns.
-    report_day = date.today()
-    day_start = datetime.combine(report_day, time.min)
-    day_end = day_start + timedelta(days=1)
+    # --------------------------------
+    # SCANS
+    # --------------------------------
+    scans = list(
+        Assembly_data.objects.filter(
+            unit=unit_id,
+            line=assembly_line,
+            entry_date__gte=shift_start,
+            entry_date__lt=shift_end,
+        ).values(
+            "machine",
+            "job_no",
+            "tb_name",
+            "seq",
+            "pc",
+            "entry_date"
+        )
+    )
 
-    # Assembly scans do not store the employee code. The report row is matched
-    # to scans by unit, line, machine, job number, top/bottom and operation.
-    scans = list(Assembly_data.objects.filter(
-        unit=unit_id,
-        line=assembly_line,
-        entry_date__gte=day_start,
-        entry_date__lt=day_end,
-    ).values("machine", "job_no", "tb_name", "seq", "pc", "entry_date"))
-
+    # --------------------------------
+    # HELPERS
+    # --------------------------------
     def normalized(value):
         return str(value or "").strip().casefold()
 
     def scan_key(machine, job_no, top_bottom, seq):
-        return tuple(normalized(value) for value in (machine, job_no, top_bottom, seq))
+        return tuple(
+            normalized(value)
+            for value in (
+                machine,
+                job_no,
+                top_bottom,
+                seq
+            )
+        )
 
     def operation_key(job_no, top_bottom, process_des):
-        return tuple(normalized(value) for value in (job_no, top_bottom, process_des))
+        return tuple(
+            normalized(value)
+            for value in (
+                job_no,
+                top_bottom,
+                process_des
+            )
+        )
 
     def hourly_target(wsec):
         value = str(wsec or "").strip()
+
         if not value:
             return ""
+
         try:
-            minutes_text, seconds_text = (value.split(".", 1) + [""])[:2]
+            minutes_text, seconds_text = (
+                value.split(".", 1) + [""]
+            )[:2]
+
             minutes = int(minutes_text or 0)
-            seconds = int((seconds_text + "00")[:2]) if seconds_text else 0
-            operation_seconds = (minutes * 60) + seconds
-            return int(3600 / operation_seconds) if operation_seconds > 0 else ""
-        except (TypeError, ValueError, ZeroDivisionError):
+
+            seconds = (
+                int((seconds_text + "00")[:2])
+                if seconds_text
+                else 0
+            )
+
+            operation_seconds = (
+                minutes * 60
+            ) + seconds
+
+            return (
+                int(3600 / operation_seconds)
+                if operation_seconds > 0
+                else ""
+            )
+
+        except (
+            TypeError,
+            ValueError,
+            ZeroDivisionError
+        ):
             return ""
 
+    # --------------------------------
+    # DEPENDENCY TARGETS
+    # --------------------------------
     dependency_targets = {
-        operation_key(row["job_no"], row["tb_name"], row["process_des"]): row["wsec"]
+        operation_key(
+            row["job_no"],
+            row["tb_name"],
+            row["process_des"]
+        ): row["wsec"]
+
         for row in dependency.objects.filter(
-            job_no__in=[row["jobno"] for row in s_data]
-        ).values("job_no", "tb_name", "process_des", "wsec")
+            job_no__in=[
+                row["jobno"]
+                for row in s_data
+            ]
+        ).values(
+            "job_no",
+            "tb_name",
+            "process_des",
+            "wsec"
+        )
     }
 
-    slot_ranges = (
-        (time(8, 30), time(10, 0)),
-        (time(10, 0), time(11, 0)),
-        (time(11, 0), time(12, 0)),
-        # Scan timestamps saved during the 1 PM production hour are recorded
-        # as 12:xx in this database, so include 12:00-13:00 in slot 4.
-        (time(12, 0), time(14, 0)),
-        (time(14, 0), time(15, 0)),
-        (time(15, 0), time(16, 0)),
-        (time(16, 0), time(17, 0)),
-        (time(17, 0), time(18, 0)),
-        (time(18, 0), time(19, 0)),
-        (time(19, 0), time(20, 0)),
+    # --------------------------------
+    # HOURLY TOTALS
+    # --------------------------------
+    hourly_totals = defaultdict(
+        lambda: [0] * len(slot_ranges)
     )
-    hourly_totals = defaultdict(lambda: [0] * len(slot_ranges))
 
     for scan in scans:
+
         scan_datetime = scan["entry_date"]
+
         if timezone.is_aware(scan_datetime):
             scan_datetime = localtime(scan_datetime)
-        scan_time = scan_datetime.time().replace(tzinfo=None)
-        slot_index = next(
-            (index for index, (start, end) in enumerate(slot_ranges) if start <= scan_time < end),
-            None,
+
+        scan_time = scan_datetime.time().replace(
+            tzinfo=None
         )
+
+        slot_index = next(
+            (
+                index
+                for index, (start, end)
+                in enumerate(slot_ranges)
+
+                if start <= scan_time < end
+            ),
+            None
+        )
+
         if slot_index is None:
             continue
+
         try:
             pieces = int(scan["pc"] or 0)
+
         except (TypeError, ValueError):
+
             try:
-                pieces = int(float(scan["pc"]))
-            except (TypeError, ValueError):
+                pieces = int(
+                    float(scan["pc"])
+                )
+
+            except (
+                TypeError,
+                ValueError
+            ):
                 pieces = 0
-        key = scan_key(scan["machine"], scan["job_no"], scan["tb_name"], scan["seq"])
+
+        key = scan_key(
+            scan["machine"],
+            scan["job_no"],
+            scan["tb_name"],
+            scan["seq"]
+        )
+
         hourly_totals[key][slot_index] += pieces
 
+    # --------------------------------
+    # FINAL DATA
+    # --------------------------------
     data = []
 
     for row in s_data:
-        emp = Empwisesal.objects.using('main').filter(
+
+        emp = Empwisesal.objects.using(
+            "main"
+        ).filter(
             code=row["emp_code"]
         ).first()
 
@@ -1827,17 +2018,43 @@ def get_allocate_live(request):
             row["machine__Identity"],
             row["jobno"],
             row["top_bottom"],
-            row["seq"],
+            row["seq"]
         )
-        employee_hours = hourly_totals[allocation_key]
+
+        employee_hours = hourly_totals[
+            allocation_key
+        ]
+
         allocation_datetime = row["date"]
-        if timezone.is_aware(allocation_datetime):
-            allocation_datetime = localtime(allocation_datetime)
-        allocation_time = allocation_datetime.time().replace(tzinfo=None)
+
+        if timezone.is_aware(
+            allocation_datetime
+        ):
+            allocation_datetime = localtime(
+                allocation_datetime
+            )
+
+        allocation_time = (
+            allocation_datetime
+            .time()
+            .replace(tzinfo=None)
+        )
+
         allocation_slot = next(
-            (index + 1 for index, (start, end) in enumerate(slot_ranges)
-             if start <= allocation_time < end),
-            1,
+            (
+                index + 1
+                for index, (start, end)
+                in enumerate(slot_ranges)
+
+                if start <= allocation_time < end
+            ),
+            1
+        )
+
+        allocation_time_display = (
+            allocation_datetime.strftime(
+                "%I:%M %p"
+            )
         )
 
         data.append({
@@ -1848,15 +2065,26 @@ def get_allocate_live(request):
             "top_bottom": row["top_bottom"],
             "name": emp.name if emp else "",
             "allocation_slot": allocation_slot,
-            "target": hourly_target(dependency_targets.get(operation_key(
-                row["jobno"],
-                row["top_bottom"],
-                row["seq"],
-            ), "")),
+            "allocation_time": allocation_time_display,
+
+            "target": hourly_target(
+                dependency_targets.get(
+                    operation_key(
+                        row["jobno"],
+                        row["top_bottom"],
+                        row["seq"]
+                    ),
+                    ""
+                )
+            ),
+
             "hours": employee_hours,
         })
 
-    return JsonResponse(data, safe=False)
+    return JsonResponse(
+        data,
+        safe=False
+    )
 
 
 
