@@ -32,8 +32,8 @@ ALLOWED_HOSTS = ['*']
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "https://hf.herofashion.com",
-    "https://web.herofashion.com",
     "https://hf.herofashion.com",
+    "https://web.herofashion.com",
     "https://hfapi.herofashion.com",
     "https://sync.herofashion.com",
     "https://dev.herofashion.com",
