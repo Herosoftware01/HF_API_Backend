@@ -1718,6 +1718,14 @@ def get_allocate_live(request):
 
     unit_id = request.GET.get("unit")
     line_id = request.GET.get("line")
+    selected_date = request.GET.get("date")
+    if selected_date:
+        try:
+            report_day = datetime.strptime(selected_date, "%Y-%m-%d").date()
+        except ValueError:
+            report_day = date.today()
+    else:
+        report_day = date.today()
 
     selected_line = Line.objects.filter(id=line_id).only("line_number").first()
     assembly_line = selected_line.line_number if selected_line else line_id
@@ -1725,7 +1733,7 @@ def get_allocate_live(request):
     s_data = emp_allocate.objects.filter(
         unit=unit_id,
         line=line_id,
-        date__date=date.today()
+        date__date=report_day
     ).values(
         "emp_code",
         "machine__Identity",
@@ -1735,14 +1743,10 @@ def get_allocate_live(request):
         "top_bottom"
     )
 
-    # Use an explicit datetime range instead of __date.  The MSSQL backend can
-    # produce an unreliable date cast for high-precision datetime columns.
-    report_day = date.today()
+    # report_day = date.today()
     day_start = datetime.combine(report_day, time.min)
     day_end = day_start + timedelta(days=1)
 
-    # Assembly scans do not store the employee code. The report row is matched
-    # to scans by unit, line, machine, job number, top/bottom and operation.
     scans = list(Assembly_data.objects.filter(
         unit=unit_id,
         line=assembly_line,
@@ -1780,18 +1784,18 @@ def get_allocate_live(request):
     }
 
     slot_ranges = (
-        (time(8, 30), time(10, 0)),
-        (time(10, 0), time(11, 0)),
-        (time(11, 0), time(12, 0)),
+        (time(8, 30), time(9, 30)),
+        (time(9, 30), time(10, 30)),
+        (time(10, 45), time(11, 45)),
         # Scan timestamps saved during the 1 PM production hour are recorded
         # as 12:xx in this database, so include 12:00-13:00 in slot 4.
-        (time(12, 0), time(14, 0)),
-        (time(14, 0), time(15, 0)),
-        (time(15, 0), time(16, 0)),
-        (time(16, 0), time(17, 0)),
-        (time(17, 0), time(18, 0)),
-        (time(18, 0), time(19, 0)),
-        (time(19, 0), time(20, 0)),
+        (time(11, 45), time(12, 45)),
+        (time(13, 30), time(14, 30)),
+        (time(14, 30), time(15, 30)),
+        (time(15, 30), time(16, 30)),
+        (time(16, 30), time(17, 30)),
+        (time(17, 45), time(18, 45)),
+        (time(18, 45), time(20, 00)),
     )
     hourly_totals = defaultdict(lambda: [0] * len(slot_ranges))
 
@@ -1839,7 +1843,7 @@ def get_allocate_live(request):
              if start <= allocation_time < end),
             1,
         )
-
+        allocation_time_display = allocation_datetime.strftime("%I:%M %p")
         data.append({
             "emp_code": row["emp_code"],
             "machine": row["machine__Identity"],
@@ -1848,6 +1852,7 @@ def get_allocate_live(request):
             "top_bottom": row["top_bottom"],
             "name": emp.name if emp else "",
             "allocation_slot": allocation_slot,
+            "allocation_time": allocation_time_display,
             "target": hourly_target(dependency_targets.get(operation_key(
                 row["jobno"],
                 row["top_bottom"],
@@ -1857,8 +1862,6 @@ def get_allocate_live(request):
         })
 
     return JsonResponse(data, safe=False)
-
-
 
 def machine_allocation_api(request):
     selected_date = request.GET.get("date")

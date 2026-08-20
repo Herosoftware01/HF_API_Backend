@@ -588,7 +588,7 @@ class GetUnitAssemply(APIView):
             data = Assembly_data.objects.filter(unit=unit, line=line, entry_date__gte=four_days_ago)
 
         # JSON response
-        results = list(data.values('bundle_id', 'job_no', 'seq', 'pc', 'color', 'entry_date'))
+        results = list(data.values('bundle_id', 'job_no','seq', 'pc', 'color', 'entry_date'))
         return Response({"status": True, "data": results})
     
 

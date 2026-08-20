@@ -4,8 +4,8 @@ from django.views.decorators.csrf import csrf_exempt
 import os
 import json
 from datetime import datetime
-from .models import LaySp, MasterFinalMistake, UnitBundlereport, FinalPlans,Corarlck1,CoraRollcheck,AttUnt,EmbAbsetnt,Holiday,LabAtt,RptCutting,VueOrdersinhand
-from .models import BillAge,BillMdapprove,BillPass,Leavempabsent,LaySpreadingLayemployee,HrLabourattendence,Employeeworking1,BitcheckHour,StickerHour
+from .models import LaySp, MasterFinalMistake, UnitBundlereport, FinalPlans,Corarlck1,CoraRollcheck,AttUnt,EmbAbsetnt,Holiday,LabAtt,RptCutting,VueOrdersinhand,VueDyeingRatenew
+from .models import BillAge,BillMdapprove,BillPass,Leavempabsent,LaySpreadingLayemployee,HrLabourattendence,Employeeworking1,BitcheckHour,StickerHour,Txorderdetstyles
 from django.db.models import F, Q , IntegerField,DateField,Case, When, Value,CharField
 from django.db import connections
 from django.db.models import OuterRef, Subquery
@@ -2519,3 +2519,57 @@ def measurement_report(request):
             "status": False,
             "error": str(e)
         })
+
+
+
+def dyeing_data(request):
+    qs = VueDyeingRatenew.objects.using("test").values().order_by("-date")
+    data = list(qs)
+
+    # Convert datetime -> date string (YYYY-MM-DD) to avoid timezone shifts on the client
+    for item in data:
+        dt = item.get('date')
+        if dt:
+            try:
+                # convert to localtime if using timezones
+                if getattr(settings, 'USE_TZ', False):
+                    dt_local = timezone.localtime(dt)
+                else:
+                    dt_local = dt
+                item['date'] = dt_local.strftime('%Y-%m-%d')
+            except Exception:
+                # fallback: stringify date portion
+                try:
+                    item['date'] = str(dt).split(' ')[0]
+                except Exception:
+                    pass
+
+    return JsonResponse(data, safe=False)
+
+def dyeing_order_details(request):
+    orderno = request.GET.get("orderno")
+    print("orderno==", orderno)
+
+    queryset = (
+        Txorderdetstyles.objects
+        .using("test")
+        .filter(orderno=orderno)
+        .values()
+    )
+
+    data = []
+
+    for obj in queryset:
+        raw_path = obj.get("mainimagepath")
+
+        if raw_path:
+            filename = raw_path.replace("\\", "/").split("/")[-1]
+            obj["mainimagepath"] = (
+                f"https://hfapi.herofashion.com/Order_images/{filename}"
+            )
+        else:
+            obj["mainimagepath"] = ""
+
+        data.append(obj)
+
+    return JsonResponse(data[0] if data else {}, safe=False)

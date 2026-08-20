@@ -59,11 +59,11 @@ CSRF_TRUSTED_ORIGINS = [
 ]
 # settings.py
 
-CSRF_COOKIE_SAMESITE = 'Lax' if DEBUG else 'None'
-CSRF_COOKIE_SECURE = not DEBUG
+# CSRF_COOKIE_SAMESITE = 'Lax' if DEBUG else 'None'
+# CSRF_COOKIE_SECURE = not DEBUG
 
-SESSION_COOKIE_SAMESITE = 'Lax' if DEBUG else 'None'
-SESSION_COOKIE_SECURE = not DEBUG
+# SESSION_COOKIE_SAMESITE = 'Lax' if DEBUG else 'None'
+# SESSION_COOKIE_SECURE = not DEBUG
 
 
 APPEND_SLASH = False
@@ -113,6 +113,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # else:
 #     SECURE_CROSS_ORIGIN_OPENER_POLICY = "same-origin"
 
+# DEBUG = False
 DEBUG = True
 
 MIDDLEWARE = [
@@ -321,6 +322,9 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 STAFF_IMAGES_URL = '/staff_images/'
 STAFF_IMAGES_ROOT = r'\\10.1.21.11\d\Staff_Employee_Images'
+
+ORDER_IMAGES_URL = '/Order_images/'
+ORDER_IMAGES_ROOT = r'\\10.1.21.11\d\Order_Images'
 
 PDF_STORAGE_PATH = r"\\adminserver\File Sharing\AAAA Hero\Syncfusion Pdf Reports"
 

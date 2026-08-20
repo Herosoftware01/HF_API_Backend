@@ -759,3 +759,166 @@ class StickerHour(models.Model):
     class Meta:
         managed = False
         db_table = 'view_sticker_hour'
+
+
+class VueDyeingRatenew(models.Model):
+    rowno = models.BigIntegerField(db_column='RowNo', primary_key=True)  # Field name made lowercase.
+    prs = models.CharField(max_length=35)
+    clr = models.CharField(max_length=50, blank=True, null=True)
+    date = models.DateTimeField(db_column='Date')  # Field name made lowercase.
+    supplier = models.CharField(max_length=35, blank=True, null=True)
+    no = models.IntegerField(db_column='No')  # Field name made lowercase.
+    orderno = models.CharField(db_column='OrderNo', max_length=50, blank=True, null=True)  # Field name made lowercase.
+    fabric = models.CharField(max_length=35)
+    rolls = models.IntegerField(blank=True, null=True)
+    wgt = models.DecimalField(max_digits=38, decimal_places=4, blank=True, null=True)
+    lotno = models.SmallIntegerField(db_column='LotNo', blank=True, null=True)  # Field name made lowercase.
+    mdapprovedrate = models.DecimalField(db_column='MDApprovedRate', max_digits=19, decimal_places=4, blank=True, null=True)  # Field name made lowercase.
+    red = models.IntegerField(db_column='Red', blank=True, null=True)  # Field name made lowercase.
+    green = models.IntegerField(db_column='Green', blank=True, null=True)  # Field name made lowercase.
+    blue = models.IntegerField(db_column='Blue', blank=True, null=True)  # Field name made lowercase.
+
+
+    class Meta:
+        managed = False
+        db_table = 'vue_dyeing_ratenew'
+
+
+class Txorderdetstyles(models.Model):
+    companyid = models.IntegerField(db_column='CompanyID', blank=True, null=True)  # Field name made lowercase.
+    orderno = models.CharField(db_column='OrderNo', max_length=50, db_collation='SQL_Latin1_General_CP1_CI_AS')  # Field name made lowercase.
+    no = models.CharField(db_column='No', max_length=50, db_collation='SQL_Latin1_General_CP1_CI_AS')  # Field name made lowercase.
+    year = models.SmallIntegerField(db_column='Year')  # Field name made lowercase.
+    itemno = models.SmallIntegerField(db_column='ItemNo')  # Field name made lowercase.
+    date = models.DateTimeField(db_column='Date', blank=True, null=True)  # Field name made lowercase.
+    ordertype = models.SmallIntegerField(db_column='OrderType', blank=True, null=True)  # Field name made lowercase.
+    customerid = models.IntegerField(db_column='CustomerID', blank=True, null=True)  # Field name made lowercase.
+    departmentid = models.IntegerField(db_column='DepartmentID', blank=True, null=True)  # Field name made lowercase.
+    reference = models.CharField(db_column='Reference', max_length=2100, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)  # Field name made lowercase.
+    pono = models.CharField(db_column='PONo', max_length=50, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)  # Field name made lowercase.
+    podate = models.DateTimeField(db_column='PODate', blank=True, null=True)  # Field name made lowercase.
+    finaldelvdate = models.DateTimeField(db_column='FinalDelvDate', blank=True, null=True)  # Field name made lowercase.
+    ourdelvdate = models.DateTimeField(db_column='OurDelvDate', blank=True, null=True)  # Field name made lowercase.
+    quantity = models.DecimalField(db_column='Quantity', max_digits=18, decimal_places=4, blank=True, null=True)  # Field name made lowercase.
+    quantityactual = models.DecimalField(db_column='QuantityActual', max_digits=18, decimal_places=4, blank=True, null=True)  # Field name made lowercase.
+    quantityextra = models.DecimalField(db_column='QuantityExtra', max_digits=18, decimal_places=4, blank=True, null=True)  # Field name made lowercase.
+    uom = models.SmallIntegerField(db_column='UOM', blank=True, null=True)  # Field name made lowercase.
+    pcsperpack = models.DecimalField(db_column='PcsPerPack', max_digits=18, decimal_places=4, blank=True, null=True)  # Field name made lowercase.
+    orderconfyear = models.SmallIntegerField(db_column='OrderConfYear')  # Field name made lowercase.
+    orderconfno = models.SmallIntegerField(db_column='OrderConfNo')  # Field name made lowercase.
+    styleid = models.IntegerField(db_column='StyleID')  # Field name made lowercase.
+    stylename = models.CharField(db_column='StyleName', max_length=50, db_collation='SQL_Latin1_General_CP1_CI_AS')  # Field name made lowercase.
+    styledesc = models.CharField(db_column='StyleDesc', max_length=2000, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)  # Field name made lowercase.
+    categoryid = models.IntegerField(db_column='CategoryID', blank=True, null=True)  # Field name made lowercase.
+    packingtype = models.SmallIntegerField(db_column='PackingType')  # Field name made lowercase.
+    finalinspby = models.SmallIntegerField(db_column='FinalInspBy')  # Field name made lowercase.
+    testagencyid = models.IntegerField(db_column='TestAgencyID')  # Field name made lowercase.
+    measurementscale = models.SmallIntegerField(db_column='MeasurementScale')  # Field name made lowercase.
+    measurementscalemp = models.SmallIntegerField(db_column='MeasurementScaleMP')  # Field name made lowercase.
+    completedmc = models.SmallIntegerField(db_column='CompletedMC')  # Field name made lowercase.
+    completedapl = models.SmallIntegerField(db_column='CompletedAPL')  # Field name made lowercase.
+    completedacl = models.SmallIntegerField(db_column='CompletedACL')  # Field name made lowercase.
+    completedlt = models.SmallIntegerField(db_column='CompletedLT')  # Field name made lowercase.
+    completeddes = models.SmallIntegerField(db_column='CompletedDES')  # Field name made lowercase.
+    completeddoc = models.SmallIntegerField(db_column='CompletedDOC')  # Field name made lowercase.
+    completedsp = models.SmallIntegerField(db_column='CompletedSP')  # Field name made lowercase.
+    quality = models.CharField(db_column='Quality', max_length=2000, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)  # Field name made lowercase.
+    stitching = models.CharField(db_column='Stitching', max_length=2000, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)  # Field name made lowercase.
+    packing = models.CharField(db_column='Packing', max_length=2000, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)  # Field name made lowercase.
+    comments = models.CharField(db_column='Comments', max_length=2000, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)  # Field name made lowercase.
+    isprinted = models.SmallIntegerField(db_column='IsPrinted')  # Field name made lowercase.
+    isembroided = models.SmallIntegerField(db_column='IsEmbroided')  # Field name made lowercase.
+    isothers = models.SmallIntegerField(db_column='IsOthers')  # Field name made lowercase.
+    printinstr = models.CharField(db_column='PrintInstr', max_length=255, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)  # Field name made lowercase.
+    embroidryinstr = models.CharField(db_column='EmbroidryInstr', max_length=255, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)  # Field name made lowercase.
+    othersinstr = models.CharField(db_column='OthersInstr', max_length=255, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)  # Field name made lowercase.
+    workbookno = models.CharField(db_column='WorkBookNo', max_length=50, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)  # Field name made lowercase.
+    workbookno_a = models.CharField(db_column='WorkBookNo_A', max_length=50, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)  # Field name made lowercase.
+    extra = models.DecimalField(db_column='Extra', max_digits=5, decimal_places=2, blank=True, null=True)  # Field name made lowercase.
+    authorized = models.SmallIntegerField(db_column='Authorized')  # Field name made lowercase.
+    mpauthorized = models.SmallIntegerField(db_column='MPAuthorized')  # Field name made lowercase.
+    acceauthorized = models.SmallIntegerField(db_column='AcceAuthorized')  # Field name made lowercase.
+    supplierid = models.IntegerField(db_column='SupplierID')  # Field name made lowercase.
+    yarnsupplied = models.SmallIntegerField(db_column='YarnSupplied')  # Field name made lowercase.
+    fabricsupplied = models.SmallIntegerField(db_column='FabricSupplied')  # Field name made lowercase.
+    productiontype = models.SmallIntegerField(db_column='ProductionType')  # Field name made lowercase.
+    productionid = models.IntegerField(db_column='ProductionID')  # Field name made lowercase.
+    merchandiserid = models.IntegerField(db_column='MerchandiserID')  # Field name made lowercase.
+    qltycontrollerid = models.IntegerField(db_column='QltyControllerID')  # Field name made lowercase.
+    mpyear = models.SmallIntegerField(db_column='MPYear')  # Field name made lowercase.
+    mprefno = models.CharField(db_column='MPRefNo', max_length=50, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)  # Field name made lowercase.
+    mpdate = models.DateTimeField(db_column='MPDate', blank=True, null=True)  # Field name made lowercase.
+    refno = models.CharField(db_column='RefNo', max_length=50, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)  # Field name made lowercase.
+    mainimagepath = models.CharField(db_column='MainImagePath', max_length=511, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)  # Field name made lowercase.
+    shipmentcompleted = models.SmallIntegerField(db_column='ShipmentCompleted')  # Field name made lowercase.
+    closed = models.SmallIntegerField(db_column='Closed')  # Field name made lowercase.
+    yarnporaised = models.IntegerField(db_column='YarnPORaised')  # Field name made lowercase.
+    fabricporaised = models.IntegerField(db_column='FabricPORaised')  # Field name made lowercase.
+    acceporaised = models.IntegerField(db_column='AccePORaised')  # Field name made lowercase.
+    yarndelvraised = models.IntegerField(db_column='YarnDelvRaised')  # Field name made lowercase.
+    knittingpgmraised = models.IntegerField(db_column='KnittingPgmRaised')  # Field name made lowercase.
+    fabricdelvraised = models.IntegerField(db_column='FabricDelvRaised')  # Field name made lowercase.
+    completedwo = models.SmallIntegerField(db_column='CompletedWO')  # Field name made lowercase.
+    repeatorders = models.SmallIntegerField(db_column='RepeatOrders', blank=True, null=True)  # Field name made lowercase.
+    seasonid = models.IntegerField(db_column='SeasonID', blank=True, null=True)  # Field name made lowercase.
+    seasonyear = models.SmallIntegerField(db_column='SeasonYear', blank=True, null=True)  # Field name made lowercase.
+    statusid = models.SmallIntegerField(db_column='StatusID')  # Field name made lowercase.
+    sorequired = models.SmallIntegerField(db_column='SORequired', blank=True, null=True)  # Field name made lowercase.
+    materialplanning = models.SmallIntegerField(db_column='MaterialPlanning', blank=True, null=True)  # Field name made lowercase.
+    acceplan_employeeid = models.IntegerField(db_column='AccePlan_EmployeeID', blank=True, null=True)  # Field name made lowercase.
+    orderfollowup_employeeid = models.IntegerField(db_column='OrderFollowUp_EmployeeID', blank=True, null=True)  # Field name made lowercase.
+    duration = models.DecimalField(db_column='Duration', max_digits=9, decimal_places=2, blank=True, null=True)  # Field name made lowercase.
+    joborderraised = models.SmallIntegerField(db_column='JobOrderRaised', blank=True, null=True)  # Field name made lowercase.
+    horefno = models.CharField(db_column='HORefNo', max_length=50, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)  # Field name made lowercase.
+    prodauthorized = models.SmallIntegerField(db_column='ProdAuthorized', blank=True, null=True)  # Field name made lowercase.
+    acceincharge_employeeid = models.IntegerField(db_column='AcceIncharge_EmployeeID', blank=True, null=True)  # Field name made lowercase.
+    ordercancelled = models.SmallIntegerField(db_column='OrderCancelled', blank=True, null=True)  # Field name made lowercase.
+    cancel = models.SmallIntegerField(db_column='Cancel', blank=True, null=True, db_comment='Cancelling the order thru Orde')  # Field name made lowercase.
+    yarnstraised = models.IntegerField(db_column='YarnSTRaised', blank=True, null=True)  # Field name made lowercase.
+    fabricstraised = models.IntegerField(db_column='FabricSTRaised', blank=True, null=True)  # Field name made lowercase.
+    fabriccutraised = models.IntegerField(db_column='FabricCutRaised', blank=True, null=True)  # Field name made lowercase.
+    yarnstcraised = models.IntegerField(db_column='YarnSTCRaised', blank=True, null=True)  # Field name made lowercase.
+    fabricstcraised = models.IntegerField(db_column='FabricSTCRaised', blank=True, null=True)  # Field name made lowercase.
+    fabricincharge_employeeid = models.IntegerField(db_column='FabricIncharge_EmployeeID', blank=True, null=True)  # Field name made lowercase.
+    purchaseprice = models.DecimalField(db_column='PurchasePrice', max_digits=19, decimal_places=4)  # Field name made lowercase.
+    purchasepricetype = models.SmallIntegerField(db_column='PurchasePriceType')  # Field name made lowercase.
+    piecercptraised = models.IntegerField(db_column='PieceRcptRaised', blank=True, null=True)  # Field name made lowercase.
+    piecestkraised = models.IntegerField(db_column='PieceStkRaised', blank=True, null=True)  # Field name made lowercase.
+    pieceprodraised = models.IntegerField(db_column='PieceProdRaised', blank=True, null=True)  # Field name made lowercase.
+    aprvlsubraised = models.IntegerField(db_column='AprvlSubRaised', blank=True, null=True)  # Field name made lowercase.
+    ihapprvlraised = models.IntegerField(db_column='IHApprvlRaised', blank=True, null=True)  # Field name made lowercase.
+    billexpenseraised = models.IntegerField(db_column='BillExpenseRaised', blank=True, null=True)  # Field name made lowercase.
+    docproformainvraised = models.IntegerField(db_column='DocProformaInvRaised', blank=True, null=True)  # Field name made lowercase.
+    doclcraised = models.IntegerField(db_column='DocLCRaised', blank=True, null=True)  # Field name made lowercase.
+    docinvraised = models.IntegerField(db_column='DocInvRaised', blank=True, null=True)  # Field name made lowercase.
+    gendlvyraised = models.IntegerField(db_column='GenDlvyRaised', blank=True, null=True)  # Field name made lowercase.
+    geninwdraised = models.IntegerField(db_column='GenInwdRaised', blank=True, null=True)  # Field name made lowercase.
+    mktcostingraised = models.IntegerField(db_column='MktCostingRaised', blank=True, null=True)  # Field name made lowercase.
+    accplanraised = models.IntegerField(db_column='AccPlanRaised', blank=True, null=True)  # Field name made lowercase.
+    prdrateplanraised = models.IntegerField(db_column='PrdRatePlanRaised', blank=True, null=True)  # Field name made lowercase.
+    prdctngfabrcptraised = models.IntegerField(db_column='PrdCtngFabRcptRaised', blank=True, null=True)  # Field name made lowercase.
+    qcprdcommentsraised = models.IntegerField(db_column='QCPrdCommentsRaised', blank=True, null=True)  # Field name made lowercase.
+    qcmesurechartraised = models.IntegerField(db_column='QCMesureChartRaised', blank=True, null=True)  # Field name made lowercase.
+    qccmtquotraised = models.IntegerField(db_column='QCCMTQuotRaised', blank=True, null=True)  # Field name made lowercase.
+    sampleorderraised = models.IntegerField(db_column='SampleOrderRaised', blank=True, null=True)  # Field name made lowercase.
+    sheduleplanraised = models.IntegerField(db_column='ShedulePlanRaised', blank=True, null=True)  # Field name made lowercase.
+    prdsheduleraised = models.IntegerField(db_column='PrdSheduleRaised', blank=True, null=True)  # Field name made lowercase.
+    despatchstatusraised = models.IntegerField(db_column='DespatchStatusRaised', blank=True, null=True)  # Field name made lowercase.
+    workorderraised = models.IntegerField(db_column='WorkOrderRaised', blank=True, null=True)  # Field name made lowercase.
+    accstkraised = models.IntegerField(db_column='AccStkRaised', blank=True, null=True)  # Field name made lowercase.
+    accstkcompraised = models.IntegerField(db_column='AccStkCompRaised', blank=True, null=True)  # Field name made lowercase.
+    styarnreqraised = models.IntegerField(db_column='STYarnReqRaised', blank=True, null=True)  # Field name made lowercase.
+    stfabricreqraised = models.IntegerField(db_column='STFabricReqRaised', blank=True, null=True)  # Field name made lowercase.
+    accporaised = models.IntegerField(db_column='AccPORaised', blank=True, null=True)  # Field name made lowercase.
+    accprocessdlvyraised = models.IntegerField(db_column='AccProcessDlvyRaised', blank=True, null=True)  # Field name made lowercase.
+    recalculatepl = models.SmallIntegerField(db_column='ReCalculatePL')  # Field name made lowercase.
+    imagedesc = models.CharField(db_column='ImageDesc', max_length=300, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)  # Field name made lowercase.
+    edate = models.DateTimeField(db_column='EDate', blank=True, null=True)  # Field name made lowercase.
+    insdate = models.DateTimeField(blank=True, null=True)
+    vessel_dt = models.DateTimeField(db_column='Vessel_DT', blank=True, null=True)  # Field name made lowercase.
+    contractno = models.CharField(max_length=10, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)
+    ordid = models.AutoField(primary_key=True)
+
+    class Meta:
+        managed = False
+        db_table = 'txOrderDetStyles'

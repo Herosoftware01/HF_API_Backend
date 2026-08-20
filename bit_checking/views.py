@@ -68,6 +68,7 @@ from datetime import timedelta
 from django.db import connections
 from django.db import connections, DatabaseError
 from django.contrib.auth import get_user_model
+from datetime import datetime, time, timedelta
 
 
 def get_previous_entry_mode(qrid):
@@ -272,6 +273,7 @@ def emp_stick(request):
             obj["photo"] = ""
 
         data.append(obj)
+
 
     return JsonResponse(data, safe=False)
 
@@ -518,7 +520,7 @@ def generate_bitcheck_production(request):
                         @PrintCutSticker=%s,
                         @PrintMistakeSticker=%s
                 """, [scanner_id, 0, 1])
-
+        
         return Response(
             {
                 "status": True,
@@ -951,8 +953,9 @@ def delete_permission(request):
 # Verification Table
 # -------------------------
 @api_view(["GET"])
-@permission_classes([IsAuthenticated])
+# @permission_classes([IsAuthenticated])
 def verification_table(request):
+    
     permission = user_accessory_verification.objects.filter(
         user_id=request.user.id
     ).first()
