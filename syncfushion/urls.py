@@ -51,6 +51,6 @@ urlpatterns = [
     path('fashionr_results/', views.fashionr_results, name='fashionr_results'),
     path('duedate/', views.DueDateList, name='duedate'),
 
-    path('accessory_poinward/', views.AccessoryPoinward, name='AccessoryPoinward'),
     path('accessory_del/', views.AccessoryDel, name='AccessoryDel'),
+    path('cutbalpend/', views.CutBalpend, name='CutBalpend'),
 ]

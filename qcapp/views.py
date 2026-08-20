@@ -2056,7 +2056,7 @@ def get_allocate_live(request):
                 "%I:%M %p"
             )
         )
-
+        allocation_time_display = allocation_datetime.strftime("%I:%M %p")
         data.append({
             "emp_code": row["emp_code"],
             "machine": row["machine__Identity"],
@@ -2085,8 +2085,6 @@ def get_allocate_live(request):
         data,
         safe=False
     )
-
-
 
 def machine_allocation_api(request):
     selected_date = request.GET.get("date")

@@ -8,7 +8,7 @@ from django.http import JsonResponse
 from rest_framework import status
 from rest_framework import viewsets
 from .models import GridSetting,DiWasg,DiWasg_img,TrsMaildtls, SyncfushionKanban, SyncfusionGantt, BlockEditor, FashionrResult, ViewAccinwpend
-from .models import VueAccessoryDel, VueAccessoryPoinward
+from .models import ViewAccessoryDel, TmpQms, ViewCutBalpend
 from .serializers import GridSettingSerializer,TrsMaildtlsSerializer
 from rest_framework.permissions import IsAuthenticated  # optional
 import json
@@ -810,10 +810,59 @@ def DueDateList(request):
     data = list(ViewAccinwpend.objects.using('test').all().values()) 
     return JsonResponse(data, safe=False)
 
-def AccessoryPoinward(request):
-    data = list(VueAccessoryPoinward.objects.using('test').all().values())
-    return JsonResponse(data, safe=False)
+def CutBalpend(request):
+    queryset = list(ViewCutBalpend.objects.using('demo').all().values())
+    
+    for obj in queryset:
+        raw_path = obj['tbimg'] if obj.get('tbimg') else None
+        if raw_path:
+            filename = raw_path.split('\\')[-1]
+            obj['tbimg'] = f"https://app.herofashion.com/order_image/{filename}"
+        else:
+            obj['tbimg'] = ""
 
+    return JsonResponse(queryset, safe=False)
+
+@csrf_exempt
 def AccessoryDel(request):
-    data = list(VueAccessoryDel.objects.using('test').all().values())
-    return JsonResponse(data, safe=False)
+    if request.method == "GET":
+
+        data = list(ViewAccessoryDel.objects.using('test').all().values())
+        return JsonResponse(data, safe=False)
+    
+    elif request.method == "PUT":
+
+        body = json.loads(request.body)
+
+        jobno = body.get("jobno")
+        pono = body.get("pono")
+        acc_item = body.get("acc_item")
+        clr_siz = body.get("clr_siz")
+        retmark = body.get("retmark")
+
+        if not all([jobno, pono, acc_item, clr_siz]):
+            return JsonResponse({
+                "success": False,
+                "error": "jobno, pono, acc_item and clr_siz are required"
+            }, status=400)
+
+        updated = TmpQms.objects.using('test').filter(
+            jobno=jobno,
+            pono=pono,
+            acc_item=acc_item,
+            clr_siz=clr_siz
+        ).update(
+            retmark=retmark
+        )
+
+        if updated == 0:
+            return JsonResponse({
+                "success": False,
+                "message": "No matching record found"
+            }, status=404)
+
+        return JsonResponse({
+            "success": True,
+            "message": "retmark updated successfully",
+            "updated": updated
+        })

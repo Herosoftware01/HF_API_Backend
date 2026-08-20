@@ -191,41 +191,68 @@ class ViewAccinwpend(models.Model):
         db_table = 'view_accinwpend'
 
 
-class VueAccessoryPoinward(models.Model):
+class ViewCutBalpend(models.Model):
     slno = models.BigIntegerField(primary_key=True)
-    cuttingdate = models.DateTimeField(db_column='CuttingDate', blank=True, null=True)
-    jobno = models.CharField(db_column='JobNo', max_length=50, blank=True, null=True)
-    color_combo = models.CharField(db_column='color/combo', max_length=8000, blank=True, null=True)  
-    pono = models.IntegerField(db_column='PONO')
-    po_supplier = models.CharField(db_column='PO Supplier', max_length=35, blank=True, null=True)
-    po_date = models.DateTimeField(db_column='PO_Date')
-    po_due_date = models.DateTimeField(db_column='PO Due DATE', blank=True, null=True)
-    accessory_item = models.CharField(db_column='Accessory Item', max_length=71, blank=True, null=True)
-    colour_size = models.CharField(db_column='Colour_Size', max_length=137)
-    po_quantity = models.DecimalField(db_column='Po_Quantity', max_digits=18, decimal_places=4)
-    uom = models.CharField(db_column='Uom', max_length=25)
-    inward_date = models.DateTimeField(db_column='Inward_Date', blank=True, null=True)
-    inward_quantity = models.DecimalField(db_column='Inward_Quantity', max_digits=38, decimal_places=4)
-    order_quantity = models.DecimalField(db_column='Order_Quantity', max_digits=18, decimal_places=4, blank=True, null=True)
-    inwdiff = models.IntegerField()
-    balancequantity = models.DecimalField(db_column='BalanceQuantity', max_digits=38, decimal_places=4, blank=True, null=True)
-    leadtime = models.CharField(max_length=10, blank=True, null=True)
+    itemno = models.SmallIntegerField(db_column='ItemNo')
+    ordno = models.CharField(max_length=50, blank=True, null=True)
+    o_finaldelvdate = models.DateTimeField(db_column='o_FinalDelvdate', blank=True, null=True)
+    sl = models.IntegerField(blank=True, null=True)
+    topbottom_des = models.CharField(db_column='TopBottom_des', max_length=50, blank=True, null=True)
+    tbimg = models.CharField(max_length=1550, blank=True, null=True)
+    clr = models.CharField(max_length=50, blank=True, null=True)
+    siz = models.CharField(max_length=50, blank=True, null=True)
+    order_qty = models.IntegerField(blank=True, null=True)
+    rejection_qty = models.IntegerField(blank=True, null=True)
+    required_qty = models.IntegerField(db_column='Required_Qty', blank=True, null=True)
+    plan_qty = models.IntegerField(db_column='Plan_Qty', blank=True, null=True)
+    plan_bal_pers = models.DecimalField(db_column='Plan_Bal_pers', max_digits=18, decimal_places=2, blank=True, null=True)
+    actual_cut_qty = models.IntegerField(db_column='Actual_Cut_Qty', blank=True, null=True)
+    hand_cutting = models.IntegerField(db_column='Hand_Cutting', blank=True, null=True)
+    cutting_bal_pers = models.DecimalField(db_column='Cutting_Bal_pers', max_digits=18, decimal_places=2, blank=True, null=True)
 
     class Meta:
         managed = False
-        db_table = 'vue_accessory_poinward'
+        db_table = 'view_cut_balpend'
 
-class VueAccessoryDel(models.Model):
-    slno = models.BigIntegerField(primary_key=True)
-    jobno = models.CharField(db_column='JobNo', max_length=50)
-    accessory_item = models.CharField(db_column='Accessory_Item', max_length=71, blank=True, null=True)
-    color_size = models.CharField(db_column='Color_Size', max_length=137)
-    deliverydate = models.DateTimeField(db_column='DeliveryDate', blank=True, null=True)
-    unit = models.CharField(db_column='Unit', max_length=4000, blank=True, null=True)
-    qty = models.DecimalField(db_column='Qty', max_digits=38, decimal_places=4, blank=True, null=True)
-    uom = models.CharField(db_column='UOM', max_length=25)
-    remarks = models.CharField(max_length=1)
+class ViewAccessoryDel(models.Model):
+    sl = models.IntegerField(primary_key=True)
+    jobno = models.CharField(max_length=50)
+    img = models.CharField(max_length=539, blank=True, null=True)
+    clrcombo = models.CharField(max_length=150, blank=True, null=True)
+    pono = models.IntegerField()
+    posupplier = models.CharField(max_length=80)
+    podate = models.CharField(max_length=50)
+    podue = models.CharField(max_length=50)
+    acc_item = models.CharField(db_column='Acc_Item', max_length=80)
+    clr_siz = models.CharField(max_length=80)
+    poqty = models.DecimalField(max_digits=18, decimal_places=2)
+    uom = models.CharField(max_length=50)
+    inwarddate = models.CharField(max_length=50)
+    fddate = models.DateTimeField(blank=True, null=True)
+    age = models.IntegerField()
+    inwardqty = models.DecimalField(max_digits=18, decimal_places=2)
+    inwpendqty = models.DecimalField(max_digits=18, decimal_places=2)
+    inwdiffqty = models.DecimalField(max_digits=18, decimal_places=2)
+    issueunit = models.CharField(max_length=80)
+    issuedt = models.CharField(max_length=50)
+    delqty = models.DecimalField(max_digits=18, decimal_places=2)
+    ret = models.DecimalField(max_digits=18, decimal_places=2)
+    storestock = models.DecimalField(max_digits=18, decimal_places=2)
+    status = models.CharField(max_length=13)
+    retmark = models.CharField(max_length=80)
+    
+    class Meta:
+        managed = False
+        db_table = 'view_accessory_del'
+
+class TmpQms(models.Model):
+    sl = models.IntegerField(primary_key=True)
+    jobno = models.CharField(max_length=50)
+    pono = models.IntegerField()
+    acc_item = models.CharField(db_column='Acc_Item', max_length=80)
+    clr_siz = models.CharField(max_length=80)
+    retmark = models.CharField(max_length=80)
 
     class Meta:
         managed = False
-        db_table = 'vue_accessory_del'
+        db_table = 'Tmp_Qms'
