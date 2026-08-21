@@ -5,7 +5,7 @@ import os
 import json
 from datetime import datetime
 from .models import LaySp, MasterFinalMistake, UnitBundlereport, FinalPlans,Corarlck1,CoraRollcheck,AttUnt,EmbAbsetnt,Holiday,LabAtt,RptCutting,VueOrdersinhand
-from .models import BillAge,BillMdapprove,BillPass,Leavempabsent,LaySpreadingLayemployee,HrLabourattendence,Employeeworking1,BitcheckHour,StickerHour
+from .models import BillAge,BillMdapprove,BillPass,Leavempabsent,LaySpreadingLayemployee,HrLabourattendence,Employeeworking1,BitcheckHour,StickerHour,TrsHrRsgnDtls
 from django.db.models import F, Q , IntegerField,DateField,Case, When, Value,CharField
 from django.db import connections
 from django.db.models import OuterRef, Subquery
@@ -20,6 +20,7 @@ from collections import defaultdict
 from django.db.models.expressions import ExpressionWrapper
 from django.core.paginator import Paginator
 from datetime import datetime
+from django.views.decorators.csrf import csrf_exempt
 
 
 # dt_timezone = timezone.make_aware(timezone.datetime(2012, 1, 1), timezone=timezone.UTC)
@@ -744,6 +745,153 @@ def abs_details(request):
             "message": str(e)
         }, status=500)
     
+
+@csrf_exempt
+def hr_resignation_details(request):
+
+    # =====================================================
+    # GET
+    # =====================================================
+    if request.method == "GET":
+        try:
+            records = TrsHrRsgnDtls.objects.all().values(
+                "empid",
+                "user_nms",
+                "in_ch_remarks",
+                "in_ch_date",
+                "hr_remarks",
+                "hr_date",
+                "created_date"
+            )
+
+            return JsonResponse({
+                "status": True,
+                "message": "Records fetched successfully",
+                "data": list(records)
+            }, status=200)
+
+        except Exception as e:
+            return JsonResponse({
+                "status": False,
+                "message": str(e),
+                "data": []
+            }, status=500)
+
+    # =====================================================
+    # POST
+    # =====================================================
+    elif request.method == "POST":
+        try:
+            data = json.loads(request.body)
+
+            empid = data.get("empid")
+            user_nms = data.get("user_nms")
+            in_ch_remarks = data.get("in_ch_remarks")
+            hr_remarks = data.get("hr_remarks")
+
+            # -------------------------------------------------
+            # Validate empid
+            # -------------------------------------------------
+            if empid is None:
+                return JsonResponse({
+                    "status": False,
+                    "message": "empid is required"
+                }, status=400)
+
+            # -------------------------------------------------
+            # Check existing employee
+            # -------------------------------------------------
+            obj = TrsHrRsgnDtls.objects.filter(
+                empid=empid
+            ).first()
+
+            # =================================================
+            # CREATE
+            # =================================================
+            if obj is None:
+
+                obj = TrsHrRsgnDtls.objects.create(
+                    empid=empid,
+                    user_nms=user_nms,
+                    in_ch_remarks=in_ch_remarks,
+                    in_ch_date=timezone.now() if in_ch_remarks else None,
+                    hr_remarks=hr_remarks,
+                    hr_date=timezone.now() if hr_remarks else None,
+                    created_date=timezone.now()
+                )
+
+                return JsonResponse({
+                    "status": True,
+                    "message": "Record created successfully",
+                    "data": {
+                        "empid": obj.empid,
+                        "user_nms": obj.user_nms,
+                        "in_ch_remarks": obj.in_ch_remarks,
+                        "in_ch_date": obj.in_ch_date,
+                        "hr_remarks": obj.hr_remarks,
+                        "hr_date": obj.hr_date,
+                        "created_date": obj.created_date
+                    }
+                }, status=201)
+
+            # =================================================
+            # UPDATE
+            # =================================================
+
+            if user_nms is not None:
+                obj.user_nms = user_nms
+
+            if in_ch_remarks is not None:
+                obj.in_ch_remarks = in_ch_remarks
+                obj.in_ch_date = timezone.now()
+
+            if hr_remarks is not None:
+                obj.hr_remarks = hr_remarks
+                obj.hr_date = timezone.now()
+
+            obj.save(
+                update_fields=[
+                    "user_nms",
+                    "in_ch_remarks",
+                    "in_ch_date",
+                    "hr_remarks",
+                    "hr_date"
+                ]
+            )
+
+            return JsonResponse({
+                "status": True,
+                "message": "Record updated successfully",
+                "data": {
+                    "empid": obj.empid,
+                    "user_nms": obj.user_nms,
+                    "in_ch_remarks": obj.in_ch_remarks,
+                    "in_ch_date": obj.in_ch_date,
+                    "hr_remarks": obj.hr_remarks,
+                    "hr_date": obj.hr_date,
+                    "created_date": obj.created_date
+                }
+            }, status=200)
+
+        except json.JSONDecodeError:
+            return JsonResponse({
+                "status": False,
+                "message": "Invalid JSON"
+            }, status=400)
+
+        except Exception as e:
+            return JsonResponse({
+                "status": False,
+                "message": str(e)
+            }, status=500)
+
+    # =====================================================
+    # Other methods
+    # =====================================================
+    return JsonResponse({
+        "status": False,
+        "message": "Only GET and POST methods are allowed"
+    }, status=405)
 
 def resign_report(request):
     try:

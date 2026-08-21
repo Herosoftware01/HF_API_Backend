@@ -8,21 +8,15 @@
 from django.db import models
 
 
-class HerofashionUser(models.Model):
-    id = models.BigAutoField(primary_key=True)
-    password = models.CharField(max_length=128, db_collation='Latin1_General_CI_AI')
-    last_login = models.DateTimeField(blank=True, null=True)
-    is_superuser = models.BooleanField()
-    username = models.CharField(unique=True, max_length=150, db_collation='Latin1_General_CI_AI')
-    first_name = models.CharField(max_length=150, db_collation='Latin1_General_CI_AI')
-    last_name = models.CharField(max_length=150, db_collation='Latin1_General_CI_AI')
-    email = models.CharField(max_length=254, db_collation='Latin1_General_CI_AI')
-    is_staff = models.BooleanField()
-    is_active = models.BooleanField()
-    date_joined = models.DateTimeField()
-    role = models.ForeignKey('herofashion.Role', models.DO_NOTHING, blank=True, null=True)
-    default_submenu = models.ForeignKey('herofashion.SubMenu', models.DO_NOTHING, blank=True, null=True)
+class TrsHrRsgnDtls(models.Model):
+    empid = models.IntegerField(primary_key=True)
+    user_nms = models.CharField(max_length=25, db_collation='Latin1_General_CI_AI', blank=True, null=True)
+    in_ch_remarks = models.CharField(max_length=100, db_collation='Latin1_General_CI_AI', blank=True, null=True)
+    in_ch_date = models.DateTimeField(blank=True, null=True)
+    hr_remarks = models.CharField(max_length=100, db_collation='Latin1_General_CI_AI', blank=True, null=True)
+    hr_date = models.DateTimeField(blank=True, null=True)
+    created_date = models.DateTimeField(blank=True, null=True)
 
     class Meta:
         managed = False
-        db_table = 'herofashion_user'
+        db_table = 'trs_hr_rsgn_dtls'

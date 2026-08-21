@@ -8,6 +8,7 @@ urlpatterns = [
     path("gate_module_api/<int:pk>/", views.gate_module_api, name="gate_module_api_detail"),
     path("gate_module_api_dtls/", views.gate_module_api_details, name="gate_module_api_details"),
     path("get_user_by_username/<int:id>/", views.get_user_by_username, name="get_user_by_username"),
+    path('holiday_list/', views.get_holidays, name='get_holidays'),
     path('cutting_del_print/', views.cutting_del_print, name='cutting_del_print'),
     path('cutting_del_print/<int:id>/', views.cutting_del_print, name='cutting_del_print'),
     path('cutting_bit_print/<int:id>/', views.cutting_bit_print, name='CuttingBitPrint'),

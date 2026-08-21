@@ -16,3 +16,5 @@ urlpatterns = [
     path('trs_workentry/', views.trs_workentry, name='trs_workentry'),
     path('trs_workentry/<int:id>/', views.trs_workentry, name='trs_workentry_detail'),
 ]  
+
+

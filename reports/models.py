@@ -411,6 +411,19 @@ class ResignDtls(models.Model):
         managed = False
         db_table = 'vue_resign_Dtls'
 
+class TrsHrRsgnDtls(models.Model):
+    empid = models.IntegerField(primary_key=True)
+    user_nms = models.CharField(max_length=25, db_collation='Latin1_General_CI_AI', blank=True, null=True)
+    in_ch_remarks = models.CharField(max_length=100, db_collation='Latin1_General_CI_AI', blank=True, null=True)
+    in_ch_date = models.DateTimeField(blank=True, null=True)
+    hr_remarks = models.CharField(max_length=100, db_collation='Latin1_General_CI_AI', blank=True, null=True)
+    hr_date = models.DateTimeField(blank=True, null=True)
+    created_date = models.DateTimeField(blank=True, null=True)
+
+    class Meta:
+        managed = False
+        db_table = 'trs_hr_rsgn_dtls'
+
 class Empjoin(models.Model):
     id = models.BigIntegerField(db_column='ID', primary_key=True)  # Field name made lowercase.
     code = models.IntegerField()

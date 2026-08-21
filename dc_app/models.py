@@ -460,3 +460,15 @@ class HerofashionUser(models.Model):
     class Meta:
         managed = False
         db_table = 'herofashion_user'
+
+
+
+class Holiday(models.Model):
+    dt = models.DateTimeField()
+    descr = models.CharField(max_length=150, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)
+    ty = models.CharField(max_length=10, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)
+    id = models.AutoField(primary_key=True)
+
+    class Meta:
+        managed = False
+        db_table = 'Holiday'

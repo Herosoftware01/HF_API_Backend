@@ -1,9 +1,11 @@
 from django.http import JsonResponse
-from .models import ViewCuttingDelPrint,ViewKnitDelivery,VueAccInhTransfer,VueAccProdDel,TrsGatemodule, CuttingPrintembdel, ViewYarnProcessDelivery,VueAccProcDel,ViewAccinwardVerification,ViewFabricDeliveryProcess,ViewMistakeqtyPrint,ViewUnitPcdelivery,VueRibDeliveryDetails,ViewGdwnFabricDeliveryPlan,TrsApidtls,ViewFabricDeliveryRepl,HerofashionUser
+from .models import ViewCuttingDelPrint,ViewKnitDelivery,VueAccInhTransfer,VueAccProdDel,TrsGatemodule, CuttingPrintembdel, ViewYarnProcessDelivery,VueAccProcDel,ViewAccinwardVerification,ViewFabricDeliveryProcess,ViewMistakeqtyPrint,ViewUnitPcdelivery,VueRibDeliveryDetails,ViewGdwnFabricDeliveryPlan,TrsApidtls,ViewFabricDeliveryRepl,HerofashionUser,Holiday
 import json
 from django.views.decorators.csrf import csrf_exempt
 from django.forms.models import model_to_dict
 from django.utils.dateparse import parse_datetime
+from django.utils import timezone
+
 
 def cutting_del_print(request):
     id = request.GET.get("id")  # Example: ?id=101
@@ -382,6 +384,24 @@ def get_user_by_username(request, id):
     data = HerofashionUser.objects.all()
 
     data1 = list(data.values('id', 'username', 'role__name'))
+
+    return JsonResponse({
+        "status": True,
+        "message": "Success",
+        "count": len(data1),
+        "data": data1
+    })
+
+
+
+def get_holidays(request):
+    current_year = timezone.now().year
+
+    data = Holiday.objects.using('main').filter(
+        dt__year=current_year
+    )
+
+    data1 = list(data.values())
 
     return JsonResponse({
         "status": True,
