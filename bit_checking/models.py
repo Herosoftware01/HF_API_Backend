@@ -36,6 +36,7 @@ class Stickemp(models.Model):
         managed = False
         db_table = 'stickemp'
 
+
 class VueMistakePartDetails(models.Model):
     rownum = models.BigIntegerField(db_column='RowNum', primary_key=True)  # Field name made lowercase.
     qrid = models.IntegerField(db_column='QrID')
@@ -167,8 +168,12 @@ class Accessory_Verification(models.Model):
     verify1_date = models.DateTimeField(blank=True, null=True)
     verify2_date = models.DateTimeField(blank=True, null=True)
 
+
 class user_accessory_verification(models.Model):
     user_id = models.IntegerField()
     user_name = models.CharField(max_length=100)
     verify1 = models.BooleanField(default=False)
     verify2 = models.BooleanField(default=False)
+
+
+

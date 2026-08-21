@@ -305,6 +305,8 @@ def gate_module_api(request, pk=None):
                 verify=body.get("verify"),
                 print_delivery_date=parse_datetime(print_date_val) if print_date_val else None,
                 gate_delivery_date=parse_datetime(gate_date_val) if gate_date_val else None,
+                prepered=body.get("prepered"),
+                fhero=body.get("fhero")
             )
 
             return JsonResponse({

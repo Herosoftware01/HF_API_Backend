@@ -588,7 +588,7 @@ class GetUnitAssemply(APIView):
             data = Assembly_data.objects.filter(unit=unit, line=line, entry_date__gte=four_days_ago)
 
         # JSON response
-        results = list(data.values('bundle_id', 'job_no', 'seq', 'pc', 'color', 'entry_date'))
+        results = list(data.values('bundle_id', 'job_no','seq', 'pc', 'color', 'entry_date'))
         return Response({"status": True, "data": results})
     
 
@@ -796,38 +796,6 @@ save_assembly = SaveAssemblyAPIView.as_view()
 
 
 
-# @api_view(['POST'])
-# def get_process_details(request):
-
-#     jobno = request.data.get('jobno')
-#     topbottom = request.data.get('topbottom')
-
-#     if not jobno or not topbottom:
-#         return JsonResponse(
-#             {"error": "Jobno and TopBottom required"},
-#             status=400
-#         )
-
-#     with connections['demo'].cursor() as cursor:
-#         cursor.execute(
-#             "EXEC sp_GetProcessDetails %s, %s",
-#             [jobno, topbottom]
-#         )
-
-#         columns = [col[0] for col in cursor.description]
-
-#         rows = cursor.fetchall()
-
-#         result = []
-
-#         for row in rows:
-#             result.append(
-#                 dict(zip(columns, row))
-#             )
-
-#     return JsonResponse(result, safe=False)
-
-
 @api_view(['POST'])
 def get_process_details(request):
     jobno = request.data.get('jobno')
@@ -843,8 +811,6 @@ def get_process_details(request):
     if str(topbottom).strip().isdigit():
         saved_filter |= Q(job_no=jobno, tb_id=int(topbottom))
 
-    # Saved configuration takes priority. Include its dependency_data rows so
-    # the frontend can restore the selected checkboxes and badges directly.
     saved_dependencies = dependency.objects.filter(saved_filter).prefetch_related(
         'data_entries'
     ).order_by('-id')
@@ -875,16 +841,38 @@ def get_process_details(request):
         return JsonResponse(saved_result, safe=False)
 
     # 1. Stored Procedure moolam data eduthu varuthu
+    # with connections['demo'].cursor() as cursor:
+    #     cursor.execute(
+    #         "EXEC sp_GetProcessDetails %s, %s",
+    #         [jobno, topbottom]
+    #     )
+    #     columns = [col[0] for col in cursor.description]
+    #     rows = cursor.fetchall()
+    #     result = []
+    #     for row in rows:
+    #         result.append(dict(zip(columns, row)))
+
     with connections['demo'].cursor() as cursor:
         cursor.execute(
             "EXEC sp_GetProcessDetails %s, %s",
             [jobno, topbottom]
         )
+
         columns = [col[0] for col in cursor.description]
         rows = cursor.fetchall()
+
         result = []
+
         for row in rows:
-            result.append(dict(zip(columns, row)))
+            item = dict(zip(columns, row))
+
+            # Trn = A / R மட்டும்
+            trn = str(
+                item.get('Trn', '') or ''
+            ).strip().upper()
+
+            if trn in ('A', 'R'):
+                result.append(item)
 
     # 2. Munbe save aanatha nu check panni results-oda serkkurathu
     for item in result:

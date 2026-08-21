@@ -44,5 +44,7 @@ urlpatterns = [
     path('bill_details/', views.bill_details , name='bill_details'),
     path('pay_dash/', views.pay_dashboard , name='pay_dash'),
     path('pay_details/', views.pay_bill_details , name='pay_details'),
+    path('dyeing_data/', views.dyeing_data , name='dyeing_data'),
+    path('dyeing_order_details/', views.dyeing_order_details , name='dyeing_order_details'),
 
     ] 
