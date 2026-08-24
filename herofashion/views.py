@@ -70,6 +70,7 @@ class SidebarView(APIView):
             menu = rm.menu
             menu_dict[menu.id] = {
                 "id": menu.id,
+                
                 "name": menu.name,
                 "icon": request.build_absolute_uri(menu.icon.url) if menu.icon else None,
                 "submenus": []
