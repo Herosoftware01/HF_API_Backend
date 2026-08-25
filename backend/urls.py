@@ -39,6 +39,7 @@ urlpatterns = [
     path('fashionr/', include('fashionr.urls')),
     path('dcapp/', include('dc_app.urls')),
     path('accessory/', include('bit_checking.urls')) ,
+    # path('software_cost/', include('software_costing.urls')) ,
 ] 
 
 

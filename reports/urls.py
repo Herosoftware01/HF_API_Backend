@@ -21,6 +21,7 @@ urlpatterns = [
     path('absent_details/', views.abs_details, name='absent_details'),
     path('present_details/', views.present_details, name='present_details'),
     path('resign_report/', views.resign_report, name='resign_report'),
+    path('hr_resignation_details/', views.hr_resignation_details, name='hr_resignation_details'),
     path('join_data/', views.join_data, name='join_data'),
     path('staff_overview/', views.staff_overview, name='staff_overview'),
     path('staff_pre/', views.staff_pre, name='staff_pre'),
