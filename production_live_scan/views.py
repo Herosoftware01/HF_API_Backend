@@ -625,7 +625,8 @@ def assembly_emp(request):
     emp_details = list(emp_allocate.objects.filter(
         date__date=filter_date,
         unit=unit_obj.id,
-        line=line_obj.id
+        line=line_obj.id,
+        status=1
     ).values(
         'emp_code',
         'machine',
@@ -782,7 +783,8 @@ class SaveAssemblyAPIView(APIView):
                     pc=bundle.pc,
                     entry_date=entry_date,
                     scan=False,
-                    lot=bundle.lot
+                    lot=bundle.lot,
+                    emp_id=emp_code
                 )
                 for bundle in bundles
             ])
@@ -829,6 +831,7 @@ def get_process_details(request):
                 'Process_des': dep.process_des,
                 'mc': dep.mc,
                 'thrd': dep.thrd,
+                
                 'Wsec': dep.wsec,
                 'Process_ID': dep.process_id,
                 'saved_and_or': 1 if dep.and_or else 0,
@@ -839,19 +842,6 @@ def get_process_details(request):
                 ],
             })
         return JsonResponse(saved_result, safe=False)
-
-    # 1. Stored Procedure moolam data eduthu varuthu
-    # with connections['demo'].cursor() as cursor:
-    #     cursor.execute(
-    #         "EXEC sp_GetProcessDetails %s, %s",
-    #         [jobno, topbottom]
-    #     )
-    #     columns = [col[0] for col in cursor.description]
-    #     rows = cursor.fetchall()
-    #     result = []
-    #     for row in rows:
-    #         result.append(dict(zip(columns, row)))
-
     with connections['demo'].cursor() as cursor:
         cursor.execute(
             "EXEC sp_GetProcessDetails %s, %s",

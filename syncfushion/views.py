@@ -810,18 +810,59 @@ def DueDateList(request):
     data = list(ViewAccinwpend.objects.using('test').all().values()) 
     return JsonResponse(data, safe=False)
 
+from django.db.models import Sum, Min
 def CutBalpend(request):
-    queryset = list(ViewCutBalpend.objects.using('demo').all().values())
-    
-    for obj in queryset:
-        raw_path = obj['tbimg'] if obj.get('tbimg') else None
-        if raw_path:
-            filename = raw_path.split('\\')[-1]
-            obj['tbimg'] = f"https://app.herofashion.com/order_image/{filename}"
-        else:
-            obj['tbimg'] = ""
+    qs = ViewCutBalpend.objects.using("demo").all()
 
-    return JsonResponse(queryset, safe=False)
+    # Normal: show all records
+    if request.GET.get("merge") != "true":
+        data = list(qs.values())
+
+        for obj in data:
+            path = obj.get("tbimg")
+            obj["tbimg"] = (
+                f"https://app.herofashion.com/order_image/{path.split('\\')[-1]}"
+                if path else ""
+            )
+
+        return JsonResponse(data, safe=False)
+
+    # Merge: jobno-wise
+    sum_fields = [
+        "order_qty", "rejection_qty", "required_qty", "plan_qty", "actual_cut_qty", "hand_cutting",
+    ]
+
+    data = list(
+        qs.values("ordno", "o_finaldelvdate", "topbottom_des", "clr")
+        .annotate(
+            slno=Min("slno"),
+            tbimg=Min("tbimg"),
+            remdays=Min("remdays"),
+            risk=Min("risk"),
+            **{field: Sum(field) for field in sum_fields})
+        .order_by("ordno")
+    )
+
+    for obj in data:
+        req = obj["required_qty"] or 0
+        path = obj.get("tbimg")
+        obj["tbimg"] = (
+            f"https://app.herofashion.com/order_image/{path.split('\\')[-1]}"
+            if path else ""
+        )
+        obj.update(
+            siz="All Size",
+            cut_pend=(obj["plan_qty"] or 0) - (obj["actual_cut_qty"] or 0),
+            cutbal_pcs=(obj["required_qty"] or 0) - (obj["actual_cut_qty"] or 0),
+            plan_bal_pers=round(
+                100 - ((obj["plan_qty"] or 0) / req * 100), 2
+            ) if req else 0,
+            cutting_bal_pers=round(
+                100 - ((obj["actual_cut_qty"] or 0) / req * 100), 2
+            ) if req else 0,
+        )
+
+    return JsonResponse(data, safe=False)
 
 @csrf_exempt
 def AccessoryDel(request):
