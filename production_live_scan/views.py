@@ -220,6 +220,7 @@ class UnitInputAPIView(APIView):
                 now_ist = timezone.now()
 
                 unit_inputs = []
+                end_line_inputs = []
 
                 for item in data_list:
 
@@ -251,7 +252,8 @@ class UnitInputAPIView(APIView):
                             color=item.get('color'),
                             tb_id=item.get('tb_id'),
                             tb_name=item.get('tb_name'),
-                            scan=item.get('scan', False),
+                            # scan=item.get('scan', False),
+                            scan=1 if item.get("allow_end_line") is True else item.get("scan", False),
                             size=item.get('size'),
                             size_id=item.get('size_id'),
                             pc=item.get('pc'),
@@ -260,8 +262,43 @@ class UnitInputAPIView(APIView):
                         )
                     )
 
-                unit_input.objects.bulk_create(unit_inputs)
+                
+                    # --------------------------------
+                    # END LINE
+                    # --------------------------------
+                    if item.get("allow_end_line") is True:
 
+                        end_line_inputs.append(
+                            end_line_data(
+                                unit=item.get("unit"),
+                                line=item.get("line"),
+                                job_no=item.get("job_no"),
+                                tb_id=item.get("tb_id"),
+                                tb_name=item.get("tb_name"),
+                                machine=item.get("machine", ""),
+                                date=final_date,
+                                bundle_id=item.get("bundle_id"),
+                                bdl_no=item.get("bdl_no"),
+                                mbud=item.get("mbud"),
+                                size=item.get("size"),
+                                size_id=item.get("size_id"),
+                                color=item.get("color"),
+                                pc=item.get("pc"),
+                                entry_date=now_ist,
+                                scan=item.get("scan", False),
+                                lot=item.get("lot") or "0",
+                            )
+                        )
+
+                # Save normal unit input
+                if unit_inputs:
+                    unit_input.objects.bulk_create(unit_inputs)
+
+                # Save end line data only when checkbox is enabled
+                if end_line_inputs:
+                    end_line_data.objects.bulk_create(end_line_inputs)
+
+                # unit_input.objects.bulk_create(unit_inputs)
 
                 bundle_ids = [
                     item.get("bundle_id")
@@ -798,119 +835,6 @@ save_assembly = SaveAssemblyAPIView.as_view()
 
 
 
-# @api_view(['POST'])
-# def get_process_details(request):
-#     jobno = request.data.get('jobno')
-#     topbottom = request.data.get('topbottom')
-
-#     if not jobno or not topbottom:
-#         return JsonResponse(
-#             {"error": "Jobno and TopBottom required"},
-#             status=400
-#         )
-
-#     saved_filter = Q(job_no=jobno) & Q(tb_name__iexact=str(topbottom).strip())
-#     if str(topbottom).strip().isdigit():
-#         saved_filter |= Q(job_no=jobno, tb_id=int(topbottom))
-
-#     saved_dependencies = dependency.objects.filter(saved_filter).prefetch_related(
-#         'data_entries'
-#     ).order_by('-id')
-#     latest_by_process = {}
-#     for dep in saved_dependencies:
-#         latest_by_process.setdefault(dep.process_id, dep)
-
-#     if latest_by_process:
-#         saved_result = []
-#         for index, dep in enumerate(reversed(list(latest_by_process.values())), start=1):
-#             saved_result.append({
-#                 'Jobno': dep.job_no,
-#                 'TopBottdes': dep.tb_name,
-#                 'TbID': dep.tb_id,
-#                 'sl': index,
-#                 'Process_des': dep.process_des,
-#                 'mc': dep.mc,
-#                 'thrd': dep.thrd,
-#                 'Wsec': dep.wsec,
-#                 'Process_ID': dep.process_id,
-#                 'saved_and_or': 1 if dep.and_or else 0,
-#                 'saved_verify': bool(dep.verify),
-#                 'saved_selected_processes': [
-#                     child.descriptions
-#                     for child in dep.data_entries.all().order_by('desc_ord_no', 'id')
-#                 ],
-#             })
-#         return JsonResponse(saved_result, safe=False)
-
-#     # 1. Stored Procedure moolam data eduthu varuthu
-#     # with connections['demo'].cursor() as cursor:
-#     #     cursor.execute(
-#     #         "EXEC sp_GetProcessDetails %s, %s",
-#     #         [jobno, topbottom]
-#     #     )
-#     #     columns = [col[0] for col in cursor.description]
-#     #     rows = cursor.fetchall()
-#     #     result = []
-#     #     for row in rows:
-#     #         result.append(dict(zip(columns, row)))
-
-#     with connections['demo'].cursor() as cursor:
-#         cursor.execute(
-#             "EXEC sp_GetProcessDetails %s, %s",
-#             [jobno, topbottom]
-#         )
-
-#         columns = [col[0] for col in cursor.description]
-#         rows = cursor.fetchall()
-
-#         result = []
-
-#         for row in rows:
-#             item = dict(zip(columns, row))
-
-#             # Trn = A / R மட்டும்
-#             trn = str(
-#                 item.get('Trn', '') or ''
-#             ).strip().upper()
-
-#             if trn in ('A', 'R'):
-#                 result.append(item)
-
-#     # 2. Munbe save aanatha nu check panni results-oda serkkurathu
-#     for item in result:
-#         process_id = item.get('Process_ID')
-#         job_no = item.get('Jobno')
-#         tb_id = item.get('TbID')
-
-#         try:
-#             # Table-la antha job_no, tb_id, process_id irukha nu paarkurathu
-#             existing_dep = dependency.objects.filter(
-#                 job_no=job_no,
-#                 tb_id=tb_id,
-#                 process_id=process_id
-#             ).order_by('-id').first()
-
-#             if existing_dep:
-#                 # and_or boolean-ah irunthal 1/0 aah mathi anuppurathu
-#                 item['saved_and_or'] = 1 if existing_dep.and_or else 0
-#                 item['saved_verify'] = bool(existing_dep.verify)
-                
-#                 # related_name='data_entries' vechu dependency_data-la irukka descriptions-ah edukkurathu
-#                 saved_children = existing_dep.data_entries.all().order_by('desc_ord_no', 'id')
-#                 item['saved_selected_processes'] = [child.descriptions for child in saved_children]
-#             else:
-#                 item['saved_and_or'] = 0
-#                 item['saved_verify'] = False
-#                 item['saved_selected_processes'] = []
-                
-#         except Exception as e:
-#             item['saved_and_or'] = 0
-#             item['saved_verify'] = False
-#             item['saved_selected_processes'] = []
-
-#     return JsonResponse(result, safe=False)
-
-
 @api_view(['POST'])
 def get_process_details(request):
     jobno = request.data.get('jobno')
@@ -921,11 +845,7 @@ def get_process_details(request):
             {"error": "Jobno and TopBottom required"},
             status=400
         )
-
-    # =========================================================
-    # 1. Stored Procedure-la irunthu data edukkum
-    #    Trn also stored procedure-la irunthu varum
-    # =========================================================
+        
     with connections['demo'].cursor() as cursor:
         cursor.execute(
             "EXEC sp_GetProcessDetails %s, %s",

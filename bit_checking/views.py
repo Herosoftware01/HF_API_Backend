@@ -952,57 +952,57 @@ def delete_permission(request):
 # -------------------------
 # Verification Table
 # -------------------------
-@api_view(["GET"])
-# @permission_classes([IsAuthenticated])
-def verification_table(request):
+# @api_view(["GET"])
+# # @permission_classes([IsAuthenticated])
+# def verification_table(request):
     
-    permission = user_accessory_verification.objects.filter(
-        user_id=request.user.id
-    ).first()
+#     permission = user_accessory_verification.objects.filter(
+#         user_id=request.user.id
+#     ).first()
 
-    show_verify1 = permission.verify1 if permission else False
-    show_verify2 = permission.verify2 if permission else False
-    view_rows = ViewAccinwardVerification.objects.using('test').values(
-        "slno", "date", "record_pk", "name", "supplierdcno", "pono",
-        "jobno", "items", "clr_siz", "quantity", "uom", "bill_rate",
-        "gst", "billno", "billdate"
-    )
-    # The source view's record_pk is the verification business key.
-    rows_with_keys = [(row, row["record_pk"]) for row in view_rows]
-    record_keys = [record_key for _, record_key in rows_with_keys]
-    verification_by_key = {
-        item.pk_name: item
-        for item in Accessory_Verification.objects.filter(pk_name__in=record_keys)
-    }
+#     show_verify1 = permission.verify1 if permission else False
+#     show_verify2 = permission.verify2 if permission else False
+#     view_rows = ViewAccinwardVerification.objects.using('test').values(
+#         "slno", "date", "record_pk", "name", "supplierdcno", "pono",
+#         "jobno", "items", "clr_siz", "quantity", "uom", "bill_rate",
+#         "gst", "billno", "billdate"
+#     )
+#     # The source view's record_pk is the verification business key.
+#     rows_with_keys = [(row, row["record_pk"]) for row in view_rows]
+#     record_keys = [record_key for _, record_key in rows_with_keys]
+#     verification_by_key = {
+#         item.pk_name: item
+#         for item in Accessory_Verification.objects.filter(pk_name__in=record_keys)
+#     }
 
-    data = []
-    for row, record_key in rows_with_keys:
-        verify = verification_by_key.get(record_key)
-        data.append({
-            "pk": record_key,
-            "slno": row["slno"],
-            "date": row["date"].strftime("%d-%m-%Y") if row["date"] else "",
-            "supplier": row["name"],
-            "supplierdcno": row["supplierdcno"],
-            "pono": row["pono"],
-            "jobno": row["jobno"],
-            "item": row["items"],
-            "clr_siz": row["clr_siz"],
-            "qty": float(row["quantity"]) if row["quantity"] is not None else 0,
-            "uom": row["uom"],
-            "bill_rate": float(row["bill_rate"]) if row["bill_rate"] is not None else None,
-            "gst": row["gst"],
-            "billno": row["billno"],
-            "billdate": row["billdate"].strftime("%d-%m-%Y") if row["billdate"] else "",
-            "verify1_status": verify.verify1 if verify else False,
-            "verify2_status": verify.verify2 if verify else False,
-        })
+#     data = []
+#     for row, record_key in rows_with_keys:
+#         verify = verification_by_key.get(record_key)
+#         data.append({
+#             "pk": record_key,
+#             "slno": row["slno"],
+#             "date": row["date"].strftime("%d-%m-%Y") if row["date"] else "",
+#             "supplier": row["name"],
+#             "supplierdcno": row["supplierdcno"],
+#             "pono": row["pono"],
+#             "jobno": row["jobno"],
+#             "item": row["items"],
+#             "clr_siz": row["clr_siz"],
+#             "qty": float(row["quantity"]) if row["quantity"] is not None else 0,
+#             "uom": row["uom"],
+#             "bill_rate": float(row["bill_rate"]) if row["bill_rate"] is not None else None,
+#             "gst": row["gst"],
+#             "billno": row["billno"],
+#             "billdate": row["billdate"].strftime("%d-%m-%Y") if row["billdate"] else "",
+#             "verify1_status": verify.verify1 if verify else False,
+#             "verify2_status": verify.verify2 if verify else False,
+#         })
 
-    return Response({
-        "user": {"id": request.user.id, "username": request.user.username},
-        "permissions": {"verify1": show_verify1, "verify2": show_verify2},
-        "data": data,
-    })
+#     return Response({
+#         "user": {"id": request.user.id, "username": request.user.username},
+#         "permissions": {"verify1": show_verify1, "verify2": show_verify2},
+#         "data": data,
+#     })
 
 
 # -------------------------
@@ -1542,7 +1542,7 @@ def delete_permission(request):
 # Verification Table
 # -------------------------
 @api_view(["GET"])
-@permission_classes([IsAuthenticated])
+# @permission_classes([IsAuthenticated])
 def verification_table(request):
     permission = user_accessory_verification.objects.filter(
         user_id=request.user.id
@@ -1584,6 +1584,14 @@ def verification_table(request):
             "billdate": row["billdate"].strftime("%d-%m-%Y") if row["billdate"] else "",
             "verify1_status": verify.verify1 if verify else False,
             "verify2_status": verify.verify2 if verify else False,
+            "verify1_date": (
+                verify.verify1_date.strftime("%d-%m-%Y %I:%M %p")
+                if verify and verify.verify1_date else ""
+            ),
+            "verify2_date": (
+                verify.verify2_date.strftime("%d-%m-%Y %I:%M %p")
+                if verify and verify.verify2_date else ""
+            ),
         })
 
     return Response({
