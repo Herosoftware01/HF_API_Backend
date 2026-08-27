@@ -46,6 +46,7 @@ class subcategory_master(models.Model):
 class task_master(models.Model):
     id = models.AutoField(primary_key=True)
     project = models.ForeignKey(project_master, on_delete=models.CASCADE, null=True, blank=True) # Connects task to a project
+    code = models.ForeignKey(user_master, on_delete=models.CASCADE, null=True, blank=True)
     task_name = models.CharField(max_length=100)
     task_description = models.TextField(null=True, blank=True)
     task_status = models.CharField(max_length=50, default="Pending") # Changed to CharField for "Pending", "Completed", etc.
