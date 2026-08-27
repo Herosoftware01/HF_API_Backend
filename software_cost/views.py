@@ -304,35 +304,63 @@ def subcategory_master_api(request):
 def task_master_api(request):
     if request.method == 'GET':
         data = task_master.objects.all()
-        return JsonResponse(list(data.values()), safe=False)
+
+        return JsonResponse(
+            list(data.values(
+                'id',
+                'project_id',
+                'code_id',
+                'task_name',
+                'task_description',
+                'task_status',
+                'created_at',
+                'updated_at'
+            )),
+            safe=False
+        )
 
     elif request.method == 'POST':
         try:
             body = json.loads(request.body)
-            
-            # Handle empty strings from the frontend dropdown gracefully
+
+            # Get IDs from frontend
             proj_id = body.get('project_id')
-            if proj_id == "": 
+            user_id = body.get('user_id')
+
+            # Convert empty values to None
+            if proj_id == "":
                 proj_id = None
 
+            if user_id == "":
+                user_id = None
+
+            # Create task
             obj = task_master.objects.create(
+                project_id=proj_id,
+                code_id=user_id,   # Save user_master ID here
                 task_name=body.get('task_name'),
                 task_description=body.get('task_description', ''),
-                task_status=body.get('task_status', 'Pending'),
-                project_id=proj_id, # Assign the task to the project here
-                created_at=timezone.now(),
-                updated_at=timezone.now()
+                task_status=body.get('task_status', 'Pending')
             )
+
             return JsonResponse({
                 "status": True,
                 "message": "Task created successfully",
-                "id": obj.id
+                "id": obj.id,
+                "project_id": obj.project_id,
+                "user_id": obj.code_id
             })
+
         except Exception as e:
             return JsonResponse({
                 "status": False,
                 "message": str(e)
             }, status=400)
+
+    return JsonResponse({
+        "status": False,
+        "message": "Method not allowed"
+    }, status=405)
 
 
 @csrf_exempt
