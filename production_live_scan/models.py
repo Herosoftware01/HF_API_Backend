@@ -51,6 +51,7 @@ class Assembly_data(models.Model):
     entry_date = models.DateTimeField()
     scan = models.BooleanField(default=False)
     lot = models.CharField(max_length=50)
+    emp_id = models.CharField(max_length=20, blank=True, null=True)
     # process_des = models.CharField(max_length=500)
 
 
