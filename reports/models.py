@@ -396,7 +396,7 @@ class VueOrdersinhand(models.Model):
 
 
 class ResignDtls(models.Model):
-    slno = models.BigIntegerField(db_column='SlNo',primary_key=True)  # Field name made lowercase.
+    slno = models.BigIntegerField(db_column='SlNo', primary_key=True)  # Field name made lowercase.
     code = models.IntegerField()
     photo = models.CharField(max_length=400, blank=True, null=True)
     name = models.CharField(max_length=100, blank=True, null=True)
@@ -406,6 +406,7 @@ class ResignDtls(models.Model):
     joindt = models.DateTimeField(db_column='JoinDt', blank=True, null=True)  # Field name made lowercase.
     resigndt = models.DateTimeField(db_column='resignDt', blank=True, null=True)  # Field name made lowercase.
     days_worked = models.IntegerField(db_column='Days_Worked', blank=True, null=True)  # Field name made lowercase.
+    unitcode = models.IntegerField(db_column='Unitcode', blank=True, null=True)  # Field name made lowercase.
 
     class Meta:
         managed = False
@@ -433,6 +434,7 @@ class Empjoin(models.Model):
     category = models.CharField(db_column='Category', max_length=50, blank=True, null=True)  # Field name made lowercase.
     joindt = models.DateTimeField(db_column='JoinDt', blank=True, null=True)  # Field name made lowercase.
     dept = models.CharField(max_length=50, blank=True, null=True)
+    unitcode = models.IntegerField(db_column='Unitcode', blank=True, null=True)  # Field name made lowercase.
 
     class Meta:
         managed = False

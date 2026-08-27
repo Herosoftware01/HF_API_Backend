@@ -3,6 +3,7 @@ from django.db import connections
 from rest_framework.decorators import api_view
 # import pandas as pd
 from rest_framework.views import APIView
+from zoneinfo import ZoneInfo
 from rest_framework.response import Response
 from rest_framework import status, permissions
 from .models import QcAdminMistake,cut_sample_data_final,Cont_employee,sequency_data,cut_sample_data,cut_sample_data_final,VueUser,Unit,Needle_change,Line,roving_qc_mistake,qc_piece_final, MachineAllocation, machine_details, emp_allocate, Empwisesal, VueProcessSequence,qc_hourly_approval,VueUloginRole,QcHourlyApproval 
@@ -2278,15 +2279,17 @@ def machine_attendance_api(request):
 
 def needle_report_api(request):
     if request.method == "GET":
-        today = timezone.localdate()
+        today = datetime.now(ZoneInfo("Asia/Kolkata")).date()
 
         data = (
-            Needle_change.objects.using('default')
-            .filter(date__date=today)   # Replace 'created_at' with your DateTimeField
+            Needle_change.objects.using("default")
+            .filter(date__date=today)
             .values()
         )
 
         return JsonResponse(list(data), safe=False)
+
+    return JsonResponse({"error": "Only GET method is allowed"}, status=405)
     
 
 def get_shift(dt):
