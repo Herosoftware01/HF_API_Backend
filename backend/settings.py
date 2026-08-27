@@ -98,7 +98,8 @@ INSTALLED_APPS = [
     'bundle_tracking',
     'production_live_scan',
     'fashionr',
-    # 'software_costing',
+    'software_cost',
+    
 ]
 
 DATA_UPLOAD_MAX_MEMORY_SIZE = 1024 * 1024 * 200
