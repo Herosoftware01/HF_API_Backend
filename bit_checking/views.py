@@ -1584,6 +1584,14 @@ def verification_table(request):
             "billdate": row["billdate"].strftime("%d-%m-%Y") if row["billdate"] else "",
             "verify1_status": verify.verify1 if verify else False,
             "verify2_status": verify.verify2 if verify else False,
+            "verify1_date": (
+                verify.verify1_date.strftime("%d-%m-%Y %I:%M %p")
+                if verify and verify.verify1_date else ""
+            ),
+            "verify2_date": (
+                verify.verify2_date.strftime("%d-%m-%Y %I:%M %p")
+                if verify and verify.verify2_date else ""
+            ),
         })
 
     return Response({
