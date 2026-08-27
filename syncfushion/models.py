@@ -207,6 +207,7 @@ class ViewCutBalpend(models.Model):
     remdays = models.IntegerField(blank=True, null=True)
     risk = models.CharField(db_column='Risk', max_length=6)
     plan_qty = models.IntegerField(db_column='Plan_Qty', blank=True, null=True)
+    planbal_pcs = models.IntegerField(db_column='PlanBal_Pcs', blank=True, null=True)
     plan_bal_pers = models.DecimalField(db_column='Plan_Bal_pers', max_digits=18, decimal_places=2, blank=True, null=True)
     actual_cut_qty = models.IntegerField(db_column='Actual_Cut_Qty', blank=True, null=True)
     cut_pend = models.IntegerField(db_column='Cut_Pend', blank=True, null=True)

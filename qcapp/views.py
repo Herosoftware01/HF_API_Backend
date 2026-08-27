@@ -1530,8 +1530,7 @@ def get_cutting_measurements(request):
         cursor.execute(
             """
             EXEC sp_GetStickerDetails_BySL
-                @sl=%s
-                
+                @sl=%s    
             """,
             [sl]
         )

@@ -853,6 +853,7 @@ def CutBalpend(request):
         obj.update(
             siz="All Size",
             cut_pend=(obj["plan_qty"] or 0) - (obj["actual_cut_qty"] or 0),
+            planbal_pcs=(obj["required_qty"] or 0) - (obj["plan_qty"] or 0),
             cutbal_pcs=(obj["required_qty"] or 0) - (obj["actual_cut_qty"] or 0),
             plan_bal_pers=round(
                 100 - ((obj["plan_qty"] or 0) / req * 100), 2

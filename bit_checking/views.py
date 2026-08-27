@@ -1599,7 +1599,7 @@ def verification_table(request):
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def verify_accessory(request):
-    body = request.dataf
+    body = request.data
     verify_type = body.get("type")
     permission = user_accessory_verification.objects.filter(
         user_id=request.user.id
