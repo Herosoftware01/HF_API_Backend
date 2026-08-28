@@ -3,6 +3,7 @@ from . import views
 
 urlpatterns = [
     path('trs_workentry/', views.trs_workentry, name='trs_workentry'),
+    path('trs_workentry/<int:id>/', views.trs_workentry, name='trs_workentry'),
     path('user_master/', views.user_master_api, name='user_master'),
     path('project_master/', views.project_master_api, name='project_master'),
     path('category_master/', views.category_master_api, name='category_master'),
