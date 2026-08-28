@@ -2,7 +2,7 @@ from django.http import JsonResponse
 import json
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
-from .models import TrsWorkentry,user_master,project_master,category_master,subcategory_master,task_master,project_task_mapping
+from .models import TrsWorkentry,user_master,project_master,category_master,subcategory_master,task_master,project_task_mapping,workentry_pause
 
 
 @csrf_exempt
@@ -309,7 +309,7 @@ def task_master_api(request):
             list(data.values(
                 'id',
                 'project_id',
-                'code_id',
+                'code_id',       # This maps to the User ID from user_master
                 'task_name',
                 'task_description',
                 'task_status',
@@ -330,7 +330,6 @@ def task_master_api(request):
             # Convert empty values to None
             if proj_id == "":
                 proj_id = None
-
             if user_id == "":
                 user_id = None
 
@@ -356,6 +355,59 @@ def task_master_api(request):
                 "status": False,
                 "message": str(e)
             }, status=400)
+
+    # ADDED PUT METHOD FOR EDITING TASKS
+    elif request.method == 'PUT':
+        try:
+            body = json.loads(request.body)
+            task_id = body.get('id')
+            
+            if not task_id:
+                return JsonResponse({"status": False, "message": "Task ID is required for update"}, status=400)
+
+            obj = task_master.objects.get(id=task_id)
+
+            proj_id = body.get('project_id')
+            user_id = body.get('user_id')
+
+            obj.project_id = None if proj_id == "" else proj_id
+            obj.code_id = None if user_id == "" else user_id
+            obj.task_name = body.get('task_name', obj.task_name)
+            obj.task_description = body.get('task_description', obj.task_description)
+            obj.task_status = body.get('task_status', obj.task_status)
+            obj.save()
+
+            return JsonResponse({
+                "status": True,
+                "message": "Task updated successfully"
+            })
+
+        except task_master.DoesNotExist:
+            return JsonResponse({"status": False, "message": "Task not found"}, status=404)
+        except Exception as e:
+            return JsonResponse({"status": False, "message": str(e)}, status=400)
+
+    # ADDED DELETE METHOD FOR DELETING TASKS
+    elif request.method == 'DELETE':
+        try:
+            body = json.loads(request.body)
+            task_id = body.get('id')
+            
+            if not task_id:
+                return JsonResponse({"status": False, "message": "Task ID is required for deletion"}, status=400)
+
+            obj = task_master.objects.get(id=task_id)
+            obj.delete()
+
+            return JsonResponse({
+                "status": True, 
+                "message": "Task deleted successfully"
+            })
+            
+        except task_master.DoesNotExist:
+            return JsonResponse({"status": False, "message": "Task not found"}, status=404)
+        except Exception as e:
+            return JsonResponse({"status": False, "message": str(e)}, status=400)
 
     return JsonResponse({
         "status": False,
@@ -545,4 +597,192 @@ def trs_workentry(request, id=None):
     return JsonResponse({
         "status": False,
         "message": "Invalid request"
+    }, status=405)
+
+
+@csrf_exempt
+def workentry_pause_api(request):
+
+    # ==========================================================
+    # GET
+    # ==========================================================
+    if request.method == 'GET':
+        try:
+            pauses = workentry_pause.objects.select_related('workentry').all()
+
+            data = []
+
+            for pause in pauses:
+                data.append({
+                    "id": pause.id,
+
+                    "workentry_id": pause.workentry_id,
+
+                    "pause_start_time": pause.pause_start_time,
+                    "pause_end_time": pause.pause_end_time,
+
+                    "created_at": pause.created_at,
+                    "updated_at": pause.updated_at,
+                })
+
+            return JsonResponse({
+                "status": True,
+                "data": data
+            })
+
+        except Exception as e:
+            return JsonResponse({
+                "status": False,
+                "message": str(e)
+            }, status=500)
+
+    # ==========================================================
+    # POST
+    # ==========================================================
+    elif request.method == 'POST':
+        try:
+            body = json.loads(request.body)
+
+            workentry_id = body.get('workentry_id')
+            pause_start_time = body.get('pause_start_time')
+            pause_end_time = body.get('pause_end_time')
+
+            # Validate workentry
+            if not workentry_id:
+                return JsonResponse({
+                    "status": False,
+                    "message": "workentry_id is required"
+                }, status=400)
+
+            if not pause_start_time:
+                return JsonResponse({
+                    "status": False,
+                    "message": "pause_start_time is required"
+                }, status=400)
+
+            # Check workentry exists
+            try:
+                workentry = TrsWorkentry.objects.get(id=workentry_id)
+            except TrsWorkentry.DoesNotExist:
+                return JsonResponse({
+                    "status": False,
+                    "message": "Workentry not found"
+                }, status=404)
+
+            # Create pause
+            pause = workentry_pause.objects.create(
+                workentry=workentry,
+                pause_start_time=pause_start_time,
+                pause_end_time=pause_end_time if pause_end_time else None
+            )
+
+            return JsonResponse({
+                "status": True,
+                "message": "Workentry pause created successfully",
+                "data": {
+                    "id": pause.id,
+                    "workentry_id": pause.workentry_id,
+                    "pause_start_time": pause.pause_start_time,
+                    "pause_end_time": pause.pause_end_time,
+                    "created_at": pause.created_at,
+                    "updated_at": pause.updated_at
+                }
+            }, status=201)
+
+        except json.JSONDecodeError:
+            return JsonResponse({
+                "status": False,
+                "message": "Invalid JSON"
+            }, status=400)
+
+        except Exception as e:
+            return JsonResponse({
+                "status": False,
+                "message": str(e)
+            }, status=400)
+
+    # ==========================================================
+    # PUT
+    # ==========================================================
+    elif request.method == 'PUT':
+        try:
+            body = json.loads(request.body)
+
+            # Get pause ID
+            pause_id = body.get('id')
+
+            if not pause_id:
+                return JsonResponse({
+                    "status": False,
+                    "message": "id is required"
+                }, status=400)
+
+            # Find pause
+            try:
+                pause = workentry_pause.objects.get(id=pause_id)
+            except workentry_pause.DoesNotExist:
+                return JsonResponse({
+                    "status": False,
+                    "message": "Pause record not found"
+                }, status=404)
+
+            # Update workentry if provided
+            if 'workentry_id' in body:
+
+                workentry_id = body.get('workentry_id')
+
+                try:
+                    workentry = TrsWorkentry.objects.get(id=workentry_id)
+                    pause.workentry = workentry
+                except TrsWorkentry.DoesNotExist:
+                    return JsonResponse({
+                        "status": False,
+                        "message": "Workentry not found"
+                    }, status=404)
+
+            # Update start time if provided
+            if 'pause_start_time' in body:
+                pause.pause_start_time = body.get('pause_start_time')
+
+            # Update end time if provided
+            if 'pause_end_time' in body:
+                pause.pause_end_time = (
+                    body.get('pause_end_time')
+                    if body.get('pause_end_time')
+                    else None
+                )
+
+            pause.save()
+
+            return JsonResponse({
+                "status": True,
+                "message": "Workentry pause updated successfully",
+                "data": {
+                    "id": pause.id,
+                    "workentry_id": pause.workentry_id,
+                    "pause_start_time": pause.pause_start_time,
+                    "pause_end_time": pause.pause_end_time,
+                    "created_at": pause.created_at,
+                    "updated_at": pause.updated_at
+                }
+            })
+
+        except json.JSONDecodeError:
+            return JsonResponse({
+                "status": False,
+                "message": "Invalid JSON"
+            }, status=400)
+
+        except Exception as e:
+            return JsonResponse({
+                "status": False,
+                "message": str(e)
+            }, status=400)
+
+    # ==========================================================
+    # INVALID METHOD
+    # ==========================================================
+    return JsonResponse({
+        "status": False,
+        "message": "Method not allowed"
     }, status=405)
