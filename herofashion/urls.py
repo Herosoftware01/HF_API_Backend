@@ -2,10 +2,14 @@ from django.urls import path
 from .views import *
 from rest_framework_simplejwt.views import TokenRefreshView
 from .import views
+from .views import RequestOTPView, ResetPasswordView
+import random
+
 
 urlpatterns = [
     path("token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
-
+    path('api/auth/request-otp/', RequestOTPView.as_view(), name='request-otp'),
+    path('api/auth/reset-password/', ResetPasswordView.as_view(), name='reset-password'),
     # Auth
     path('login/', LoginView.as_view()),
     path('logout/', LogoutView.as_view()), 
