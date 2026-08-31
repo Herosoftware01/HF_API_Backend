@@ -474,3 +474,20 @@ class Holiday(models.Model):
     class Meta:
         managed = False
         db_table = 'Holiday'
+
+
+class RoleModulePermission(models.Model):
+    role = models.CharField(max_length=100, db_index=True)
+    module_id = models.CharField(max_length=100)
+    module_name = models.CharField(max_length=255)
+    is_enabled = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'role_module_permissions'
+        # Prevent duplicate role + module combinations
+        unique_together = ('role', 'module_id')
+
+    def __str__(self):
+        return f"{self.role} - {self.module_name} ({'ON' if self.is_enabled else 'OFF'})"

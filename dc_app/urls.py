@@ -33,4 +33,9 @@ urlpatterns = [
     path('godown_fabric_delivery_plan/', views.godown_fabric_delivery_plan, name='godown_fabric_delivery_plan'),
     path('fabric_delivery_repl/', views.fabric_delivery_repl, name='fabric_delivery_repl'),
     path('fabric_delivery_repl/<int:dcno>/', views.fabric_delivery_repl, name='fabric_delivery_repl'),
+
+    path('dc_permissions/roles/', views.get_available_roles, name='get_roles'),
+    path('dc_permissions/modules/', views.get_all_modules, name='get_modules'),
+    path('dc_permissions/save/', views.save_role_permissions, name='save_permissions'),
+    path('dc_permissions/<str:role>/', views.get_role_permissions, name='get_role_permissions'),
 ]

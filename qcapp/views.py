@@ -2314,6 +2314,14 @@ def get_shift(dt):
     else:
         return "VI"
 
+<<<<<<< HEAD
+=======
+    return "NOT CHECK"
+
+    
+
+
+>>>>>>> a7442be5ecb6c807d28c459a176b870ac1ad3239
 def qcroving(request):
     unit = request.GET.get("unit")
     date = request.GET.get("date")
