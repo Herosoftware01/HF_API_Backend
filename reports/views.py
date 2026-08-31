@@ -1,26 +1,27 @@
-from .models import VueHoldwage, Empwisesal, Employeeworking, Holdwagepaid,ResignDtls,Empjoin,AttStaff,StaffAbsent,StaffAtt,ContractSec
+from .models import VueHoldwage, Empwisesal, Employeeworking, Holdwagepaid, ResignDtls, Empjoin, AttStaff, StaffAbsent, StaffAtt, ContractSec
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
+
 import os
 import json
-from datetime import datetime
-from .models import LaySp, MasterFinalMistake, UnitBundlereport, FinalPlans,Corarlck1,CoraRollcheck,AttUnt,EmbAbsetnt,Holiday,LabAtt,RptCutting,VueOrdersinhand
-from .models import BillAge,BillMdapprove,BillPass,Leavempabsent,LaySpreadingLayemployee,HrLabourattendence,Employeeworking1,BitcheckHour,StickerHour,TrsHrRsgnDtls
-from django.db.models import F, Q , IntegerField,DateField,Case, When, Value,CharField
+
+from datetime import datetime, timedelta, date, timezone as dt_timezone
+
+from .models import LaySp, MasterFinalMistake, UnitBundlereport, FinalPlans, Corarlck1, CoraRollcheck, AttUnt, EmbAbsetnt, Holiday, LabAtt, RptCutting, VueOrdersinhand
+from .models import BillAge, BillMdapprove, BillPass, Leavempabsent, LaySpreadingLayemployee, HrLabourattendence, Employeeworking1, BitcheckHour, StickerHour, TrsHrRsgnDtls
+
+from django.db.models import F, Q, IntegerField, DateField, Case, When, Value, CharField
 from django.db import connections
 from django.db.models import OuterRef, Subquery
-from django.db.models import Sum,Max
-from datetime import datetime, timedelta,date
+from django.db.models import Sum, Max
 from django.utils import timezone
 from django.conf import settings
 from django.db.models import Count
-from django.db.models.functions import TruncDate, TruncDay,Cast,Coalesce
+from django.db.models.functions import TruncDate, TruncDay, Cast, Coalesce
 from dateutil.relativedelta import relativedelta
 from collections import defaultdict
 from django.db.models.expressions import ExpressionWrapper
 from django.core.paginator import Paginator
-from datetime import datetime
-from django.views.decorators.csrf import csrf_exempt
 
 
 # dt_timezone = timezone.make_aware(timezone.datetime(2012, 1, 1), timezone=timezone.UTC)
@@ -1838,41 +1839,75 @@ def _fill_months(counts_by_month, months):
     return [counts_by_month.get(m, 0) for m in months]
 
 def _to_js_ts(d):
-    """Convert Python date to JavaScript timestamp (milliseconds since epoch)."""
-    dt = datetime(d.year, d.month, getattr(d, "day", 1), tzinfo=timezone.utc)
-    return int(dt.timestamp() * 1000)
+    """
+    Convert Python date/datetime/string to
+    JavaScript timestamp in milliseconds.
+    """
 
-def _day_range(start, end):
-    today = date.today()
-    days = []
-    cur = start
-    while cur <= end and cur <= today:
-        days.append(cur)
-        cur += timedelta(days=1)
-    return days
+    if isinstance(d, datetime):
+        dt = datetime(
+            d.year,
+            d.month,
+            d.day,
+            tzinfo=dt_timezone.utc
+        )
+        return int(dt.timestamp() * 1000)
 
-def _fill_days(counts_by_day, days):
-    return [counts_by_day.get(d, 0) for d in days]
-
-def _to_js_ts(d):
-    if isinstance(d, (datetime, date)):
-        dt = datetime(d.year, d.month, getattr(d, "day", 1), tzinfo=dt_timezone.utc)
+    if isinstance(d, date):
+        dt = datetime(
+            d.year,
+            d.month,
+            d.day,
+            tzinfo=dt_timezone.utc
+        )
         return int(dt.timestamp() * 1000)
 
     if isinstance(d, str):
         if not any(ch.isdigit() for ch in d):
             return None
+
         try:
             d = datetime.fromisoformat(d).date()
         except Exception:
             try:
-                d = datetime.strptime(d.split(" ")[0], "%Y-%m-%d").date()
+                d = datetime.strptime(
+                    d.split(" ")[0],
+                    "%Y-%m-%d"
+                ).date()
             except Exception:
                 return None
-        dt = datetime(d.year, d.month, d.day, tzinfo=dt_timezone.utc)
+
+        dt = datetime(
+            d.year,
+            d.month,
+            d.day,
+            tzinfo=dt_timezone.utc
+        )
+
         return int(dt.timestamp() * 1000)
 
     return None
+
+
+def _day_range(start, end):
+    today = date.today()
+
+    days = []
+    cur = start
+
+    while cur <= end and cur <= today:
+        days.append(cur)
+        cur += timedelta(days=1)
+
+    return days
+
+
+def _fill_days(counts_by_day, days):
+    return [
+        counts_by_day.get(d, 0)
+        for d in days
+    ]
+
 
 def workforce_trends_api(request):
 
@@ -1884,111 +1919,296 @@ def workforce_trends_api(request):
 
     today = date.today()
 
+    # -----------------------------
     # DATE FILTER
+    # -----------------------------
+
     if start_date and end_date:
+
         try:
-            start = datetime.strptime(start_date, "%Y-%m-%d").date()
-            end = datetime.strptime(end_date, "%Y-%m-%d").date()
-        except:
+            start = datetime.strptime(
+                start_date,
+                "%Y-%m-%d"
+            ).date()
+
+            end = datetime.strptime(
+                end_date,
+                "%Y-%m-%d"
+            ).date()
+
+        except Exception:
             start = today.replace(day=1)
             end = today
+
     else:
+
         if rng == "1M":
             start = today.replace(day=1)
+
         elif rng == "6M":
             start = today - relativedelta(months=6)
+
         elif rng == "1Y":
             start = today - relativedelta(years=1)
+
         elif rng == "MAX":
-            first_join = Empjoin.objects.using("main").order_by("joindt").first()
-            first_resign = ResignDtls.objects.using("main").order_by("resigndt").first()
+
+            first_join = (
+                Empjoin.objects
+                .using("main")
+                .order_by("joindt")
+                .first()
+            )
+
+            first_resign = (
+                ResignDtls.objects
+                .using("main")
+                .order_by("resigndt")
+                .first()
+            )
 
             earliest = today
-            if first_join: earliest = min(earliest, first_join.joindt.date())
-            if first_resign: earliest = min(earliest, first_resign.resigndt.date())
+
+            if first_join and first_join.joindt:
+                earliest = min(
+                    earliest,
+                    first_join.joindt.date()
+                )
+
+            if first_resign and first_resign.resigndt:
+                earliest = min(
+                    earliest,
+                    first_resign.resigndt.date()
+                )
 
             start = earliest
+
         else:
             start = today.replace(day=1)
 
         end = today
 
-    cats = ["TAILOR", "CHECKING", "IRONING", "PACKING"]
+    # -----------------------------
+    # CATEGORIES
+    # -----------------------------
 
-    join_qs = Empjoin.objects.using("main").filter(category__in=cats)
-    resign_qs = ResignDtls.objects.using("main").filter(category__in=cats)
+    cats = [
+        "TAILOR",
+        "CHECKING",
+        "IRONING",
+        "PACKING"
+    ]
 
-    join_qs = join_qs.filter(joindt__date__range=[start, end])
-    resign_qs = resign_qs.filter(resigndt__date__range=[start, end])
+    join_qs = (
+        Empjoin.objects
+        .using("main")
+        .filter(category__in=cats)
+    )
+
+    resign_qs = (
+        ResignDtls.objects
+        .using("main")
+        .filter(category__in=cats)
+    )
+
+    join_qs = join_qs.filter(
+        joindt__date__range=[start, end]
+    )
+
+    resign_qs = resign_qs.filter(
+        resigndt__date__range=[start, end]
+    )
 
     if dept != "ALL":
         join_qs = join_qs.filter(dept=dept)
         resign_qs = resign_qs.filter(dept=dept)
 
-    # DAILY
-    join_days = join_qs.annotate(d=TruncDay("joindt")).values("d").annotate(c=Count("id"))
-    resign_days = resign_qs.annotate(d=TruncDay("resigndt")).values("d").annotate(c=Count("slno"))
+    # -----------------------------
+    # DAILY TOTAL
+    # -----------------------------
+
+    join_days = (
+        join_qs
+        .annotate(d=TruncDay("joindt"))
+        .values("d")
+        .annotate(c=Count("id"))
+    )
+
+    resign_days = (
+        resign_qs
+        .annotate(d=TruncDay("resigndt"))
+        .values("d")
+        .annotate(c=Count("slno"))
+    )
 
     days = _day_range(start, end)
 
-    counts_join = {i["d"].date(): i["c"] for i in join_days}
-    counts_resign = {i["d"].date(): i["c"] for i in resign_days}
+    counts_join = {
+        i["d"].date(): i["c"]
+        for i in join_days
+        if i["d"]
+    }
 
-    join_series = _fill_days(counts_join, days)
-    resign_series = _fill_days(counts_resign, days)
-    x_ts = [_to_js_ts(d) for d in days]
+    counts_resign = {
+        i["d"].date(): i["c"]
+        for i in resign_days
+        if i["d"]
+    }
 
+    join_series = _fill_days(
+        counts_join,
+        days
+    )
+
+    resign_series = _fill_days(
+        counts_resign,
+        days
+    )
+
+    x_ts = [
+        _to_js_ts(d)
+        for d in days
+    ]
+
+    # -----------------------------
     # CATEGORY TOTALS
-    cat_idx = {c: i for i, c in enumerate(cats)}
+    # -----------------------------
+
+    cat_idx = {
+        c: i
+        for i, c in enumerate(cats)
+    }
+
     cat_join_vals = [0] * len(cats)
     cat_resign_vals = [0] * len(cats)
 
-    for row in join_qs.values("category").annotate(c=Count("id")):
-        cat_join_vals[cat_idx[row["category"].upper()]] = row["c"]
+    for row in (
+        join_qs
+        .values("category")
+        .annotate(c=Count("id"))
+    ):
 
-    for row in resign_qs.values("category").annotate(c=Count("slno")):
-        cat_resign_vals[cat_idx[row["category"].upper()]] = row["c"]
+        category = (
+            row["category"] or "UNKNOWN"
+        ).upper()
 
+        if category in cat_idx:
+            cat_join_vals[
+                cat_idx[category]
+            ] = row["c"]
+
+    for row in (
+        resign_qs
+        .values("category")
+        .annotate(c=Count("slno"))
+    ):
+
+        category = (
+            row["category"] or "UNKNOWN"
+        ).upper()
+
+        if category in cat_idx:
+            cat_resign_vals[
+                cat_idx[category]
+            ] = row["c"]
+
+    # -----------------------------
     # DAILY CATEGORY
-    daily_join = defaultdict(lambda: defaultdict(int))
-    daily_resign = defaultdict(lambda: defaultdict(int))
+    # -----------------------------
 
-    for row in join_qs.annotate(d=TruncDay("joindt")).values("d", "category").annotate(c=Count("id")):
-        daily_join[row["category"].upper()][row["d"].date()] = row["c"]
+    daily_join = defaultdict(
+        lambda: defaultdict(int)
+    )
 
-    for row in resign_qs.annotate(d=TruncDay("resigndt")).values("d", "category").annotate(c=Count("slno")):
-        daily_resign[row["category"].upper()][row["d"].date()] = row["c"]
+    daily_resign = defaultdict(
+        lambda: defaultdict(int)
+    )
+
+    for row in (
+        join_qs
+        .annotate(d=TruncDay("joindt"))
+        .values("d", "category")
+        .annotate(c=Count("id"))
+    ):
+
+        if row["d"]:
+            category = (
+                row["category"] or "UNKNOWN"
+            ).upper()
+
+            daily_join[
+                category
+            ][
+                row["d"].date()
+            ] = row["c"]
+
+    for row in (
+        resign_qs
+        .annotate(d=TruncDay("resigndt"))
+        .values("d", "category")
+        .annotate(c=Count("slno"))
+    ):
+
+        if row["d"]:
+            category = (
+                row["category"] or "UNKNOWN"
+            ).upper()
+
+            daily_resign[
+                category
+            ][
+                row["d"].date()
+            ] = row["c"]
 
     daily_join_series = []
     daily_resign_series = []
 
     for cat in cats:
+
         daily_join_series.append({
             "name": cat,
-            "data": [daily_join[cat].get(d, 0) for d in days]
+            "data": [
+                daily_join[cat].get(d, 0)
+                for d in days
+            ]
         })
+
         daily_resign_series.append({
             "name": cat,
-            "data": [daily_resign[cat].get(d, 0) for d in days]
+            "data": [
+                daily_resign[cat].get(d, 0)
+                for d in days
+            ]
         })
 
     return JsonResponse({
+
         "status": "success",
+
         "filters": {
             "range": rng,
             "department": dept,
             "start_date": start.isoformat(),
             "end_date": end.isoformat()
         },
+
         "x_ts": x_ts,
+
         "join_series": join_series,
+
         "resign_series": resign_series,
+
         "categories": cats,
+
         "category_join": cat_join_vals,
+
         "category_resign": cat_resign_vals,
+
         "daily_join_series": daily_join_series,
+
         "daily_resign_series": daily_resign_series
     })
+
 
 def workforce_unit_trends_api(request):
 
@@ -2000,108 +2220,310 @@ def workforce_unit_trends_api(request):
 
     today = date.today()
 
+    # -----------------------------
     # DATE FILTER
+    # -----------------------------
+
     if start_date and end_date:
+
         try:
-            start = datetime.strptime(start_date, "%Y-%m-%d").date()
-            end = datetime.strptime(end_date, "%Y-%m-%d").date()
-        except:
+            start = datetime.strptime(
+                start_date,
+                "%Y-%m-%d"
+            ).date()
+
+            end = datetime.strptime(
+                end_date,
+                "%Y-%m-%d"
+            ).date()
+
+        except Exception:
             start = today.replace(day=1)
             end = today
+
     else:
+
         if rng == "1M":
             start = today.replace(day=1)
+
         elif rng == "6M":
             start = today - relativedelta(months=6)
+
         elif rng == "1Y":
             start = today - relativedelta(years=1)
+
         elif rng == "MAX":
-            first_join = Empjoin.objects.using("main").order_by("joindt").first()
-            first_resign = ResignDtls.objects.using("main").order_by("resigndt").first()
+
+            first_join = (
+                Empjoin.objects
+                .using("main")
+                .order_by("joindt")
+                .first()
+            )
+
+            first_resign = (
+                ResignDtls.objects
+                .using("main")
+                .order_by("resigndt")
+                .first()
+            )
 
             earliest = today
-            if first_join: earliest = min(earliest, first_join.joindt.date())
-            if first_resign: earliest = min(earliest, first_resign.resigndt.date())
+
+            if first_join and first_join.joindt:
+                earliest = min(
+                    earliest,
+                    first_join.joindt.date()
+                )
+
+            if first_resign and first_resign.resigndt:
+                earliest = min(
+                    earliest,
+                    first_resign.resigndt.date()
+                )
 
             start = earliest
+
         else:
             start = today.replace(day=1)
 
         end = today
 
-    join_qs = Empjoin.objects.using("main").filter(joindt__date__range=[start, end])
-    resign_qs = ResignDtls.objects.using("main").filter(resigndt__date__range=[start, end])
+    # -----------------------------
+    # QUERYSETS
+    # -----------------------------
+
+    join_qs = (
+        Empjoin.objects
+        .using("main")
+        .filter(
+            joindt__date__range=[start, end]
+        )
+    )
+
+    resign_qs = (
+        ResignDtls.objects
+        .using("main")
+        .filter(
+            resigndt__date__range=[start, end]
+        )
+    )
 
     if unit_filter != "ALL":
-        join_qs = join_qs.filter(dept=unit_filter)
-        resign_qs = resign_qs.filter(dept=unit_filter)
+        join_qs = join_qs.filter(
+            dept=unit_filter
+        )
 
+        resign_qs = resign_qs.filter(
+            dept=unit_filter
+        )
+
+    # -----------------------------
     # UNITS
-    units = sorted(list({
-        (u or "Unknown").upper()
-        for u in list(join_qs.values_list('dept', flat=True)) +
-                 list(resign_qs.values_list('dept', flat=True))
-    }))
+    # -----------------------------
 
+    units = sorted(
+        list({
+            (u or "Unknown").upper()
+            for u in (
+                list(
+                    join_qs.values_list(
+                        "dept",
+                        flat=True
+                    )
+                )
+                +
+                list(
+                    resign_qs.values_list(
+                        "dept",
+                        flat=True
+                    )
+                )
+            )
+        })
+    )
+
+    # -----------------------------
     # DAILY TOTAL
-    join_days = join_qs.annotate(d=TruncDay("joindt")).values("d").annotate(c=Count("id"))
-    resign_days = resign_qs.annotate(d=TruncDay("resigndt")).values("d").annotate(c=Count("slno"))
+    # -----------------------------
 
-    days = _day_range(start, end)
+    join_days = (
+        join_qs
+        .annotate(d=TruncDay("joindt"))
+        .values("d")
+        .annotate(c=Count("id"))
+    )
 
-    counts_join = {i["d"].date(): i["c"] for i in join_days}
-    counts_resign = {i["d"].date(): i["c"] for i in resign_days}
+    resign_days = (
+        resign_qs
+        .annotate(d=TruncDay("resigndt"))
+        .values("d")
+        .annotate(c=Count("slno"))
+    )
 
-    join_series = _fill_days(counts_join, days)
-    resign_series = _fill_days(counts_resign, days)
-    x_ts = [_to_js_ts(d) for d in days]
+    days = _day_range(
+        start,
+        end
+    )
 
+    counts_join = {
+        i["d"].date(): i["c"]
+        for i in join_days
+        if i["d"]
+    }
+
+    counts_resign = {
+        i["d"].date(): i["c"]
+        for i in resign_days
+        if i["d"]
+    }
+
+    join_series = _fill_days(
+        counts_join,
+        days
+    )
+
+    resign_series = _fill_days(
+        counts_resign,
+        days
+    )
+
+    x_ts = [
+        _to_js_ts(d)
+        for d in days
+    ]
+
+    # -----------------------------
     # TOTALS
-    join_totals = {r['dept'].upper(): r['c'] for r in join_qs.values('dept').annotate(c=Count('id'))}
-    resign_totals = {r['dept'].upper(): r['c'] for r in resign_qs.values('dept').annotate(c=Count('slno'))}
+    # -----------------------------
 
-    unit_join_vals = [join_totals.get(u, 0) for u in units]
-    unit_resign_vals = [resign_totals.get(u, 0) for u in units]
+    join_totals = {
+        (r["dept"] or "Unknown").upper(): r["c"]
+        for r in (
+            join_qs
+            .values("dept")
+            .annotate(c=Count("id"))
+        )
+    }
 
+    resign_totals = {
+        (r["dept"] or "Unknown").upper(): r["c"]
+        for r in (
+            resign_qs
+            .values("dept")
+            .annotate(c=Count("slno"))
+        )
+    }
+
+    unit_join_vals = [
+        join_totals.get(u, 0)
+        for u in units
+    ]
+
+    unit_resign_vals = [
+        resign_totals.get(u, 0)
+        for u in units
+    ]
+
+    # -----------------------------
     # DAILY UNIT
-    unit_daily_join = defaultdict(lambda: defaultdict(int))
-    unit_daily_resign = defaultdict(lambda: defaultdict(int))
+    # -----------------------------
 
-    for row in join_qs.annotate(d=TruncDay("joindt")).values("d", "dept").annotate(c=Count("id")):
-        unit_daily_join[(row["dept"] or "Unknown").upper()][row["d"].date()] = row["c"]
+    unit_daily_join = defaultdict(
+        lambda: defaultdict(int)
+    )
 
-    for row in resign_qs.annotate(d=TruncDay("resigndt")).values("d", "dept").annotate(c=Count("slno")):
-        unit_daily_resign[(row["dept"] or "Unknown").upper()][row["d"].date()] = row["c"]
+    unit_daily_resign = defaultdict(
+        lambda: defaultdict(int)
+    )
+
+    for row in (
+        join_qs
+        .annotate(d=TruncDay("joindt"))
+        .values("d", "dept")
+        .annotate(c=Count("id"))
+    ):
+
+        if row["d"]:
+
+            unit = (
+                row["dept"] or "Unknown"
+            ).upper()
+
+            unit_daily_join[
+                unit
+            ][
+                row["d"].date()
+            ] = row["c"]
+
+    for row in (
+        resign_qs
+        .annotate(d=TruncDay("resigndt"))
+        .values("d", "dept")
+        .annotate(c=Count("slno"))
+    ):
+
+        if row["d"]:
+
+            unit = (
+                row["dept"] or "Unknown"
+            ).upper()
+
+            unit_daily_resign[
+                unit
+            ][
+                row["d"].date()
+            ] = row["c"]
 
     unit_daily_join_series = []
     unit_daily_resign_series = []
 
     for u in units:
+
         unit_daily_join_series.append({
             "name": u,
-            "data": [unit_daily_join[u].get(d, 0) for d in days]
+            "data": [
+                unit_daily_join[u].get(d, 0)
+                for d in days
+            ]
         })
+
         unit_daily_resign_series.append({
             "name": u,
-            "data": [unit_daily_resign[u].get(d, 0) for d in days]
+            "data": [
+                unit_daily_resign[u].get(d, 0)
+                for d in days
+            ]
         })
 
     return JsonResponse({
+
         "status": "success",
+
         "filters": {
             "range": rng,
             "unit": unit_filter,
             "start_date": start.isoformat(),
             "end_date": end.isoformat()
         },
+
         "units": units,
+
         "x_ts": x_ts,
+
         "join_series": join_series,
+
         "resign_series": resign_series,
+
         "unit_join_vals": unit_join_vals,
+
         "unit_resign_vals": unit_resign_vals,
-        "unit_daily_join_series": unit_daily_join_series,
-        "unit_daily_resign_series": unit_daily_resign_series
+
+        "unit_daily_join_series":
+            unit_daily_join_series,
+
+        "unit_daily_resign_series":
+            unit_daily_resign_series
     })
 
 
@@ -2759,3 +3181,49 @@ def dyeing_order_details(request):
         data.append(obj)
 
     return JsonResponse(data[0] if data else {}, safe=False)
+
+def GetCuttingDetails(request):
+    jobno = request.GET.get("jobno")
+
+    if not jobno:
+        return JsonResponse(
+            {"error": "jobno parameter is required"},
+            status=400
+        )
+
+    with connections["demo"].cursor() as cursor:
+        cursor.execute(
+            "EXEC sp_GetCuttingDetails @jobno=%s",
+            [jobno]
+        )
+
+        columns = [col[0] for col in cursor.description]
+        data = [
+            dict(zip(columns, row))
+            for row in cursor.fetchall()
+        ]
+
+    return JsonResponse(data, safe=False)
+
+def GetAprodDetails(request):
+    jobno = request.GET.get("jobno")
+
+    if not jobno:
+        return JsonResponse(
+            {"error": "jobno parameter is required"},
+            status=400
+        )
+
+    with connections["demo"].cursor() as cursor:
+        cursor.execute(
+            "EXEC sp_GetAprodDetails @jobno=%s",
+            [jobno]
+        )
+
+        columns = [col[0] for col in cursor.description]
+        data = [
+            dict(zip(columns, row))
+            for row in cursor.fetchall()
+        ]
+
+    return JsonResponse(data, safe=False)

@@ -19,7 +19,7 @@ import json
 from django.utils import timezone
 from django.utils.dateparse import parse_date
 from datetime import date, datetime, timedelta
-from django.db.models import Q
+from django.db.models import Sum, Max
 from datetime import time
 from django.db import connection
 from datetime import datetime
@@ -27,9 +27,6 @@ from django.utils import timezone
 from django.db.models import Case, When, Value, IntegerField,Sum
 from django.utils.timezone import localtime
 from production_live_scan.models import Assembly_data, dependency
-import os
-import glob
-import subprocess
 from django.conf import settings
 from datetime import time as time_cls, datetime as datetime_cls, timedelta
 from collections import defaultdict
@@ -2303,21 +2300,19 @@ def get_shift(dt):
 
     t = dt.time()
 
-    if time(8, 30) <= t < time(10, 30):
+    # Contiguous boundaries ensure no records fall into "NOT CHECK" during break times
+    if time(0, 0) <= t < time(10, 45):
         return "I"
-    elif time(10, 45) <= t < time(12, 45):
+    elif time(10, 45) <= t < time(13, 30):
         return "II"
     elif time(13, 30) <= t < time(15, 30):
         return "III"
-    elif time(15, 30) <= t < time(17, 30):
+    elif time(15, 30) <= t < time(17, 45):
         return "IV"
-    elif time(17, 45) <= t < time(20, 0):
+    elif time(17, 45) <= t < time(20, 45):
         return "V"
-    elif time(20, 45) <= t < time(23, 30):
+    else:
         return "VI"
-
-    return "NOT CHECK"
-
 
 def qcroving(request):
     unit = request.GET.get("unit")
@@ -2334,17 +2329,19 @@ def qcroving(request):
     # ----------------------------
     # Summary Query
     # ----------------------------
+    # Removed "date" from values to prevent duplicating identical bundles.
+    # Grouping identical bundles and using Max("date") to get a single timestamp.
     qc_list = list(
         qc_queryset.values(
             "machine_id",
             "bundle_id",
-            "date",
             "jobno",
             "product",
             "seq",
             "size",
         ).annotate(
-            mistake_count=Sum("mistake_count")
+            mistake_count=Sum("mistake_count"),
+            max_date=Max("date")
         )
     )
 
@@ -2395,7 +2392,6 @@ def qcroving(request):
     # Employee Map
     # ----------------------------
     emp_map = {}
-
     emp_queryset = emp_allocate.objects.select_related("machine")
 
     if unit:
@@ -2430,7 +2426,7 @@ def qcroving(request):
         final_map[key] = {
             "total_pieces": f.total_pieces,
             "checked_piece": f.checked_piece,
-            "line": f.line, # <-- ADDED: Extract line from qc_piece_final
+            "line": f.line, 
         }
 
     # ----------------------------
@@ -2446,7 +2442,8 @@ def qcroving(request):
         if unit and emp is None:
             continue
 
-        timeline = get_shift(row["date"])
+        # Use the aggregated max_date instead of standard date
+        timeline = get_shift(row["max_date"])
 
         key = (
             row["bundle_id"],
@@ -2461,7 +2458,7 @@ def qcroving(request):
             {
                 "total_pieces": 0,
                 "checked_piece": 0,
-                "line": None, # <-- ADDED: Default fallback for line
+                "line": None,
             },
         )
 
@@ -2480,9 +2477,9 @@ def qcroving(request):
 
             "emp_code": emp.emp_code if emp else None,
             "unit": emp.unit if emp else None,
-            "line": final_data["line"], # <-- ADDED: Push line into JSON response
+            "line": final_data["line"], 
 
-            "date": row["date"].strftime("%d/%m/%Y %H:%M:%S") if row["date"] else None,
+            "date": row["max_date"].strftime("%d/%m/%Y %H:%M:%S") if row["max_date"] else None,
             "timeline": timeline,
 
             "jobno": row["jobno"],

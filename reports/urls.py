@@ -47,5 +47,8 @@ urlpatterns = [
     path('pay_details/', views.pay_bill_details , name='pay_details'),
     path('dyeing_data/', views.dyeing_data , name='dyeing_data'),
     path('dyeing_order_details/', views.dyeing_order_details , name='dyeing_order_details'),
-
+    
+    # Cutting Reports
+    path('cutting_details/', views.GetCuttingDetails, name='get_cutting_details'),
+    path('aprod_details/', views.GetAprodDetails, name='get_aprod_details'),
     ] 
