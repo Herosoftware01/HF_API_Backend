@@ -57,15 +57,6 @@ class task_master(models.Model):
     def __str__(self):
         return self.task_name
 
-class project_task_mapping(models.Model):
-    id = models.AutoField(primary_key=True)
-    project = models.ForeignKey(project_master, on_delete=models.CASCADE)
-    task = models.ForeignKey(task_master, on_delete=models.CASCADE)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True) 
-
-    def __str__(self):
-        return f"{self.project.project_name} - {self.task.task_name}"
 
 
 class TrsWorkentry(models.Model):

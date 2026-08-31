@@ -2,7 +2,7 @@ from django.http import JsonResponse
 import json
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
-from .models import TrsWorkentry,user_master,project_master,category_master,subcategory_master,task_master,project_task_mapping,workentry_pause
+from .models import TrsWorkentry,user_master,project_master,category_master,subcategory_master,task_master,workentry_pause
 
 
 @csrf_exempt
@@ -312,6 +312,7 @@ def task_master_api(request):
                 'code_id',       # This maps to the User ID from user_master
                 'task_name',
                 'task_description',
+                'assing_date',
                 'task_status',
                 'created_at',
                 'updated_at'
@@ -338,6 +339,7 @@ def task_master_api(request):
                 project_id=proj_id,
                 code_id=user_id,   # Save user_master ID here
                 task_name=body.get('task_name'),
+                assing_date=body.get('assing_date'),
                 task_description=body.get('task_description', ''),
                 task_status=body.get('task_status', 'Pending')
             )
@@ -415,47 +417,6 @@ def task_master_api(request):
     }, status=405)
 
 
-@csrf_exempt
-def project_task_mapping_api(request):
-    if request.method == 'GET':
-        data = project_task_mapping.objects.all()
-        return JsonResponse(list(data.values()), safe=False)
-
-    elif request.method == 'POST':
-        try:
-            body = json.loads(request.body)
-            project_id = body.get('project_id')
-            task_id = body.get('task_id')
-
-            project = project_master.objects.get(id=project_id)
-            task = task_master.objects.get(id=task_id)
-
-            obj = project_task_mapping.objects.create(
-                project=project,
-                task=task,
-                created_at=timezone.now(),
-                updated_at=timezone.now()
-            )
-            return JsonResponse({
-                "status": True,
-                "message": "Project-Task mapping created successfully",
-                "id": obj.id
-            })
-        except project_master.DoesNotExist:
-            return JsonResponse({
-                "status": False,
-                "message": "Project not found"
-            }, status=404)
-        except task_master.DoesNotExist:
-            return JsonResponse({
-                "status": False,
-                "message": "Task not found"
-            }, status=404)
-        except Exception as e:
-            return JsonResponse({
-                "status": False,
-                "message": str(e)
-            }, status=400)
 
 @csrf_exempt
 def trs_workentry(request, id=None):

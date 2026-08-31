@@ -10,5 +10,5 @@ urlpatterns = [
     path('category_master/', views.category_master_api, name='category_master'),
     path('subcategory_master/', views.subcategory_master_api, name='subcategory_master'),
     path('task_master/', views.task_master_api, name='task_master'),
-    path('project_task_mapping/', views.project_task_mapping_api, name='project_task_mapping'),
+   
 ]
