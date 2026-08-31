@@ -2318,6 +2318,8 @@ def get_shift(dt):
 
     return "NOT CHECK"
 
+    
+
 
 def qcroving(request):
     unit = request.GET.get("unit")

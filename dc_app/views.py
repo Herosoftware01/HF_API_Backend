@@ -1,10 +1,13 @@
 from django.http import JsonResponse
-from .models import ViewCuttingDelPrint,ViewKnitDelivery,VueAccInhTransfer,VueAccProdDel,TrsGatemodule, CuttingPrintembdel, ViewYarnProcessDelivery,VueAccProcDel,ViewAccinwardVerification,ViewFabricDeliveryProcess,ViewMistakeqtyPrint,ViewUnitPcdelivery,VueRibDeliveryDetails,ViewGdwnFabricDeliveryPlan,TrsApidtls,ViewFabricDeliveryRepl,HerofashionUser,Holiday
+from .models import ViewCuttingDelPrint,ViewKnitDelivery,VueAccInhTransfer,VueAccProdDel,TrsGatemodule, CuttingPrintembdel, ViewYarnProcessDelivery,VueAccProcDel,ViewAccinwardVerification,ViewFabricDeliveryProcess,ViewMistakeqtyPrint,ViewUnitPcdelivery,VueRibDeliveryDetails,ViewGdwnFabricDeliveryPlan,TrsApidtls,ViewFabricDeliveryRepl,HerofashionUser,Holiday,RoleModulePermission
 import json
 from django.views.decorators.csrf import csrf_exempt
 from django.forms.models import model_to_dict
 from django.utils.dateparse import parse_datetime
 from django.utils import timezone
+from django.views.decorators.http import require_GET, require_POST
+from django.db import transaction
+from django.contrib.auth import get_user_model
 
 
 def cutting_del_print(request):
@@ -411,3 +414,82 @@ def get_holidays(request):
         "count": len(data1),
         "data": data1
     })
+
+
+# Hardcoded single source of truth for all modules
+AVAILABLE_MODULES = [
+    {"module_id": "cut_to_unit", "module_name": "Cut to Unit Delivery"},
+    {"module_id": "cutting_sec_fabric", "module_name": "Cutting Section Fabric"},
+    {"module_id": "knitting_delivery", "module_name": "Knitting Delivery"},
+    {"module_id": "bit_delivery", "module_name": "Bit Delivery Challan"},
+    {"module_id": "yarn_process", "module_name": "Yarn Process Challan"},
+    {"module_id": "acc_production", "module_name": "Accessory Production"},
+    {"module_id": "acc_process", "module_name": "Accessory Process"},
+    {"module_id": "acc_inhouse", "module_name": "Accessory Inhouse Delivery"},
+    {"module_id": "fabric_process", "module_name": "Fabric Process Delivery"},
+    {"module_id": "mistake_cut", "module_name": "Mistake Cut Delivery"},
+    {"module_id": "rib_cut", "module_name": "Rib Cut Delivery"},
+    {"module_id": "godown_fabric", "module_name": "Godown Fabric Delivery"},
+    {"module_id": "replacement_del", "module_name": "Replacement Delivery"},
+    {"module_id": "unit_pcs", "module_name": "Unit Pcs Delivery"},
+]
+
+@csrf_exempt
+def get_available_roles(request):
+    if request.method == "GET":
+        User = get_user_model()
+        roles = User.objects.exclude(role__isnull=True).exclude(role__exact='').values_list('role', flat=True).distinct()
+        return JsonResponse(list(roles), safe=False, status=200)
+    return JsonResponse({"error": "Method not allowed"}, status=405)
+
+@csrf_exempt
+def get_all_modules(request):
+    if request.method == "GET":
+        return JsonResponse(AVAILABLE_MODULES, safe=False, status=200)
+    return JsonResponse({"error": "Method not allowed"}, status=405)
+
+@csrf_exempt
+def get_role_permissions(request, role):
+    if request.method == "GET":
+        permissions = RoleModulePermission.objects.filter(role__iexact=role)
+        
+        if not permissions.exists():
+            default_permissions = [
+                {**mod, "is_enabled": False} for mod in AVAILABLE_MODULES
+            ]
+            return JsonResponse(default_permissions, safe=False, status=200)
+
+        data = list(permissions.values('module_id', 'module_name', 'is_enabled'))
+        return JsonResponse(data, safe=False, status=200)
+    return JsonResponse({"error": "Method not allowed"}, status=405)
+
+@csrf_exempt
+def save_role_permissions(request):
+    if request.method == "POST":
+        try:
+            body_data = json.loads(request.body.decode('utf-8'))
+        except json.JSONDecodeError:
+            return JsonResponse({"error": "Invalid JSON format."}, status=400)
+
+        role = body_data.get('role')
+        permissions_data = body_data.get('permissions', [])
+
+        if not role or not permissions_data:
+            return JsonResponse({"error": "Role and permissions data are required."}, status=400)
+
+        try:
+            with transaction.atomic():
+                for perm in permissions_data:
+                    RoleModulePermission.objects.update_or_create(
+                        role=role,
+                        module_id=perm.get('module_id'),
+                        defaults={
+                            'module_name': perm.get('module_name'),
+                            'is_enabled': perm.get('is_enabled', False)
+                        }
+                    )
+            return JsonResponse({"message": "Permissions saved successfully."}, status=200)
+        except Exception as e:
+            return JsonResponse({"error": str(e)}, status=500)
+            
+    return JsonResponse({"error": "Method not allowed"}, status=405)

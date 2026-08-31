@@ -48,6 +48,7 @@ class task_master(models.Model):
     project = models.ForeignKey(project_master, on_delete=models.CASCADE, null=True, blank=True) # Connects task to a project
     code = models.ForeignKey(user_master, on_delete=models.CASCADE, null=True, blank=True)
     task_name = models.CharField(max_length=100)
+    assing_date = models.DateTimeField(auto_now_add=True)
     task_description = models.TextField(null=True, blank=True)
     task_status = models.CharField(max_length=50, default="Pending") # Changed to CharField for "Pending", "Completed", etc.
     created_at = models.DateTimeField(auto_now_add=True)
