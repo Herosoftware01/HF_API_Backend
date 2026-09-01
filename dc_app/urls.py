@@ -6,4 +6,8 @@ from django.conf import settings
 urlpatterns = [
     path('cutting_del_print/', views.cutting_del_print, name='cutting_del_print'),
     path('cutting_del_print/<int:id>/', views.cutting_del_print, name='cutting_del_print'),
+    path('cutting_bit_print/<int:id>/', views.cutting_bit_print, name='CuttingBitPrint'),
+    path('yarn_process_del/<int:dcno>/', views.yarn_process_delivery, name='YarnProcessDelivery'),
+    path('unit_pc_del/<int:dcno>/', views.unit_pc_delivery, name='UnitPCDelivery'),
+    path('cutting_sec_fabric/<int:dcno>/', views.CuttingSecFabric, name='CuttingSecFabric'),
 ]

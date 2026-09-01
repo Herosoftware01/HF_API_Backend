@@ -5,7 +5,7 @@ import os
 import json
 from datetime import datetime
 from .models import LaySp, MasterFinalMistake, UnitBundlereport, FinalPlans,Corarlck1,CoraRollcheck,AttUnt,EmbAbsetnt,Holiday,LabAtt,RptCutting,VueOrdersinhand
-from .models import BillAge,BillMdapprove,BillPass,Leavempabsent,LaySpreadingLayemployee,HrLabourattendence,Employeeworking1,BitcheckHour,StickerHour
+from .models import BillAge,BillMdapprove,BillPass,Leavempabsent,LaySpreadingLayemployee,HrLabourattendence,Employeeworking1,BitcheckHour,StickerHour, VueRepCutPend
 from django.db.models import F, Q , IntegerField,DateField,Case, When, Value,CharField
 from django.db import connections
 from django.db.models import OuterRef, Subquery
@@ -2521,3 +2521,60 @@ def measurement_report(request):
             "status": False,
             "error": str(e)
         })
+
+def GetCuttingDetails(request):
+    jobno = request.GET.get("jobno")
+
+    if not jobno:
+        return JsonResponse(
+            {"error": "jobno parameter is required"},
+            status=400
+        )
+
+    with connections["demo"].cursor() as cursor:
+        cursor.execute(
+            "EXEC sp_GetCuttingDetails @jobno=%s",
+            [jobno]
+        )
+
+        columns = [col[0] for col in cursor.description]
+        data = [
+            dict(zip(columns, row))
+            for row in cursor.fetchall()
+        ]
+
+    return JsonResponse(data, safe=False)
+
+def GetAprodDetails(request):
+    jobno = request.GET.get("jobno")
+
+    if not jobno:
+        return JsonResponse(
+            {"error": "jobno parameter is required"},
+            status=400
+        )
+
+    with connections["demo"].cursor() as cursor:
+        cursor.execute(
+            "EXEC sp_GetAprodDetails @jobno=%s",
+            [jobno]
+        )
+
+        columns = [col[0] for col in cursor.description]
+        data = [
+            dict(zip(columns, row))
+            for row in cursor.fetchall()
+        ]
+
+    return JsonResponse(data, safe=False)
+
+def RepCutPending(request):
+    jobno = request.GET.get("jobno")
+    queryset = VueRepCutPend.objects.using('demo').all()
+
+    if jobno:
+        queryset = queryset.filter(jobno=jobno)
+        
+    data = list(queryset.values())
+
+    return JsonResponse(data, safe=False)

@@ -8,6 +8,7 @@ from django.http import JsonResponse
 from rest_framework import status
 from rest_framework import viewsets
 from .models import GridSetting,DiWasg,DiWasg_img,TrsMaildtls, SyncfushionKanban, SyncfusionGantt, BlockEditor, FashionrResult, ViewAccinwpend
+from .models import ViewAccessoryDel, TmpQms, ViewCutBalpend
 from .serializers import GridSettingSerializer,TrsMaildtlsSerializer
 from rest_framework.permissions import IsAuthenticated  # optional
 import json
@@ -807,4 +808,103 @@ def DueDateList(request):
         return JsonResponse({"message": "Method not allowed"}, status=405)
 
     data = list(ViewAccinwpend.objects.using('test').all().values()) 
+    return JsonResponse(data, safe=False)
+
+@csrf_exempt
+def AccessoryDel(request):
+    if request.method == "GET":
+
+        data = list(ViewAccessoryDel.objects.using('test').all().values())
+        return JsonResponse(data, safe=False)
+    
+    elif request.method == "PUT":
+
+        body = json.loads(request.body)
+
+        jobno = body.get("jobno")
+        pono = body.get("pono")
+        acc_item = body.get("acc_item")
+        clr_siz = body.get("clr_siz")
+        retmark = body.get("retmark")
+
+        if not all([jobno, pono, acc_item, clr_siz]):
+            return JsonResponse({
+                "success": False,
+                "error": "jobno, pono, acc_item and clr_siz are required"
+            }, status=400)
+
+        updated = TmpQms.objects.using('test').filter(
+            jobno=jobno,
+            pono=pono,
+            acc_item=acc_item,
+            clr_siz=clr_siz
+        ).update(
+            retmark=retmark
+        )
+
+        if updated == 0:
+            return JsonResponse({
+                "success": False,
+                "message": "No matching record found"
+            }, status=404)
+
+        return JsonResponse({
+            "success": True,
+            "message": "retmark updated successfully",
+            "updated": updated
+        })
+
+from django.db.models import Sum, Min
+def CutBalpend(request):
+    qs = ViewCutBalpend.objects.using("demo").all()
+
+    # Normal: show all records
+    if request.GET.get("merge") != "true":
+        data = list(qs.values())
+
+        for obj in data:
+            path = obj.get("tbimg")
+            obj["tbimg"] = (
+                f"https://app.herofashion.com/order_image/{path.split('\\')[-1]}"
+                if path else ""
+            )
+
+        return JsonResponse(data, safe=False)
+
+    # Merge: jobno-wise
+    sum_fields = [
+        "order_qty", "rejection_qty", "required_qty", "plan_qty", "actual_cut_qty", "hand_cutting",
+    ]
+
+    data = list(
+        qs.values("ordno", "o_finaldelvdate", "topbottom_des", "clr")
+        .annotate(
+            slno=Min("slno"),
+            tbimg=Min("tbimg"),
+            remdays=Min("remdays"),
+            risk=Min("risk"),
+            **{field: Sum(field) for field in sum_fields})
+        .order_by("ordno")
+    )
+
+    for obj in data:
+        req = obj["required_qty"] or 0
+        path = obj.get("tbimg")
+        obj["tbimg"] = (
+            f"https://app.herofashion.com/order_image/{path.split('\\')[-1]}"
+            if path else ""
+        )
+        obj.update(
+            siz="All Size",
+            cut_pend=(obj["plan_qty"] or 0) - (obj["actual_cut_qty"] or 0),
+            planbal_pcs=(obj["required_qty"] or 0) - (obj["plan_qty"] or 0),
+            cutbal_pcs=(obj["required_qty"] or 0) - (obj["actual_cut_qty"] or 0),
+            plan_bal_pers=round(
+                100 - ((obj["plan_qty"] or 0) / req * 100), 2
+            ) if req else 0,
+            cutting_bal_pers=round(
+                100 - ((obj["actual_cut_qty"] or 0) / req * 100), 2
+            ) if req else 0,
+        )
+
     return JsonResponse(data, safe=False)

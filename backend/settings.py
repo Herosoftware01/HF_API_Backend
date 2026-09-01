@@ -42,11 +42,12 @@ CORS_ALLOWED_ORIGINS = [
     "http://10.1.21.80:3600",
     "https://hfempdtls.netlify.app",
     "http://10.1.21.110:7003",
+    "http://10.1.21.156:3000",
     
 ]
 
 CSRF_TRUSTED_ORIGINS = [
-    "http://10.1.21.158:3000/",
+    "http://10.1.21.158:3000",
     "http://localhost:3000",
     "http://10.1.21.110:7003",
     "https://hf.herofashion.com",
@@ -57,6 +58,7 @@ CSRF_TRUSTED_ORIGINS = [
     "http://10.1.21.13:3000",
     "https://hfempdtls.netlify.app",
     "http://10.1.21.110:7003",
+    "http://10.1.21.156:3000",
     
 ]
 # settings.py
@@ -116,9 +118,9 @@ else:
 
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
+    'django.middleware.common.CommonMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
-    'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
@@ -181,7 +183,7 @@ DATABASES = {
         'NAME': 'hfapi',
         'USER': 'sa',
         'PASSWORD': 'Fashion@01',
-        'HOST': '10.1.21.10',
+        'HOST': '10.1.21.11',
         'PORT': '1433',
         'OPTIONS': {
             'driver': 'ODBC Driver 17 for SQL Server',
@@ -195,7 +197,7 @@ DATABASES = {
         'NAME': 'Tally2sql',
         'USER': 'sa',
         'PASSWORD': 'Fashion@01',
-        'HOST': '10.1.21.10',
+        'HOST': '10.1.21.11',
         'PORT': '1433',
         'OPTIONS': {
             'driver': 'ODBC Driver 17 for SQL Server',
@@ -208,7 +210,7 @@ DATABASES = {
         'NAME': 'Garmentrk',
         'USER': 'sa',
         'PASSWORD': 'Fashion@01',
-        'HOST': '10.1.21.10',
+        'HOST': '10.1.21.11',
         'PORT': '1433',
         'OPTIONS': {
             'driver': 'ODBC Driver 17 for SQL Server',
@@ -221,7 +223,7 @@ DATABASES = {
         'NAME': 'demo',
         'USER': 'sa',
         'PASSWORD': 'Fashion@01',
-        'HOST': '10.1.21.10',
+        'HOST': '10.1.21.11',
         'PORT': '1433',
         'OPTIONS': {
                 'driver': 'ODBC Driver 17 for SQL Server',
@@ -234,7 +236,7 @@ DATABASES = {
         'NAME': 'Django',
         'USER': 'sa',
         'PASSWORD': 'Fashion@01',
-        'HOST': '10.1.21.10',
+        'HOST': '10.1.21.11',
         'PORT': '1433',
         'OPTIONS': {
                 'driver': 'ODBC Driver 17 for SQL Server',
@@ -247,7 +249,7 @@ DATABASES = {
             'NAME': 'NewPowerBi',
             'USER': 'sa',
             'PASSWORD': 'Fashion@01',
-            'HOST': '10.1.21.10',
+            'HOST': '10.1.21.11',
             'PORT': '1433',
             'OPTIONS': {
                 'driver': 'ODBC Driver 17 for SQL Server',
@@ -260,7 +262,7 @@ DATABASES = {
             'NAME': 'testerphero',
             'USER': 'sa',
             'PASSWORD': 'Fashion@01',
-            'HOST': '10.1.21.10',
+            'HOST': '10.1.21.11',
             'PORT': '1433',
             'OPTIONS': {
                 'driver': 'ODBC Driver 17 for SQL Server',
@@ -319,7 +321,7 @@ MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 STAFF_IMAGES_URL = '/staff_images/'
-STAFF_IMAGES_ROOT = r'\\10.1.21.10\e\Staff_Employee_Images'
+STAFF_IMAGES_ROOT = r'\\10.1.21.11\e\Staff_Employee_Images'
 
 PDF_STORAGE_PATH = r"\\adminserver\File Sharing\AAAA Hero\Syncfusion Pdf Reports"
 
