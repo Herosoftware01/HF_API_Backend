@@ -51,4 +51,5 @@ urlpatterns = [
     # Cutting Reports
     path('cutting_details/', views.GetCuttingDetails, name='get_cutting_details'),
     path('aprod_details/', views.GetAprodDetails, name='get_aprod_details'),
+    path('rep_cut_pend/', views.RepCutPending, name='RepCutPending'),
     ] 

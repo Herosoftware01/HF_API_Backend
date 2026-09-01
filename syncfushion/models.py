@@ -190,7 +190,6 @@ class ViewAccinwpend(models.Model):
         managed = False
         db_table = 'view_accinwpend'
 
-
 class ViewCutBalpend(models.Model):
     slno = models.BigIntegerField(primary_key=True)
     itemno = models.SmallIntegerField(db_column='ItemNo')
@@ -261,3 +260,4 @@ class TmpQms(models.Model):
     class Meta:
         managed = False
         db_table = 'Tmp_Qms'
+

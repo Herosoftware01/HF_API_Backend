@@ -1,4 +1,5 @@
 from django.http import JsonResponse
+from .models import ViewCuttingDelPrint, CuttingPrintembdel, ViewYarnProcessDelivery, ViewUnitPcdelivery, ViewCutsecFabricdelivery
 from .models import ViewCuttingDelPrint,ViewKnitDelivery,VueAccInhTransfer,VueAccProdDel,TrsGatemodule, CuttingPrintembdel, ViewYarnProcessDelivery,VueAccProcDel,ViewAccinwardVerification,ViewFabricDeliveryProcess,ViewMistakeqtyPrint,ViewUnitPcdelivery,VueRibDeliveryDetails,ViewGdwnFabricDeliveryPlan,TrsApidtls,ViewFabricDeliveryRepl,HerofashionUser,Holiday,RoleModulePermission
 import json
 from django.views.decorators.csrf import csrf_exempt
@@ -32,7 +33,6 @@ def cutting_bit_print(request, id):
     queryset = CuttingPrintembdel.objects.using('demo').filter(id=id)
     data = list(queryset.values())
     return JsonResponse(data, safe=False)
-
 
 def yarn_process_delivery(request, dcno):
     queryset = ViewYarnProcessDelivery.objects.using('test').filter(dcno=dcno)
@@ -172,6 +172,10 @@ def unit_pc_delivery(request, dcno):
     data = list(queryset.values())
     return JsonResponse(data, safe=False)
 
+def CuttingSecFabric(request, dcno):
+    queryset = ViewCutsecFabricdelivery.objects.using('demo').filter(dcno=dcno)
+    data = list(queryset.values())
+    return JsonResponse(data, safe=False)
 def rib_delivery_print(request):
     dcno = request.GET.get("dc")  # Example: ?id=101
 

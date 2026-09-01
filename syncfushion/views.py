@@ -810,6 +810,50 @@ def DueDateList(request):
     data = list(ViewAccinwpend.objects.using('test').all().values()) 
     return JsonResponse(data, safe=False)
 
+@csrf_exempt
+def AccessoryDel(request):
+    if request.method == "GET":
+
+        data = list(ViewAccessoryDel.objects.using('test').all().values())
+        return JsonResponse(data, safe=False)
+    
+    elif request.method == "PUT":
+
+        body = json.loads(request.body)
+
+        jobno = body.get("jobno")
+        pono = body.get("pono")
+        acc_item = body.get("acc_item")
+        clr_siz = body.get("clr_siz")
+        retmark = body.get("retmark")
+
+        if not all([jobno, pono, acc_item, clr_siz]):
+            return JsonResponse({
+                "success": False,
+                "error": "jobno, pono, acc_item and clr_siz are required"
+            }, status=400)
+
+        updated = TmpQms.objects.using('test').filter(
+            jobno=jobno,
+            pono=pono,
+            acc_item=acc_item,
+            clr_siz=clr_siz
+        ).update(
+            retmark=retmark
+        )
+
+        if updated == 0:
+            return JsonResponse({
+                "success": False,
+                "message": "No matching record found"
+            }, status=404)
+
+        return JsonResponse({
+            "success": True,
+            "message": "retmark updated successfully",
+            "updated": updated
+        })
+
 from django.db.models import Sum, Min
 def CutBalpend(request):
     qs = ViewCutBalpend.objects.using("demo").all()
@@ -865,46 +909,3 @@ def CutBalpend(request):
 
     return JsonResponse(data, safe=False)
 
-@csrf_exempt
-def AccessoryDel(request):
-    if request.method == "GET":
-
-        data = list(ViewAccessoryDel.objects.using('test').all().values())
-        return JsonResponse(data, safe=False)
-    
-    elif request.method == "PUT":
-
-        body = json.loads(request.body)
-
-        jobno = body.get("jobno")
-        pono = body.get("pono")
-        acc_item = body.get("acc_item")
-        clr_siz = body.get("clr_siz")
-        retmark = body.get("retmark")
-
-        if not all([jobno, pono, acc_item, clr_siz]):
-            return JsonResponse({
-                "success": False,
-                "error": "jobno, pono, acc_item and clr_siz are required"
-            }, status=400)
-
-        updated = TmpQms.objects.using('test').filter(
-            jobno=jobno,
-            pono=pono,
-            acc_item=acc_item,
-            clr_siz=clr_siz
-        ).update(
-            retmark=retmark
-        )
-
-        if updated == 0:
-            return JsonResponse({
-                "success": False,
-                "message": "No matching record found"
-            }, status=404)
-
-        return JsonResponse({
-            "success": True,
-            "message": "retmark updated successfully",
-            "updated": updated
-        })

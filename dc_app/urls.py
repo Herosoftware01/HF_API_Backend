@@ -26,6 +26,7 @@ urlpatterns = [
     path('fabric_process_delivery/', views.fabric_process_delivery, name='FabricProcessDelivery'),
     path('fabric_process_delivery/<int:dcno>/', views.fabric_process_delivery, name='FabricProcessDelivery'),
     path('unit_pc_del/<int:dcno>/', views.unit_pc_delivery, name='UnitPCDelivery'),
+    path('cutting_sec_fabric/<int:dcno>/', views.CuttingSecFabric, name='CuttingSecFabric'),
     path('mistake_qty_print/', views.mistake_qty_print, name='mistake_qty_print'),
     path('mistake_qty_print/<int:id>/', views.mistake_qty_print, name='mistake_qty_print'),
     path('rib_delivery_print/', views.rib_delivery_print, name='rib_delivery_print'),

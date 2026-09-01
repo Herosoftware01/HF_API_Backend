@@ -40,11 +40,12 @@ CORS_ALLOWED_ORIGINS = [
     "http://10.1.21.80:3000",
     "https://hfempdtls.netlify.app",
     "http://10.1.21.110:7003",
+    "http://10.1.21.156:3000",
     
 ]
 
 CSRF_TRUSTED_ORIGINS = [
-    "http://10.1.21.158:3000/",
+    "http://10.1.21.158:3000",
     "http://localhost:3000",
     "http://10.1.21.110:7003",
     "https://hf.herofashion.com",
@@ -54,6 +55,7 @@ CSRF_TRUSTED_ORIGINS = [
     "https://dev.herofashion.com",
     "https://hfempdtls.netlify.app",
     "http://10.1.21.110:7003",
+    "http://10.1.21.156:3000",
     "http://10.1.21.80:3000",
     
 ]
@@ -120,9 +122,9 @@ DEBUG = True
 
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
+    'django.middleware.common.CommonMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
-    'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
@@ -183,8 +185,8 @@ DATABASES = {
     'default': {
         'ENGINE': 'mssql',
         'NAME': 'hfapi',
-        'USER': 'sa',
-        'PASSWORD': 'Fashion@01',
+        'USER': 'Python',
+        'PASSWORD': 'Python@001',
         'HOST': '10.1.21.11',
         'PORT': '1433',
         'OPTIONS': {
@@ -197,8 +199,8 @@ DATABASES = {
     'demo': {
         'ENGINE': 'mssql',
         'NAME': 'Tally2sql',
-        'USER': 'sa',
-        'PASSWORD': 'Fashion@01',
+        'USER': 'Python',
+        'PASSWORD': 'Python@001',
         'HOST': '10.1.21.11',
         'PORT': '1433',
         'OPTIONS': {
@@ -210,8 +212,8 @@ DATABASES = {
     'main': {
         'ENGINE': 'mssql',
         'NAME': 'Garmentrk',
-        'USER': 'sa',
-        'PASSWORD': 'Fashion@01',
+        'USER': 'Python',
+        'PASSWORD': 'Python@001',
         'HOST': '10.1.21.11',
         'PORT': '1433',
         'OPTIONS': {
@@ -223,8 +225,8 @@ DATABASES = {
     'mssql1' : {
         'ENGINE': 'mssql',
         'NAME': 'demo',
-        'USER': 'sa',
-        'PASSWORD': 'Fashion@01',
+        'USER': 'Python',
+        'PASSWORD': 'Python@001',
         'HOST': '10.1.21.11',
         'PORT': '1433',
         'OPTIONS': {
@@ -236,8 +238,8 @@ DATABASES = {
      'app' : {
         'ENGINE': 'mssql',
         'NAME': 'Django',
-        'USER': 'sa',
-        'PASSWORD': 'Fashion@01',
+        'USER': 'Python',
+        'PASSWORD': 'Python@001',
         'HOST': '10.1.21.11',
         'PORT': '1433',
         'OPTIONS': {
@@ -249,8 +251,8 @@ DATABASES = {
      'demo1': {
             'ENGINE': 'mssql',
             'NAME': 'NewPowerBi',
-            'USER': 'sa',
-            'PASSWORD': 'Fashion@01',
+            'USER': 'Python',
+            'PASSWORD': 'Python@001',
             'HOST': '10.1.21.11',
             'PORT': '1433',
             'OPTIONS': {
@@ -262,8 +264,8 @@ DATABASES = {
     'test': {
             'ENGINE': 'mssql',
             'NAME': 'testerphero',
-            'USER': 'sa',
-            'PASSWORD': 'Fashion@01',
+            'USER': 'Python',
+            'PASSWORD': 'Python@001',
             'HOST': '10.1.21.11',
             'PORT': '1433',
             'OPTIONS': {

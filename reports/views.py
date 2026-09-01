@@ -7,8 +7,8 @@ import json
 
 from datetime import datetime, timedelta, date, timezone as dt_timezone
 
-from .models import LaySp, MasterFinalMistake, UnitBundlereport, FinalPlans, Corarlck1, CoraRollcheck, AttUnt, EmbAbsetnt, Holiday, LabAtt, RptCutting, VueOrdersinhand
-from .models import BillAge, BillMdapprove, BillPass, Leavempabsent, LaySpreadingLayemployee, HrLabourattendence, Employeeworking1, BitcheckHour, StickerHour, TrsHrRsgnDtls
+from .models import LaySp, MasterFinalMistake, UnitBundlereport, FinalPlans, Corarlck1, CoraRollcheck, AttUnt, EmbAbsetnt, Holiday, LabAtt, RptCutting, VueOrdersinhand, Txorderdetstyles, VueDyeingRatenew
+from .models import BillAge, BillMdapprove, BillPass, Leavempabsent, LaySpreadingLayemployee, HrLabourattendence, Employeeworking1, BitcheckHour, StickerHour, TrsHrRsgnDtls, VueRepCutPend
 
 from django.db.models import F, Q, IntegerField, DateField, Case, When, Value, CharField
 from django.db import connections
@@ -3129,7 +3129,6 @@ def measurement_report(request):
         })
 
 
-
 def dyeing_data(request):
     qs = VueDyeingRatenew.objects.using("test").values().order_by("-date")
     data = list(qs)
@@ -3225,5 +3224,16 @@ def GetAprodDetails(request):
             dict(zip(columns, row))
             for row in cursor.fetchall()
         ]
+
+    return JsonResponse(data, safe=False)
+
+def RepCutPending(request):
+    jobno = request.GET.get("jobno")
+    queryset = VueRepCutPend.objects.using('demo').all()
+
+    if jobno:
+        queryset = queryset.filter(jobno=jobno)
+        
+    data = list(queryset.values())
 
     return JsonResponse(data, safe=False)

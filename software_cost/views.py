@@ -301,6 +301,8 @@ def subcategory_master_api(request):
                 "status": False,
                 "message": "Subcategory not found"
             }, status=404)
+
+
 @csrf_exempt
 def task_master_api(request):
     if request.method == 'GET':
