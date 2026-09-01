@@ -1,9 +1,6 @@
 from django.http import JsonResponse
-<<<<<<< HEAD
 from .models import ViewCuttingDelPrint, CuttingPrintembdel, ViewYarnProcessDelivery, ViewUnitPcdelivery, ViewCutsecFabricdelivery
-=======
 from .models import ViewCuttingDelPrint,ViewKnitDelivery,VueAccInhTransfer,VueAccProdDel,TrsGatemodule, CuttingPrintembdel, ViewYarnProcessDelivery,VueAccProcDel,ViewAccinwardVerification,ViewFabricDeliveryProcess,ViewMistakeqtyPrint,ViewUnitPcdelivery,VueRibDeliveryDetails,ViewGdwnFabricDeliveryPlan,TrsApidtls,ViewFabricDeliveryRepl,HerofashionUser,Holiday,RoleModulePermission
->>>>>>> c4365d64b9f81458cced1ff487cdfb925052254d
 import json
 from django.views.decorators.csrf import csrf_exempt
 from django.forms.models import model_to_dict
@@ -37,17 +34,11 @@ def cutting_bit_print(request, id):
     data = list(queryset.values())
     return JsonResponse(data, safe=False)
 
-<<<<<<< HEAD
-=======
-
->>>>>>> c4365d64b9f81458cced1ff487cdfb925052254d
 def yarn_process_delivery(request, dcno):
     queryset = ViewYarnProcessDelivery.objects.using('test').filter(dcno=dcno)
     data = list(queryset.values())
     return JsonResponse(data, safe=False)
 
-<<<<<<< HEAD
-=======
 
 def knitting_del_print(request):
     dcno = request.GET.get("dcno")  # Example: ?id=101
@@ -176,18 +167,15 @@ def mistake_qty_print(request):
         "data": data
     })
 
->>>>>>> c4365d64b9f81458cced1ff487cdfb925052254d
 def unit_pc_delivery(request, dcno):
     queryset = ViewUnitPcdelivery.objects.using('test').filter(dcno=dcno)
     data = list(queryset.values())
     return JsonResponse(data, safe=False)
 
-<<<<<<< HEAD
 def CuttingSecFabric(request, dcno):
     queryset = ViewCutsecFabricdelivery.objects.using('demo').filter(dcno=dcno)
     data = list(queryset.values())
     return JsonResponse(data, safe=False)
-=======
 def rib_delivery_print(request):
     dcno = request.GET.get("dc")  # Example: ?id=101
 
@@ -509,4 +497,3 @@ def save_role_permissions(request):
             return JsonResponse({"error": str(e)}, status=500)
             
     return JsonResponse({"error": "Method not allowed"}, status=405)
->>>>>>> c4365d64b9f81458cced1ff487cdfb925052254d

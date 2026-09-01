@@ -26,10 +26,6 @@ class ViewCuttingDelPrint(models.Model):
         managed = False
         db_table = 'view_cutting_del_print'
 
-<<<<<<< HEAD
-
-=======
->>>>>>> c4365d64b9f81458cced1ff487cdfb925052254d
 class CuttingPrintembdel(models.Model):
     rowno = models.BigIntegerField(db_column='RowNo', primary_key=True) 
     frm = models.CharField(max_length=750, blank=True, null=True)
@@ -50,18 +46,10 @@ class CuttingPrintembdel(models.Model):
         managed = False
         db_table = 'vue_cutting_printembdel'
 
-<<<<<<< HEAD
-
-class ViewYarnProcessDelivery(models.Model):
-    sl = models.BigIntegerField(db_column='Sl', primary_key=True)
-    itemno1 = models.SmallIntegerField()
-    companyid=models.SmallIntegerField()
-=======
 class ViewYarnProcessDelivery(models.Model):
     sl = models.BigIntegerField(db_column='Sl', primary_key=True)
     itemno1 = models.SmallIntegerField()
     companyid = models.SmallIntegerField()
->>>>>>> c4365d64b9f81458cced1ff487cdfb925052254d
     year = models.SmallIntegerField()
     n = models.CharField(db_column='N', max_length=19, blank=True, null=True)
     companyname = models.CharField(db_column='CompanyName', max_length=12)
@@ -100,8 +88,6 @@ class ViewYarnProcessDelivery(models.Model):
         managed = False
         db_table = 'view_yarn_process_delivery'
 
-<<<<<<< HEAD
-=======
 
 class ViewKnitDelivery(models.Model):
     sl = models.BigIntegerField(db_column='Sl',primary_key=True)  # Field name made lowercase.
@@ -297,7 +283,6 @@ class ViewFabricDeliveryProcess(models.Model):
         managed = False
         db_table = 'view_fabric_delivery_process'
 
->>>>>>> c4365d64b9f81458cced1ff487cdfb925052254d
 class ViewUnitPcdelivery(models.Model):
     slno = models.BigIntegerField(primary_key=True)
     frm = models.CharField(max_length=750, blank=True, null=True)
@@ -319,7 +304,6 @@ class ViewUnitPcdelivery(models.Model):
         db_table = 'view_unit_pcdelivery'
 
 
-<<<<<<< HEAD
 class ViewCutsecFabricdelivery(models.Model):
     rlno = models.CharField(db_column='RlNo', max_length=50, primary_key=True)
     dcaddres = models.CharField(max_length=750, blank=True, null=True)
@@ -340,7 +324,6 @@ class ViewCutsecFabricdelivery(models.Model):
         db_table = 'view_cutsec_fabricdelivery'
 
 
-=======
 class ViewGdwnFabricDeliveryPlan(models.Model):
     slno = models.BigIntegerField(db_column='SlNo', primary_key=True)  # Field name made lowercase.
     frm = models.CharField(max_length=11)
@@ -528,4 +511,3 @@ class RoleModulePermission(models.Model):
 
     def __str__(self):
         return f"{self.role} - {self.module_name} ({'ON' if self.is_enabled else 'OFF'})"
->>>>>>> c4365d64b9f81458cced1ff487cdfb925052254d

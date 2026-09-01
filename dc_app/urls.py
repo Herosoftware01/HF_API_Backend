@@ -13,11 +13,6 @@ urlpatterns = [
     path('cutting_del_print/<int:id>/', views.cutting_del_print, name='cutting_del_print'),
     path('cutting_bit_print/<int:id>/', views.cutting_bit_print, name='CuttingBitPrint'),
     path('yarn_process_del/<int:dcno>/', views.yarn_process_delivery, name='YarnProcessDelivery'),
-<<<<<<< HEAD
-    path('unit_pc_del/<int:dcno>/', views.unit_pc_delivery, name='UnitPCDelivery'),
-    path('cutting_sec_fabric/<int:dcno>/', views.CuttingSecFabric, name='CuttingSecFabric'),
-]
-=======
     path('knitting_del_print/', views.knitting_del_print, name='knitting_del_print'),
     path('knitting_del_print/<int:id>/', views.knitting_del_print, name='knitting_del_print'),
     path('acc_prod_del_print/', views.acc_prod_del_print, name='acc_prod_del_print'),
@@ -31,6 +26,7 @@ urlpatterns = [
     path('fabric_process_delivery/', views.fabric_process_delivery, name='FabricProcessDelivery'),
     path('fabric_process_delivery/<int:dcno>/', views.fabric_process_delivery, name='FabricProcessDelivery'),
     path('unit_pc_del/<int:dcno>/', views.unit_pc_delivery, name='UnitPCDelivery'),
+    path('cutting_sec_fabric/<int:dcno>/', views.CuttingSecFabric, name='CuttingSecFabric'),
     path('mistake_qty_print/', views.mistake_qty_print, name='mistake_qty_print'),
     path('mistake_qty_print/<int:id>/', views.mistake_qty_print, name='mistake_qty_print'),
     path('rib_delivery_print/', views.rib_delivery_print, name='rib_delivery_print'),
@@ -44,4 +40,3 @@ urlpatterns = [
     path('dc_permissions/save/', views.save_role_permissions, name='save_permissions'),
     path('dc_permissions/<str:role>/', views.get_role_permissions, name='get_role_permissions'),
 ]
->>>>>>> c4365d64b9f81458cced1ff487cdfb925052254d
