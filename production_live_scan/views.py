@@ -9,7 +9,7 @@ from django.db import transaction
 from imp_reports.models import UnitBundlereport
 from bundle_tracking.models import TrsMcutstickerprod,MasUnit,MasTopbottom
 from qcapp.models import Unit,Line,machine_details,emp_allocate,Empwisesal
-from .models import Assembly_data, unit_input, Msizes,dependency,dependency_data
+from .models import Assembly_data,end_line_data, unit_input, Msizes,dependency,dependency_data
 from django.utils.dateparse import parse_datetime
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
@@ -97,6 +97,118 @@ def live_scan_data(request):
     })
 
 
+
+
+@require_GET
+def end_live_scan_data(request):
+    unit = request.GET.get('unit')
+    line = request.GET.get('line')
+
+    verified_dependencies = dependency.objects.filter(verify=True).values(
+        'job_no', 'tb_name', 'process_des'
+    )
+
+    dependency_map = {}
+    for item in verified_dependencies:
+        job_no = str(item.get('job_no') or '').strip()
+        tb_name = str(item.get('tb_name') or '').strip()
+        process_des = str(item.get('process_des') or '').strip().casefold()
+        if not job_no or not tb_name or not process_des:
+            continue
+        key = (job_no.casefold(), tb_name.casefold())
+        dependency_map.setdefault(key, set()).add(process_des)
+
+    if not dependency_map:
+        return JsonResponse({
+            "status": True,
+            "message": "No verified endline dependency configuration found.",
+            "data": []
+        })
+
+    filters = Q()
+    for job_no, tb_name in dependency_map.keys():
+        filters |= Q(job_no__iexact=job_no) & Q(tb_name__iexact=tb_name)
+
+    assembly_rows = Assembly_data.objects.filter(filters)
+    if unit is not None:
+        assembly_rows = assembly_rows.filter(unit=unit)
+    if line is not None:
+        assembly_rows = assembly_rows.filter(line=line)
+
+    unit_ids = {str(row.unit).strip() for row in assembly_rows if row.unit is not None}
+    unit_name_map = {
+        str(u.unitcode): u.unitname
+        for u in MasUnit.objects.using("main").filter(unitcode__in=unit_ids)
+    }
+
+    bundle_info = {}
+    for row in assembly_rows:
+        bundle_id = str(row.bundle_id or '').strip()
+        job_no_key = str(row.job_no or '').strip().casefold()
+        tb_name_key = str(row.tb_name or '').strip().casefold()
+        seq_value = str(row.seq or '').strip().casefold()
+        if not bundle_id or not seq_value:
+            continue
+
+        bundle_key = (bundle_id, job_no_key, tb_name_key)
+        bundle_info.setdefault(bundle_key, {
+            'bundle_id': bundle_id,
+            'job_no': row.job_no,
+            'tb_id': row.tb_id,
+            'tb_name': row.tb_name,
+            'unit': row.unit,
+            'line': row.line,
+            'bdl_no': row.bdl_no,
+            'mbud': row.mbud,
+            'size': row.size,
+            'size_id': row.size_id,
+            'color': row.color,
+            'pc': row.pc,
+            'entry_date': row.entry_date,
+            'lot': row.lot,
+            'has_scanned_row': False,
+            'completed_sequences': set(),
+        })
+        if row.scan:
+            bundle_info[bundle_key]['has_scanned_row'] = True
+        bundle_info[bundle_key]['completed_sequences'].add(seq_value)
+
+    eligible_units = {}
+    for (bundle_id, job_no_key, tb_name_key), info in bundle_info.items():
+        if info['has_scanned_row']:
+            continue
+        required_sequences = dependency_map.get((job_no_key, tb_name_key))
+        if required_sequences and required_sequences.issubset(info['completed_sequences']):
+            unit_id = str(info['unit'])
+            unit_data = eligible_units.setdefault(unit_id, {
+                'unit_id': unit_id,
+                'unit_name': unit_name_map.get(unit_id, 'Unknown Unit'),
+                'total_records': 0,
+                'data': []
+            })
+            unit_data['total_records'] += 1
+            unit_data['data'].append({
+                'bundid': info['bundle_id'],
+                'jobno': info['job_no'],
+                'tbid': info['tb_id'],
+                'tbid_name': info['tb_name'],
+                'bdl': info['bdl_no'],
+                'comboclr': info['color'],
+                'sizid': info['size_id'],
+                'sizid_name': info['size'],
+                'mbud': info['mbud'],
+                'pc': info['pc'],
+                'lot': info['lot'],
+                'entry_date': info['entry_date'],
+            })
+
+    return JsonResponse({
+        "status": True,
+        "message": "End Line Live Scan Data API is working",
+        "data": list(eligible_units.values())
+    })
+
+
 class UnitInputAPIView(APIView):
     def post(self, request):
         data_list = request.data.get("data", [])
@@ -108,6 +220,7 @@ class UnitInputAPIView(APIView):
                 now_ist = timezone.now()
 
                 unit_inputs = []
+                end_line_inputs = []
 
                 for item in data_list:
 
@@ -139,7 +252,8 @@ class UnitInputAPIView(APIView):
                             color=item.get('color'),
                             tb_id=item.get('tb_id'),
                             tb_name=item.get('tb_name'),
-                            scan=item.get('scan', False),
+                            # scan=item.get('scan', False),
+                            scan=1 if item.get("allow_end_line") is True else item.get("scan", False),
                             size=item.get('size'),
                             size_id=item.get('size_id'),
                             pc=item.get('pc'),
@@ -148,8 +262,43 @@ class UnitInputAPIView(APIView):
                         )
                     )
 
-                unit_input.objects.bulk_create(unit_inputs)
+                
+                    # --------------------------------
+                    # END LINE
+                    # --------------------------------
+                    if item.get("allow_end_line") is True:
 
+                        end_line_inputs.append(
+                            end_line_data(
+                                unit=item.get("unit"),
+                                line=item.get("line"),
+                                job_no=item.get("job_no"),
+                                tb_id=item.get("tb_id"),
+                                tb_name=item.get("tb_name"),
+                                machine=item.get("machine", ""),
+                                date=final_date,
+                                bundle_id=item.get("bundle_id"),
+                                bdl_no=item.get("bdl_no"),
+                                mbud=item.get("mbud"),
+                                size=item.get("size"),
+                                size_id=item.get("size_id"),
+                                color=item.get("color"),
+                                pc=item.get("pc"),
+                                entry_date=now_ist,
+                                scan=item.get("scan", False),
+                                lot=item.get("lot") or "0",
+                            )
+                        )
+
+                # Save normal unit input
+                if unit_inputs:
+                    unit_input.objects.bulk_create(unit_inputs)
+
+                # Save end line data only when checkbox is enabled
+                if end_line_inputs:
+                    end_line_data.objects.bulk_create(end_line_inputs)
+
+                # unit_input.objects.bulk_create(unit_inputs)
 
                 bundle_ids = [
                     item.get("bundle_id")
@@ -166,6 +315,88 @@ class UnitInputAPIView(APIView):
                     )
 
                 print("--- Bulk Create & LiveScan Update Success ---")
+
+            return Response(
+                {"status": "success"},
+                status=status.HTTP_201_CREATED
+            )
+
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+
+            return Response(
+                {"error": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+
+
+class EndUnitInputAPIView(APIView):
+    def post(self, request):
+        data_list = request.data.get("data", [])
+
+        try:
+            with transaction.atomic():
+
+                # USE_TZ=False என்பதால் localtime வேண்டாம்
+                now_ist = timezone.now()
+
+                end_inputs = []
+
+                for item in data_list:
+
+                    raw_date = item.get("date")
+                    parsed_date = parse_datetime(raw_date)
+
+                    if parsed_date:
+                        # Frontend date already IST (13:34)
+                        if timezone.is_aware(parsed_date):
+                            final_date = parsed_date.replace(tzinfo=None)
+                        else:
+                            final_date = parsed_date
+                    else:
+                        final_date = now_ist
+
+                    print("Saving Date:", final_date)
+
+                    end_inputs.append(
+                        end_line_data(
+                            bundle_id=item.get('bundle_id'),
+                            bdl_no=item.get('bdl_no'),
+                            mbud=item.get('mbud'),
+                            unit=item.get('unit'),
+                            line=item.get('line'),
+                            entry_date=now_ist,
+                            job_no=item.get('job_no'),
+                            color=item.get('color'),
+                            tb_id=item.get('tb_id'),
+                            tb_name=item.get('tb_name'),
+                            scan=item.get('scan', False),
+                            size=item.get('size'),
+                            size_id=item.get('size_id'),
+                            pc=item.get('pc'),
+                            lot=item.get('lot'),
+                            date=final_date
+                        )
+                    )
+
+                if end_inputs:
+                    end_line_data.objects.bulk_create(end_inputs)
+
+                bundle_ids = [
+                    item.get("bundle_id")
+                    for item in data_list
+                    if item.get("bundle_id")
+                ]
+
+                if bundle_ids:
+                    Assembly_data.objects.filter(
+                        bundle_id__in=bundle_ids
+                    ).update(scan=True)
+
+                print("--- Bulk Create & Assembly_data Scan Update Success ---")
 
             return Response(
                 {"status": "success"},
@@ -259,10 +490,10 @@ class GetUnitDataAPIView(APIView):
 
         if selected_date:
             date_obj = datetime.strptime(selected_date, '%Y-%m-%d')
-            data = unit_input.objects.filter(unit=unit, line=line, entry_date__date=date_obj)
+            data = unit_input.objects.filter(unit=unit, line=line, entry_date__date=date_obj).order_by('-entry_date')
         else:
             four_days_ago = datetime.now() - timedelta(days=4)
-            data = unit_input.objects.filter(unit=unit, line=line, entry_date__gte=four_days_ago)
+            data = unit_input.objects.filter(unit=unit, line=line, entry_date__gte=four_days_ago).order_by('-entry_date')
 
         if job_no is not None:
             job_no = job_no.strip()
@@ -313,6 +544,73 @@ class GetUnitDataAPIView(APIView):
     
 
 
+
+class EndUnitDataAPIView(APIView):
+    def get(self, request):
+        unit = request.query_params.get('unit')
+        line = request.query_params.get('line')
+        job_no = request.query_params.get('job_no')
+        process_des = request.query_params.get('process_des')
+        top_bottom = str(request.query_params.get('top_bottom', '') or '').strip()
+        selected_date = request.query_params.get('date') 
+
+        if selected_date:
+            date_obj = datetime.strptime(selected_date, '%Y-%m-%d')
+            data = end_line_data.objects.filter(unit=unit, line=line, entry_date__date=date_obj)
+        else:
+            four_days_ago = datetime.now() - timedelta(days=4)
+            data = end_line_data.objects.filter(unit=unit, line=line, entry_date__gte=four_days_ago)
+
+        if job_no is not None:
+            job_no = job_no.strip()
+            if not job_no:
+                return Response(
+                    {"error": "job_no is required to load assembly bundles"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            if process_des is not None:
+                process_des = process_des.strip()
+                if not top_bottom:
+                    return Response(
+                        {"error": "top_bottom is required to load assembly bundles"},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+                allowed, eligible_bundle_ids, error_message = get_eligible_assembly_bundle_ids(
+                    job_no, process_des, top_bottom
+                )
+                if not allowed:
+                    return Response(
+                        {"error": error_message},
+                        status=status.HTTP_409_CONFLICT
+                    )
+                already_scanned_ids = Assembly_data.objects.filter(
+                    job_no__iexact=job_no,
+                    seq__iexact=process_des,
+                ).values_list('bundle_id', flat=True)
+                data = data.filter(job_no__iexact=job_no)
+                if top_bottom:
+                    data = data.filter(tb_name__iexact=top_bottom)
+                data = data.exclude(bundle_id__in=already_scanned_ids)
+                if eligible_bundle_ids is not None:
+                    data = data.filter(bundle_id__in=eligible_bundle_ids)
+            else:
+                verified_tb_ids = dependency.objects.filter(
+                    job_no__iexact=job_no,
+                    verify=True
+                ).values_list('tb_id', flat=True)
+                data = data.filter(
+                    job_no__iexact=job_no,
+                    tb_id__in=verified_tb_ids,
+                    scan=False,
+                )
+
+        # JSON response
+        results = list(data.values('bundle_id','bdl_no','mbud', 'job_no','color','bdl_no','size','tb_name', 'pc', 'color', 'entry_date'))
+        return Response({"status": True, "data": results})
+    
+
+
+
 class GetUnitAssemply(APIView):
     def get(self, request):
         unit = request.query_params.get('unit')
@@ -321,13 +619,13 @@ class GetUnitAssemply(APIView):
 
         if selected_date:
             date_obj = datetime.strptime(selected_date, '%Y-%m-%d')
-            data = Assembly_data.objects.filter(unit=unit, line=line, entry_date__date=date_obj)
+            data = Assembly_data.objects.filter(unit=unit, line=line, entry_date__date=date_obj).order_by('-entry_date')
         else:
             four_days_ago = datetime.now() - timedelta(days=4)
-            data = Assembly_data.objects.filter(unit=unit, line=line, entry_date__gte=four_days_ago)
+            data = Assembly_data.objects.filter(unit=unit, line=line, entry_date__gte=four_days_ago).order_by('-entry_date')
 
         # JSON response
-        results = list(data.values('bundle_id', 'job_no', 'pc', 'color', 'entry_date'))
+        results = list(data.values('bundle_id','bdl_no', 'job_no','seq', 'pc', 'color', 'entry_date'))
         return Response({"status": True, "data": results})
     
 
@@ -364,7 +662,8 @@ def assembly_emp(request):
     emp_details = list(emp_allocate.objects.filter(
         date__date=filter_date,
         unit=unit_obj.id,
-        line=line_obj.id
+        line=line_obj.id,
+        status=1
     ).values(
         'emp_code',
         'machine',
@@ -521,7 +820,8 @@ class SaveAssemblyAPIView(APIView):
                     pc=bundle.pc,
                     entry_date=entry_date,
                     scan=False,
-                    lot=bundle.lot
+                    lot=bundle.lot,
+                    emp_id=emp_code
                 )
                 for bundle in bundles
             ])
@@ -535,38 +835,6 @@ save_assembly = SaveAssemblyAPIView.as_view()
 
 
 
-# @api_view(['POST'])
-# def get_process_details(request):
-
-#     jobno = request.data.get('jobno')
-#     topbottom = request.data.get('topbottom')
-
-#     if not jobno or not topbottom:
-#         return JsonResponse(
-#             {"error": "Jobno and TopBottom required"},
-#             status=400
-#         )
-
-#     with connections['demo'].cursor() as cursor:
-#         cursor.execute(
-#             "EXEC sp_GetProcessDetails %s, %s",
-#             [jobno, topbottom]
-#         )
-
-#         columns = [col[0] for col in cursor.description]
-
-#         rows = cursor.fetchall()
-
-#         result = []
-
-#         for row in rows:
-#             result.append(
-#                 dict(zip(columns, row))
-#             )
-
-#     return JsonResponse(result, safe=False)
-
-
 @api_view(['POST'])
 def get_process_details(request):
     jobno = request.data.get('jobno')
@@ -577,23 +845,82 @@ def get_process_details(request):
             {"error": "Jobno and TopBottom required"},
             status=400
         )
+        
+    with connections['demo'].cursor() as cursor:
+        cursor.execute(
+            "EXEC sp_GetProcessDetails %s, %s",
+            [jobno, topbottom]
+        )
 
-    saved_filter = Q(job_no=jobno) & Q(tb_name__iexact=str(topbottom).strip())
+        columns = [col[0] for col in cursor.description]
+        rows = cursor.fetchall()
+
+        result = []
+
+        for row in rows:
+            item = dict(zip(columns, row))
+
+            # Trn = A / R mattum
+            trn = str(
+                item.get('Trn', '') or ''
+            ).strip().upper()
+
+            if trn in ('A'):
+                item['Trn'] = trn
+                result.append(item)
+
+    # =========================================================
+    # 2. Process_ID -> Trn mapping
+    # =========================================================
+    trn_map = {}
+
+    for item in result:
+        process_id = item.get('Process_ID')
+        trn = item.get('Trn')
+
+        if process_id is not None:
+            trn_map[process_id] = trn
+
+    # =========================================================
+    # 3. Saved dependency data check
+    # =========================================================
+    saved_filter = (
+        Q(job_no=jobno) &
+        Q(tb_name__iexact=str(topbottom).strip())
+    )
+
     if str(topbottom).strip().isdigit():
-        saved_filter |= Q(job_no=jobno, tb_id=int(topbottom))
+        saved_filter |= Q(
+            job_no=jobno,
+            tb_id=int(topbottom)
+        )
 
-    # Saved configuration takes priority. Include its dependency_data rows so
-    # the frontend can restore the selected checkboxes and badges directly.
-    saved_dependencies = dependency.objects.filter(saved_filter).prefetch_related(
-        'data_entries'
-    ).order_by('-id')
+    saved_dependencies = (
+        dependency.objects
+        .filter(saved_filter)
+        .prefetch_related('data_entries')
+        .order_by('-id')
+    )
+
     latest_by_process = {}
-    for dep in saved_dependencies:
-        latest_by_process.setdefault(dep.process_id, dep)
 
+    for dep in saved_dependencies:
+        latest_by_process.setdefault(
+            dep.process_id,
+            dep
+        )
+
+    # =========================================================
+    # 4. Saved data iruntha
+    # =========================================================
     if latest_by_process:
+
         saved_result = []
-        for index, dep in enumerate(reversed(list(latest_by_process.values())), start=1):
+
+        for index, dep in enumerate(
+            reversed(list(latest_by_process.values())),
+            start=1
+        ):
             saved_result.append({
                 'Jobno': dep.job_no,
                 'TopBottdes': dep.tb_name,
@@ -602,63 +929,98 @@ def get_process_details(request):
                 'Process_des': dep.process_des,
                 'mc': dep.mc,
                 'thrd': dep.thrd,
+
+                # Stored Procedure-la irunthu Trn
+                'Trn': trn_map.get(
+                    dep.process_id,
+                    ''
+                ),
+
                 'Wsec': dep.wsec,
                 'Process_ID': dep.process_id,
-                'saved_and_or': 1 if dep.and_or else 0,
-                'saved_verify': bool(dep.verify),
+
+                'saved_and_or': (
+                    1 if dep.and_or else 0
+                ),
+
+                'saved_verify': bool(
+                    dep.verify
+                ),
+
                 'saved_selected_processes': [
                     child.descriptions
-                    for child in dep.data_entries.all().order_by('desc_ord_no', 'id')
+                    for child in dep.data_entries.all().order_by(
+                        'desc_ord_no',
+                        'id'
+                    )
                 ],
             })
-        return JsonResponse(saved_result, safe=False)
 
-    # 1. Stored Procedure moolam data eduthu varuthu
-    with connections['demo'].cursor() as cursor:
-        cursor.execute(
-            "EXEC sp_GetProcessDetails %s, %s",
-            [jobno, topbottom]
+        return JsonResponse(
+            saved_result,
+            safe=False
         )
-        columns = [col[0] for col in cursor.description]
-        rows = cursor.fetchall()
-        result = []
-        for row in rows:
-            result.append(dict(zip(columns, row)))
 
-    # 2. Munbe save aanatha nu check panni results-oda serkkurathu
+    # =========================================================
+    # 5. Saved data illana
+    #    Stored Procedure result direct-ah return pannum
+    # =========================================================
     for item in result:
+
         process_id = item.get('Process_ID')
         job_no = item.get('Jobno')
         tb_id = item.get('TbID')
 
         try:
-            # Table-la antha job_no, tb_id, process_id irukha nu paarkurathu
-            existing_dep = dependency.objects.filter(
-                job_no=job_no,
-                tb_id=tb_id,
-                process_id=process_id
-            ).order_by('-id').first()
+            existing_dep = (
+                dependency.objects
+                .filter(
+                    job_no=job_no,
+                    tb_id=tb_id,
+                    process_id=process_id
+                )
+                .order_by('-id')
+                .first()
+            )
 
             if existing_dep:
-                # and_or boolean-ah irunthal 1/0 aah mathi anuppurathu
-                item['saved_and_or'] = 1 if existing_dep.and_or else 0
-                item['saved_verify'] = bool(existing_dep.verify)
-                
-                # related_name='data_entries' vechu dependency_data-la irukka descriptions-ah edukkurathu
-                saved_children = existing_dep.data_entries.all().order_by('desc_ord_no', 'id')
-                item['saved_selected_processes'] = [child.descriptions for child in saved_children]
+
+                item['saved_and_or'] = (
+                    1 if existing_dep.and_or else 0
+                )
+
+                item['saved_verify'] = bool(
+                    existing_dep.verify
+                )
+
+                saved_children = (
+                    existing_dep.data_entries
+                    .all()
+                    .order_by(
+                        'desc_ord_no',
+                        'id'
+                    )
+                )
+
+                item['saved_selected_processes'] = [
+                    child.descriptions
+                    for child in saved_children
+                ]
+
             else:
                 item['saved_and_or'] = 0
                 item['saved_verify'] = False
                 item['saved_selected_processes'] = []
-                
-        except Exception as e:
+
+        except Exception:
             item['saved_and_or'] = 0
             item['saved_verify'] = False
             item['saved_selected_processes'] = []
 
-    return JsonResponse(result, safe=False)
-
+    return JsonResponse(
+        result,
+        safe=False
+    )
 
 @require_GET
 def get_job_top_bottom(request):

@@ -21,6 +21,8 @@ urlpatterns = [
     path('absent_details/', views.abs_details, name='absent_details'),
     path('present_details/', views.present_details, name='present_details'),
     path('resign_report/', views.resign_report, name='resign_report'),
+    path('resign_join_report/', views.resign_join_summary, name='resign_join_summary'),
+    path('hr_resignation_details/', views.hr_resignation_details, name='hr_resignation_details'),
     path('join_data/', views.join_data, name='join_data'),
     path('staff_overview/', views.staff_overview, name='staff_overview'),
     path('staff_pre/', views.staff_pre, name='staff_pre'),
@@ -43,7 +45,9 @@ urlpatterns = [
     path('bill_details/', views.bill_details , name='bill_details'),
     path('pay_dash/', views.pay_dashboard , name='pay_dash'),
     path('pay_details/', views.pay_bill_details , name='pay_details'),
-
+    path('dyeing_data/', views.dyeing_data , name='dyeing_data'),
+    path('dyeing_order_details/', views.dyeing_order_details , name='dyeing_order_details'),
+    
     # Cutting Reports
     path('cutting_details/', views.GetCuttingDetails, name='get_cutting_details'),
     path('aprod_details/', views.GetAprodDetails, name='get_aprod_details'),

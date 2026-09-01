@@ -908,3 +908,4 @@ def CutBalpend(request):
         )
 
     return JsonResponse(data, safe=False)
+

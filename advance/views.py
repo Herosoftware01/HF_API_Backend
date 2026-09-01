@@ -2,7 +2,7 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.db.models import Max
 import json
-from .models import IncdebUsers, Adreq, Empwisesal,Employeeworking,HrWrkdtlsnew,RptCut002,Monthlysaltime
+from .models import  Adreq, Empwisesal,Employeeworking,HrWrkdtlsnew,RptCut002,Monthlysaltime
 from django.db import connections
 import os
 from django.core.mail import send_mail
@@ -17,119 +17,6 @@ import threading
 from django.core.cache import cache
 from django.utils.timezone import now
 from datetime import datetime
-
-
-# ==========================================
-# USER LOGIN / REGISTER / UPDATE / DELETE
-# ==========================================
-@csrf_exempt
-def login(request):
-
-    # ================= GET USERS =================
-    if request.method == 'GET':
-        users = IncdebUsers.objects.using('demo').all().values()
-        return JsonResponse(list(users), safe=False)
-
-    # ================= POST (LOGIN / REGISTER) =================
-    elif request.method == 'POST':
-        try:
-            data = json.loads(request.body)
-            action = data.get('action')
-
-            # ---------- LOGIN ----------
-            if action != "register":
-                user = IncdebUsers.objects.using('demo').filter(
-                    username=data.get('username'),
-                    password=data.get('password')
-                ).first()
-
-                if user:
-                    return JsonResponse({
-                        "status": "success",
-                        "user": {
-                            "id": user.id,
-                            "username": user.username,
-                            "screen_per": user.screen_per,
-                            "app_n": user.app_n
-                        }
-                    })
-                else:
-                    return JsonResponse({"error": "Invalid credentials"}, status=400)
-
-            # ---------- REGISTER ----------
-            if action == "register":
-
-                if IncdebUsers.objects.using('demo').filter(
-                    username=data.get('username')
-                ).exists():
-                    return JsonResponse({"error": "User already exists"}, status=400)
-
-                new_user = IncdebUsers.objects.using('demo').create(
-                    username=data.get('username'),
-                    password=data.get('password'),
-                    screen_per=data.get('screen_per'),
-                    app_n=int(data.get('app_n'))   # ✅ FIX TYPE
-                )
-
-                return JsonResponse({
-                    "message": "User created",
-                    "id": new_user.id
-                })
-
-        except Exception as e:
-            print("POST ERROR:", str(e))
-            return JsonResponse({"error": str(e)}, status=500)
-
-    # ================= PUT (UPDATE USER) =================
-    elif request.method == 'PUT':
-        try:
-            data = json.loads(request.body)
-            print("PUT DATA:", data)
-
-            user_id = data.get('id')
-            if not user_id:
-                return JsonResponse({"error": "ID is required"}, status=400)
-
-            user = IncdebUsers.objects.using('demo').get(id=user_id)
-
-            user.username = data.get('username')
-
-            if data.get('password'):
-                user.password = data.get('password')
-
-            user.screen_per = data.get('screen_per')
-
-            # ✅ SAFE CONVERSION
-            app_n = data.get('app_n')
-            if app_n is not None and str(app_n).strip() != "":
-                user.app_n = int(app_n)
-
-            user.save()
-
-            return JsonResponse({"message": "User updated"})
-
-        except Exception as e:
-            print("PUT ERROR:", str(e))
-            return JsonResponse({"error": str(e)}, status=500)
-
-    # ================= DELETE USER =================
-    elif request.method == 'DELETE':
-        try:
-            data = json.loads(request.body)
-            user_id = data.get('id')
-
-            user = IncdebUsers.objects.using('demo').get(id=user_id)
-            user.delete()
-
-            return JsonResponse({"message": "User deleted"}, status=200)
-
-        except IncdebUsers.DoesNotExist:
-            return JsonResponse({"error": "User not found"}, status=404)
-
-        except Exception as e:
-            print("DELETE ERROR:", str(e))
-            return JsonResponse({"error": str(e)}, status=500)
-
 
 @csrf_exempt
 def request_advance(request):
@@ -178,43 +65,51 @@ def request_advance(request):
                 mail_sent=False,  # initially false
             )
 
-            # ================= SEND EMAIL =================
-            try:
-                subject = "🧾 New Advance Request Submitted"
+            # A successful write must always produce a response.  Without this,
+            # Django raises a debug error after inserting the record and callers
+            # receive its HTML error page instead of a success payload.
+            return JsonResponse({"message": "Created", "id": obj.entryno}, status=201)
 
-                message = f"""
-                    Employee ID : {empid}
-                    Month       : {smon}-{syear}
-                    Amount      : ₹{data.get('amt')}
-                    Eligible    : ₹{data.get('elig')}
-                    Remarks     : {data.get('remarks')}
-                    """
+            # # ================= SEND EMAIL =================
+            # try:
+            #     subject = "🧾 New Advance Request Submitted"
 
-                send_mail(
-                    subject,
-                    message,
-                    settings.EMAIL_HOST_USER,   # from email
-                    ['hfautomation2026@email.com',"hr@herofashion.com","hrm@herofashion.com","accounts@herofashion.com","design@herofashion.com"],     # 👈 change to real email
-                    fail_silently=False,
-                )
+            #     message = f"""
+            #         Employee ID : {empid}
+            #         Month       : {smon}-{syear}
+            #         Amount      : ₹{data.get('amt')}
+            #         Eligible    : ₹{data.get('elig')}
+            #         Remarks     : {data.get('remarks')}
+            #         """
 
-                # ✅ update mail_sent = True
-                obj.mail_sent = True
-                obj.save()
+            #     send_mail(
+            #         subject,
+            #         message,
+            #         settings.EMAIL_HOST_USER,   # from email
+            #         ['hfautomation2026@gmail.com','design@herofashion.com'],    # 👈 change to real email
+            #         fail_silently=False,
+            #     )
 
-                return JsonResponse({"message": "Created", "id": obj.entryno})
+            #     # ✅ update mail_sent = True
+            #     obj.mail_sent = True
+            #     obj.save()
 
-            except Exception as mail_error:
-                print("MAIL ERROR:", str(mail_error))
+            # return JsonResponse({"message": "Created", "id": obj.entryno})
+
+            # except Exception as mail_error:
+            #     print("MAIL ERROR:", str(mail_error))
 
                 # Note: If email fails, the advance record is still created in the DB above.
                 # Returning a 500 here might confuse the frontend since the save was actually successful.
                 # You might want to return 200 with a warning message instead in production.
-                return JsonResponse({"error": str(mail_error)}, status=500)
+                # return JsonResponse({"error": str(mail_error)}, status=500)
 
-        except Exception as e:
-            print("POST REQUEST ERROR:", str(e))
-            return JsonResponse({"error": str(e)}, status=500)
+        except Exception:
+            # Log the detailed exception server-side; do not return database or
+            # configuration details to the browser.
+            import logging
+            logging.getLogger(__name__).exception("Unable to create advance request")
+            return JsonResponse({"error": "Unable to save the advance request."}, status=500)
 
     # ================= DELETE =================
     elif request.method == 'DELETE':
@@ -233,6 +128,8 @@ def request_advance(request):
         except Exception as e:
             print("DELETE REQUEST ERROR:", str(e))
             return JsonResponse({"error": str(e)}, status=500)
+
+    return JsonResponse({"error": "Method not allowed"}, status=405)
 
 # views.py — Add this new view
 # ==============================
@@ -273,79 +170,79 @@ def get_employee_map(employees):
     return {str(emp.get('code')).strip(): emp for emp in employees}
 
 
-@csrf_exempt
-def send_advance_mail(request):
-    if request.method == 'POST':
-        try:
-            print("\n=====  FAST MAIL API START =====")
+# @csrf_exempt
+# def send_advance_mail(request):
+#     if request.method == 'POST':
+#         try:
+#             print("\n=====  FAST MAIL API START =====")
 
-            data = json.loads(request.body)
-            entryno = data.get('entryno')
+#             data = json.loads(request.body)
+#             entryno = data.get('entryno')
 
-            # OPTIMIZED DB QUERY
-            obj = Adreq.objects.using('demo').only('empid', 'amt', 'remarks').get(entryno=entryno)
+#             # OPTIMIZED DB QUERY
+#             obj = Adreq.objects.using('demo').only('empid', 'amt', 'remarks').get(entryno=entryno)
 
-            # API CACHE
-            api_url = "https://app.herofashion.com/incentive/api/emp/"
-            employees = get_employee_data(api_url)
-            emp_map = get_employee_map(employees)
+#             # API CACHE
+#             api_url = "https://app.herofashion.com/incentive/api/emp/"
+#             employees = get_employee_data(api_url)
+#             emp_map = get_employee_map(employees)
 
-            emp = emp_map.get(str(obj.empid).strip(), {})
-            emp_name = emp.get('name', 'Not Found')
-            emp_dept = emp.get('dept', 'Not Found')
-            photo_name = emp.get('photo')
+#             emp = emp_map.get(str(obj.empid).strip(), {})
+#             emp_name = emp.get('name', 'Not Found')
+#             emp_dept = emp.get('dept', 'Not Found')
+#             photo_name = emp.get('photo')
 
-            #  EMAIL OBJECT
-            email = EmailMultiAlternatives(
-                "🧾 New Advance Request Submitted",
-                "",
-                settings.EMAIL_HOST_USER,
-                ['hfautomation2026@gmail.com',"hr@herofashion.com","hrm@herofashion.com","accounts@herofashion.com","design@herofashion.com"],
-            )
+#             #  EMAIL OBJECT
+#             email = EmailMultiAlternatives(
+#                 "🧾 New Advance Request Submitted",
+#                 "",
+#                 settings.EMAIL_HOST_USER,
+#                 ['hfautomation2026@gmail.com',"design@herofashion.com"],
+#             )
 
-            # IMAGE ATTACH (optional)
-            photo_cid = None
-            if photo_name:
-                try:
-                    filename = os.path.basename(photo_name)
-                    local_path = os.path.join(settings.STAFF_IMAGES_ROOT, filename)
+#             # IMAGE ATTACH (optional)
+#             photo_cid = None
+#             if photo_name:
+#                 try:
+#                     filename = os.path.basename(photo_name)
+#                     local_path = os.path.join(settings.STAFF_IMAGES_ROOT, filename)
 
-                    if os.path.exists(local_path):
-                        with open(local_path, "rb") as f:
-                            img = MIMEImage(f.read())
-                            photo_cid = f"photo_{obj.empid}"
-                            img.add_header("Content-ID", f"<{photo_cid}>")
-                            email.attach(img)
-                except Exception as e:
-                    print("⚠️ Image error:", str(e))
+#                     if os.path.exists(local_path):
+#                         with open(local_path, "rb") as f:
+#                             img = MIMEImage(f.read())
+#                             photo_cid = f"photo_{obj.empid}"
+#                             img.add_header("Content-ID", f"<{photo_cid}>")
+#                             email.attach(img)
+#                 except Exception as e:
+#                     print("⚠️ Image error:", str(e))
 
-            # TEMPLATE
-            html_content = render_to_string('mail.html', {
-                'name': emp_name,
-                'dept': emp_dept,
-                'empid': obj.empid,
-                'amt': obj.amt,
-                'remarks': obj.remarks,
-                'approve_url': f"https://hf.herofashion.com/approve?entryno={entryno}&status=Y",
-                'reject_url': f"https://hf.herofashion.com/approve?entryno={entryno}&status=N",
-                'photo_cid': photo_cid
-            })
+#             # TEMPLATE
+#             html_content = render_to_string('mail.html', {
+#                 'name': emp_name,
+#                 'dept': emp_dept,
+#                 'empid': obj.empid,
+#                 'amt': obj.amt,
+#                 'remarks': obj.remarks,
+#                 'approve_url': f"https://hf.herofashion.com/approve?entryno={entryno}&status=Y",
+#                 'reject_url': f"https://hf.herofashion.com/approve?entryno={entryno}&status=N",
+#                 'photo_cid': photo_cid
+#             })
 
-            text_content = strip_tags(html_content)
+#             text_content = strip_tags(html_content)
 
-            email.body = text_content
-            email.attach_alternative(html_content, "text/html")
+#             email.body = text_content
+#             email.attach_alternative(html_content, "text/html")
 
-            # BACKGROUND SEND
-            threading.Thread(target=send_mail_async, args=(email,)).start()
+#             # BACKGROUND SEND
+#             threading.Thread(target=send_mail_async, args=(email,)).start()
 
-            return JsonResponse({"message": "Mail queued (fast 🚀)"})
+#             return JsonResponse({"message": "Mail queued (fast 🚀)"})
 
-        except Exception as e:
-            print("❌ ERROR:", str(e))
-            return JsonResponse({"error": str(e)}, status=500)
+#         except Exception as e:
+#             print("❌ ERROR:", str(e))
+#             return JsonResponse({"error": str(e)}, status=500)
 
-    return JsonResponse({"error": "Invalid request"}, status=400)
+#     return JsonResponse({"error": "Invalid request"}, status=400)
         
 
 @csrf_exempt
@@ -388,7 +285,7 @@ def send_approval_mail(request):
                 subject,
                 text_content,
                 settings.EMAIL_HOST_USER,
-                ['hfautomation2026@gmail.com',"hr@herofashion.com","hrm@herofashion.com","accounts@herofashion.com","design@herofashion.com"],
+                ['hfautomation2026@gmail.com',"design@herofashion.com"],
             )
 
             email.attach_alternative(html_content, "text/html")
@@ -414,9 +311,7 @@ def ad_approve(request):
             obj.status = data.get('status')
             obj.status_dt = data.get('status_dt')
             obj.save()
-
             
-
             return JsonResponse({"message": "Updated"}, status=200)
 
         except Adreq.DoesNotExist:

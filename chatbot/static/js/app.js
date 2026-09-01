@@ -21,6 +21,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const response = await fetch('/chatbot/api/chat/', {
                 method: 'POST',
+                credentials: 'same-origin',
                 headers: {
                     'Content-Type': 'application/json',
                     'X-CSRFToken': csrfToken

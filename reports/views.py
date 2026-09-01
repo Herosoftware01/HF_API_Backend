@@ -1,25 +1,27 @@
-from .models import VueHoldwage, Empwisesal, Employeeworking, Holdwagepaid,ResignDtls,Empjoin,AttStaff,StaffAbsent,StaffAtt,ContractSec
+from .models import VueHoldwage, Empwisesal, Employeeworking, Holdwagepaid, ResignDtls, Empjoin, AttStaff, StaffAbsent, StaffAtt, ContractSec
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
+
 import os
 import json
-from datetime import datetime
-from .models import LaySp, MasterFinalMistake, UnitBundlereport, FinalPlans,Corarlck1,CoraRollcheck,AttUnt,EmbAbsetnt,Holiday,LabAtt,RptCutting,VueOrdersinhand
-from .models import BillAge,BillMdapprove,BillPass,Leavempabsent,LaySpreadingLayemployee,HrLabourattendence,Employeeworking1,BitcheckHour,StickerHour, VueRepCutPend
-from django.db.models import F, Q , IntegerField,DateField,Case, When, Value,CharField
+
+from datetime import datetime, timedelta, date, timezone as dt_timezone
+
+from .models import LaySp, MasterFinalMistake, UnitBundlereport, FinalPlans, Corarlck1, CoraRollcheck, AttUnt, EmbAbsetnt, Holiday, LabAtt, RptCutting, VueOrdersinhand, Txorderdetstyles, VueDyeingRatenew
+from .models import BillAge, BillMdapprove, BillPass, Leavempabsent, LaySpreadingLayemployee, HrLabourattendence, Employeeworking1, BitcheckHour, StickerHour, TrsHrRsgnDtls, VueRepCutPend
+
+from django.db.models import F, Q, IntegerField, DateField, Case, When, Value, CharField
 from django.db import connections
 from django.db.models import OuterRef, Subquery
-from django.db.models import Sum,Max
-from datetime import datetime, timedelta,date
+from django.db.models import Sum, Max
 from django.utils import timezone
 from django.conf import settings
 from django.db.models import Count
-from django.db.models.functions import TruncDate, TruncDay,Cast,Coalesce
+from django.db.models.functions import TruncDate, TruncDay, Cast, Coalesce
 from dateutil.relativedelta import relativedelta
 from collections import defaultdict
 from django.db.models.expressions import ExpressionWrapper
 from django.core.paginator import Paginator
-from datetime import datetime
 
 
 # dt_timezone = timezone.make_aware(timezone.datetime(2012, 1, 1), timezone=timezone.UTC)
@@ -745,6 +747,153 @@ def abs_details(request):
         }, status=500)
     
 
+@csrf_exempt
+def hr_resignation_details(request):
+
+    # =====================================================
+    # GET
+    # =====================================================
+    if request.method == "GET":
+        try:
+            records = TrsHrRsgnDtls.objects.all().values(
+                "empid",
+                "user_nms",
+                "in_ch_remarks",
+                "in_ch_date",
+                "hr_remarks",
+                "hr_date",
+                "created_date"
+            )
+
+            return JsonResponse({
+                "status": True,
+                "message": "Records fetched successfully",
+                "data": list(records)
+            }, status=200)
+
+        except Exception as e:
+            return JsonResponse({
+                "status": False,
+                "message": str(e),
+                "data": []
+            }, status=500)
+
+    # =====================================================
+    # POST
+    # =====================================================
+    elif request.method == "POST":
+        try:
+            data = json.loads(request.body)
+
+            empid = data.get("empid")
+            user_nms = data.get("user_nms")
+            in_ch_remarks = data.get("in_ch_remarks")
+            hr_remarks = data.get("hr_remarks")
+
+            # -------------------------------------------------
+            # Validate empid
+            # -------------------------------------------------
+            if empid is None:
+                return JsonResponse({
+                    "status": False,
+                    "message": "empid is required"
+                }, status=400)
+
+            # -------------------------------------------------
+            # Check existing employee
+            # -------------------------------------------------
+            obj = TrsHrRsgnDtls.objects.filter(
+                empid=empid
+            ).first()
+
+            # =================================================
+            # CREATE
+            # =================================================
+            if obj is None:
+
+                obj = TrsHrRsgnDtls.objects.create(
+                    empid=empid,
+                    user_nms=user_nms,
+                    in_ch_remarks=in_ch_remarks,
+                    in_ch_date=timezone.now() if in_ch_remarks else None,
+                    hr_remarks=hr_remarks,
+                    hr_date=timezone.now() if hr_remarks else None,
+                    created_date=timezone.now()
+                )
+
+                return JsonResponse({
+                    "status": True,
+                    "message": "Record created successfully",
+                    "data": {
+                        "empid": obj.empid,
+                        "user_nms": obj.user_nms,
+                        "in_ch_remarks": obj.in_ch_remarks,
+                        "in_ch_date": obj.in_ch_date,
+                        "hr_remarks": obj.hr_remarks,
+                        "hr_date": obj.hr_date,
+                        "created_date": obj.created_date
+                    }
+                }, status=201)
+
+            # =================================================
+            # UPDATE
+            # =================================================
+
+            if user_nms is not None:
+                obj.user_nms = user_nms
+
+            if in_ch_remarks is not None:
+                obj.in_ch_remarks = in_ch_remarks
+                obj.in_ch_date = timezone.now()
+
+            if hr_remarks is not None:
+                obj.hr_remarks = hr_remarks
+                obj.hr_date = timezone.now()
+
+            obj.save(
+                update_fields=[
+                    "user_nms",
+                    "in_ch_remarks",
+                    "in_ch_date",
+                    "hr_remarks",
+                    "hr_date"
+                ]
+            )
+
+            return JsonResponse({
+                "status": True,
+                "message": "Record updated successfully",
+                "data": {
+                    "empid": obj.empid,
+                    "user_nms": obj.user_nms,
+                    "in_ch_remarks": obj.in_ch_remarks,
+                    "in_ch_date": obj.in_ch_date,
+                    "hr_remarks": obj.hr_remarks,
+                    "hr_date": obj.hr_date,
+                    "created_date": obj.created_date
+                }
+            }, status=200)
+
+        except json.JSONDecodeError:
+            return JsonResponse({
+                "status": False,
+                "message": "Invalid JSON"
+            }, status=400)
+
+        except Exception as e:
+            return JsonResponse({
+                "status": False,
+                "message": str(e)
+            }, status=500)
+
+    # =====================================================
+    # Other methods
+    # =====================================================
+    return JsonResponse({
+        "status": False,
+        "message": "Only GET and POST methods are allowed"
+    }, status=405)
+
 def resign_report(request):
     try:
         # =========================
@@ -843,6 +992,7 @@ def resign_report(request):
                 "dept": getattr(r, "dept", ""),
                 "joindt": r.joindt,
                 "resign_date": r.resigndt,
+                "unitcode": getattr(r, "unitcode", 0),
                 "category": getattr(r, "category", ""),
                 "mobile": getattr(r, "mobile", ""),
                 "days_worked": getattr(r, "days_worked", 0),
@@ -916,6 +1066,41 @@ def resign_report(request):
             "this_month_count": 0
         }, status=500)
     
+
+
+def resign_join_summary(request):
+    try:
+        from_date = request.GET.get("from_date")
+        to_date = request.GET.get("to_date")
+
+        if not from_date or not to_date:
+            return JsonResponse({
+                "status": False,
+                "error": "from_date and to_date are required"
+            }, status=400)
+
+        with connections['main'].cursor() as cursor:
+            cursor.execute(
+                "EXEC sp_ResignJoinEmployee @FromDate=%s, @ToDate=%s",
+                [from_date, to_date]
+            )
+
+            columns = [col[0] for col in cursor.description]
+            rows = cursor.fetchall()
+
+        data = [
+            dict(zip(columns, row))
+            for row in rows
+        ]
+
+        return JsonResponse(data, safe=False)
+
+    except Exception as e:
+        return JsonResponse({
+            "status": False,
+            "error": str(e)
+        }, status=500)
+
 
 def empatlev(request):
     leave_records = (
@@ -1028,8 +1213,10 @@ def join_data(request):
         rows.append({
             "id": rec.id,
             "empcode": getattr(rec, 'code', ''),
+            "empcode": getattr(rec, 'code', ''),
             "name": getattr(rec, 'name', ''),
             "dept": getattr(rec, 'dept', ''),
+            "unitcode" : getattr(rec, 'unitcode', ''),
             "designation": getattr(rec, 'category', ''),
             "joindt": rec.joindt.strftime("%Y-%m-%d %H:%M:%S") if rec.joindt else None,
             "photo": photo_url,
@@ -1652,41 +1839,75 @@ def _fill_months(counts_by_month, months):
     return [counts_by_month.get(m, 0) for m in months]
 
 def _to_js_ts(d):
-    """Convert Python date to JavaScript timestamp (milliseconds since epoch)."""
-    dt = datetime(d.year, d.month, getattr(d, "day", 1), tzinfo=timezone.utc)
-    return int(dt.timestamp() * 1000)
+    """
+    Convert Python date/datetime/string to
+    JavaScript timestamp in milliseconds.
+    """
 
-def _day_range(start, end):
-    today = date.today()
-    days = []
-    cur = start
-    while cur <= end and cur <= today:
-        days.append(cur)
-        cur += timedelta(days=1)
-    return days
+    if isinstance(d, datetime):
+        dt = datetime(
+            d.year,
+            d.month,
+            d.day,
+            tzinfo=dt_timezone.utc
+        )
+        return int(dt.timestamp() * 1000)
 
-def _fill_days(counts_by_day, days):
-    return [counts_by_day.get(d, 0) for d in days]
-
-def _to_js_ts(d):
-    if isinstance(d, (datetime, date)):
-        dt = datetime(d.year, d.month, getattr(d, "day", 1), tzinfo=dt_timezone.utc)
+    if isinstance(d, date):
+        dt = datetime(
+            d.year,
+            d.month,
+            d.day,
+            tzinfo=dt_timezone.utc
+        )
         return int(dt.timestamp() * 1000)
 
     if isinstance(d, str):
         if not any(ch.isdigit() for ch in d):
             return None
+
         try:
             d = datetime.fromisoformat(d).date()
         except Exception:
             try:
-                d = datetime.strptime(d.split(" ")[0], "%Y-%m-%d").date()
+                d = datetime.strptime(
+                    d.split(" ")[0],
+                    "%Y-%m-%d"
+                ).date()
             except Exception:
                 return None
-        dt = datetime(d.year, d.month, d.day, tzinfo=dt_timezone.utc)
+
+        dt = datetime(
+            d.year,
+            d.month,
+            d.day,
+            tzinfo=dt_timezone.utc
+        )
+
         return int(dt.timestamp() * 1000)
 
     return None
+
+
+def _day_range(start, end):
+    today = date.today()
+
+    days = []
+    cur = start
+
+    while cur <= end and cur <= today:
+        days.append(cur)
+        cur += timedelta(days=1)
+
+    return days
+
+
+def _fill_days(counts_by_day, days):
+    return [
+        counts_by_day.get(d, 0)
+        for d in days
+    ]
+
 
 def workforce_trends_api(request):
 
@@ -1698,111 +1919,296 @@ def workforce_trends_api(request):
 
     today = date.today()
 
+    # -----------------------------
     # DATE FILTER
+    # -----------------------------
+
     if start_date and end_date:
+
         try:
-            start = datetime.strptime(start_date, "%Y-%m-%d").date()
-            end = datetime.strptime(end_date, "%Y-%m-%d").date()
-        except:
+            start = datetime.strptime(
+                start_date,
+                "%Y-%m-%d"
+            ).date()
+
+            end = datetime.strptime(
+                end_date,
+                "%Y-%m-%d"
+            ).date()
+
+        except Exception:
             start = today.replace(day=1)
             end = today
+
     else:
+
         if rng == "1M":
             start = today.replace(day=1)
+
         elif rng == "6M":
             start = today - relativedelta(months=6)
+
         elif rng == "1Y":
             start = today - relativedelta(years=1)
+
         elif rng == "MAX":
-            first_join = Empjoin.objects.using("main").order_by("joindt").first()
-            first_resign = ResignDtls.objects.using("main").order_by("resigndt").first()
+
+            first_join = (
+                Empjoin.objects
+                .using("main")
+                .order_by("joindt")
+                .first()
+            )
+
+            first_resign = (
+                ResignDtls.objects
+                .using("main")
+                .order_by("resigndt")
+                .first()
+            )
 
             earliest = today
-            if first_join: earliest = min(earliest, first_join.joindt.date())
-            if first_resign: earliest = min(earliest, first_resign.resigndt.date())
+
+            if first_join and first_join.joindt:
+                earliest = min(
+                    earliest,
+                    first_join.joindt.date()
+                )
+
+            if first_resign and first_resign.resigndt:
+                earliest = min(
+                    earliest,
+                    first_resign.resigndt.date()
+                )
 
             start = earliest
+
         else:
             start = today.replace(day=1)
 
         end = today
 
-    cats = ["TAILOR", "CHECKING", "IRONING", "PACKING"]
+    # -----------------------------
+    # CATEGORIES
+    # -----------------------------
 
-    join_qs = Empjoin.objects.using("main").filter(category__in=cats)
-    resign_qs = ResignDtls.objects.using("main").filter(category__in=cats)
+    cats = [
+        "TAILOR",
+        "CHECKING",
+        "IRONING",
+        "PACKING"
+    ]
 
-    join_qs = join_qs.filter(joindt__date__range=[start, end])
-    resign_qs = resign_qs.filter(resigndt__date__range=[start, end])
+    join_qs = (
+        Empjoin.objects
+        .using("main")
+        .filter(category__in=cats)
+    )
+
+    resign_qs = (
+        ResignDtls.objects
+        .using("main")
+        .filter(category__in=cats)
+    )
+
+    join_qs = join_qs.filter(
+        joindt__date__range=[start, end]
+    )
+
+    resign_qs = resign_qs.filter(
+        resigndt__date__range=[start, end]
+    )
 
     if dept != "ALL":
         join_qs = join_qs.filter(dept=dept)
         resign_qs = resign_qs.filter(dept=dept)
 
-    # DAILY
-    join_days = join_qs.annotate(d=TruncDay("joindt")).values("d").annotate(c=Count("id"))
-    resign_days = resign_qs.annotate(d=TruncDay("resigndt")).values("d").annotate(c=Count("slno"))
+    # -----------------------------
+    # DAILY TOTAL
+    # -----------------------------
+
+    join_days = (
+        join_qs
+        .annotate(d=TruncDay("joindt"))
+        .values("d")
+        .annotate(c=Count("id"))
+    )
+
+    resign_days = (
+        resign_qs
+        .annotate(d=TruncDay("resigndt"))
+        .values("d")
+        .annotate(c=Count("slno"))
+    )
 
     days = _day_range(start, end)
 
-    counts_join = {i["d"].date(): i["c"] for i in join_days}
-    counts_resign = {i["d"].date(): i["c"] for i in resign_days}
+    counts_join = {
+        i["d"].date(): i["c"]
+        for i in join_days
+        if i["d"]
+    }
 
-    join_series = _fill_days(counts_join, days)
-    resign_series = _fill_days(counts_resign, days)
-    x_ts = [_to_js_ts(d) for d in days]
+    counts_resign = {
+        i["d"].date(): i["c"]
+        for i in resign_days
+        if i["d"]
+    }
 
+    join_series = _fill_days(
+        counts_join,
+        days
+    )
+
+    resign_series = _fill_days(
+        counts_resign,
+        days
+    )
+
+    x_ts = [
+        _to_js_ts(d)
+        for d in days
+    ]
+
+    # -----------------------------
     # CATEGORY TOTALS
-    cat_idx = {c: i for i, c in enumerate(cats)}
+    # -----------------------------
+
+    cat_idx = {
+        c: i
+        for i, c in enumerate(cats)
+    }
+
     cat_join_vals = [0] * len(cats)
     cat_resign_vals = [0] * len(cats)
 
-    for row in join_qs.values("category").annotate(c=Count("id")):
-        cat_join_vals[cat_idx[row["category"].upper()]] = row["c"]
+    for row in (
+        join_qs
+        .values("category")
+        .annotate(c=Count("id"))
+    ):
 
-    for row in resign_qs.values("category").annotate(c=Count("slno")):
-        cat_resign_vals[cat_idx[row["category"].upper()]] = row["c"]
+        category = (
+            row["category"] or "UNKNOWN"
+        ).upper()
 
+        if category in cat_idx:
+            cat_join_vals[
+                cat_idx[category]
+            ] = row["c"]
+
+    for row in (
+        resign_qs
+        .values("category")
+        .annotate(c=Count("slno"))
+    ):
+
+        category = (
+            row["category"] or "UNKNOWN"
+        ).upper()
+
+        if category in cat_idx:
+            cat_resign_vals[
+                cat_idx[category]
+            ] = row["c"]
+
+    # -----------------------------
     # DAILY CATEGORY
-    daily_join = defaultdict(lambda: defaultdict(int))
-    daily_resign = defaultdict(lambda: defaultdict(int))
+    # -----------------------------
 
-    for row in join_qs.annotate(d=TruncDay("joindt")).values("d", "category").annotate(c=Count("id")):
-        daily_join[row["category"].upper()][row["d"].date()] = row["c"]
+    daily_join = defaultdict(
+        lambda: defaultdict(int)
+    )
 
-    for row in resign_qs.annotate(d=TruncDay("resigndt")).values("d", "category").annotate(c=Count("slno")):
-        daily_resign[row["category"].upper()][row["d"].date()] = row["c"]
+    daily_resign = defaultdict(
+        lambda: defaultdict(int)
+    )
+
+    for row in (
+        join_qs
+        .annotate(d=TruncDay("joindt"))
+        .values("d", "category")
+        .annotate(c=Count("id"))
+    ):
+
+        if row["d"]:
+            category = (
+                row["category"] or "UNKNOWN"
+            ).upper()
+
+            daily_join[
+                category
+            ][
+                row["d"].date()
+            ] = row["c"]
+
+    for row in (
+        resign_qs
+        .annotate(d=TruncDay("resigndt"))
+        .values("d", "category")
+        .annotate(c=Count("slno"))
+    ):
+
+        if row["d"]:
+            category = (
+                row["category"] or "UNKNOWN"
+            ).upper()
+
+            daily_resign[
+                category
+            ][
+                row["d"].date()
+            ] = row["c"]
 
     daily_join_series = []
     daily_resign_series = []
 
     for cat in cats:
+
         daily_join_series.append({
             "name": cat,
-            "data": [daily_join[cat].get(d, 0) for d in days]
+            "data": [
+                daily_join[cat].get(d, 0)
+                for d in days
+            ]
         })
+
         daily_resign_series.append({
             "name": cat,
-            "data": [daily_resign[cat].get(d, 0) for d in days]
+            "data": [
+                daily_resign[cat].get(d, 0)
+                for d in days
+            ]
         })
 
     return JsonResponse({
+
         "status": "success",
+
         "filters": {
             "range": rng,
             "department": dept,
             "start_date": start.isoformat(),
             "end_date": end.isoformat()
         },
+
         "x_ts": x_ts,
+
         "join_series": join_series,
+
         "resign_series": resign_series,
+
         "categories": cats,
+
         "category_join": cat_join_vals,
+
         "category_resign": cat_resign_vals,
+
         "daily_join_series": daily_join_series,
+
         "daily_resign_series": daily_resign_series
     })
+
 
 def workforce_unit_trends_api(request):
 
@@ -1814,108 +2220,310 @@ def workforce_unit_trends_api(request):
 
     today = date.today()
 
+    # -----------------------------
     # DATE FILTER
+    # -----------------------------
+
     if start_date and end_date:
+
         try:
-            start = datetime.strptime(start_date, "%Y-%m-%d").date()
-            end = datetime.strptime(end_date, "%Y-%m-%d").date()
-        except:
+            start = datetime.strptime(
+                start_date,
+                "%Y-%m-%d"
+            ).date()
+
+            end = datetime.strptime(
+                end_date,
+                "%Y-%m-%d"
+            ).date()
+
+        except Exception:
             start = today.replace(day=1)
             end = today
+
     else:
+
         if rng == "1M":
             start = today.replace(day=1)
+
         elif rng == "6M":
             start = today - relativedelta(months=6)
+
         elif rng == "1Y":
             start = today - relativedelta(years=1)
+
         elif rng == "MAX":
-            first_join = Empjoin.objects.using("main").order_by("joindt").first()
-            first_resign = ResignDtls.objects.using("main").order_by("resigndt").first()
+
+            first_join = (
+                Empjoin.objects
+                .using("main")
+                .order_by("joindt")
+                .first()
+            )
+
+            first_resign = (
+                ResignDtls.objects
+                .using("main")
+                .order_by("resigndt")
+                .first()
+            )
 
             earliest = today
-            if first_join: earliest = min(earliest, first_join.joindt.date())
-            if first_resign: earliest = min(earliest, first_resign.resigndt.date())
+
+            if first_join and first_join.joindt:
+                earliest = min(
+                    earliest,
+                    first_join.joindt.date()
+                )
+
+            if first_resign and first_resign.resigndt:
+                earliest = min(
+                    earliest,
+                    first_resign.resigndt.date()
+                )
 
             start = earliest
+
         else:
             start = today.replace(day=1)
 
         end = today
 
-    join_qs = Empjoin.objects.using("main").filter(joindt__date__range=[start, end])
-    resign_qs = ResignDtls.objects.using("main").filter(resigndt__date__range=[start, end])
+    # -----------------------------
+    # QUERYSETS
+    # -----------------------------
+
+    join_qs = (
+        Empjoin.objects
+        .using("main")
+        .filter(
+            joindt__date__range=[start, end]
+        )
+    )
+
+    resign_qs = (
+        ResignDtls.objects
+        .using("main")
+        .filter(
+            resigndt__date__range=[start, end]
+        )
+    )
 
     if unit_filter != "ALL":
-        join_qs = join_qs.filter(dept=unit_filter)
-        resign_qs = resign_qs.filter(dept=unit_filter)
+        join_qs = join_qs.filter(
+            dept=unit_filter
+        )
 
+        resign_qs = resign_qs.filter(
+            dept=unit_filter
+        )
+
+    # -----------------------------
     # UNITS
-    units = sorted(list({
-        (u or "Unknown").upper()
-        for u in list(join_qs.values_list('dept', flat=True)) +
-                 list(resign_qs.values_list('dept', flat=True))
-    }))
+    # -----------------------------
 
+    units = sorted(
+        list({
+            (u or "Unknown").upper()
+            for u in (
+                list(
+                    join_qs.values_list(
+                        "dept",
+                        flat=True
+                    )
+                )
+                +
+                list(
+                    resign_qs.values_list(
+                        "dept",
+                        flat=True
+                    )
+                )
+            )
+        })
+    )
+
+    # -----------------------------
     # DAILY TOTAL
-    join_days = join_qs.annotate(d=TruncDay("joindt")).values("d").annotate(c=Count("id"))
-    resign_days = resign_qs.annotate(d=TruncDay("resigndt")).values("d").annotate(c=Count("slno"))
+    # -----------------------------
 
-    days = _day_range(start, end)
+    join_days = (
+        join_qs
+        .annotate(d=TruncDay("joindt"))
+        .values("d")
+        .annotate(c=Count("id"))
+    )
 
-    counts_join = {i["d"].date(): i["c"] for i in join_days}
-    counts_resign = {i["d"].date(): i["c"] for i in resign_days}
+    resign_days = (
+        resign_qs
+        .annotate(d=TruncDay("resigndt"))
+        .values("d")
+        .annotate(c=Count("slno"))
+    )
 
-    join_series = _fill_days(counts_join, days)
-    resign_series = _fill_days(counts_resign, days)
-    x_ts = [_to_js_ts(d) for d in days]
+    days = _day_range(
+        start,
+        end
+    )
 
+    counts_join = {
+        i["d"].date(): i["c"]
+        for i in join_days
+        if i["d"]
+    }
+
+    counts_resign = {
+        i["d"].date(): i["c"]
+        for i in resign_days
+        if i["d"]
+    }
+
+    join_series = _fill_days(
+        counts_join,
+        days
+    )
+
+    resign_series = _fill_days(
+        counts_resign,
+        days
+    )
+
+    x_ts = [
+        _to_js_ts(d)
+        for d in days
+    ]
+
+    # -----------------------------
     # TOTALS
-    join_totals = {r['dept'].upper(): r['c'] for r in join_qs.values('dept').annotate(c=Count('id'))}
-    resign_totals = {r['dept'].upper(): r['c'] for r in resign_qs.values('dept').annotate(c=Count('slno'))}
+    # -----------------------------
 
-    unit_join_vals = [join_totals.get(u, 0) for u in units]
-    unit_resign_vals = [resign_totals.get(u, 0) for u in units]
+    join_totals = {
+        (r["dept"] or "Unknown").upper(): r["c"]
+        for r in (
+            join_qs
+            .values("dept")
+            .annotate(c=Count("id"))
+        )
+    }
 
+    resign_totals = {
+        (r["dept"] or "Unknown").upper(): r["c"]
+        for r in (
+            resign_qs
+            .values("dept")
+            .annotate(c=Count("slno"))
+        )
+    }
+
+    unit_join_vals = [
+        join_totals.get(u, 0)
+        for u in units
+    ]
+
+    unit_resign_vals = [
+        resign_totals.get(u, 0)
+        for u in units
+    ]
+
+    # -----------------------------
     # DAILY UNIT
-    unit_daily_join = defaultdict(lambda: defaultdict(int))
-    unit_daily_resign = defaultdict(lambda: defaultdict(int))
+    # -----------------------------
 
-    for row in join_qs.annotate(d=TruncDay("joindt")).values("d", "dept").annotate(c=Count("id")):
-        unit_daily_join[(row["dept"] or "Unknown").upper()][row["d"].date()] = row["c"]
+    unit_daily_join = defaultdict(
+        lambda: defaultdict(int)
+    )
 
-    for row in resign_qs.annotate(d=TruncDay("resigndt")).values("d", "dept").annotate(c=Count("slno")):
-        unit_daily_resign[(row["dept"] or "Unknown").upper()][row["d"].date()] = row["c"]
+    unit_daily_resign = defaultdict(
+        lambda: defaultdict(int)
+    )
+
+    for row in (
+        join_qs
+        .annotate(d=TruncDay("joindt"))
+        .values("d", "dept")
+        .annotate(c=Count("id"))
+    ):
+
+        if row["d"]:
+
+            unit = (
+                row["dept"] or "Unknown"
+            ).upper()
+
+            unit_daily_join[
+                unit
+            ][
+                row["d"].date()
+            ] = row["c"]
+
+    for row in (
+        resign_qs
+        .annotate(d=TruncDay("resigndt"))
+        .values("d", "dept")
+        .annotate(c=Count("slno"))
+    ):
+
+        if row["d"]:
+
+            unit = (
+                row["dept"] or "Unknown"
+            ).upper()
+
+            unit_daily_resign[
+                unit
+            ][
+                row["d"].date()
+            ] = row["c"]
 
     unit_daily_join_series = []
     unit_daily_resign_series = []
 
     for u in units:
+
         unit_daily_join_series.append({
             "name": u,
-            "data": [unit_daily_join[u].get(d, 0) for d in days]
+            "data": [
+                unit_daily_join[u].get(d, 0)
+                for d in days
+            ]
         })
+
         unit_daily_resign_series.append({
             "name": u,
-            "data": [unit_daily_resign[u].get(d, 0) for d in days]
+            "data": [
+                unit_daily_resign[u].get(d, 0)
+                for d in days
+            ]
         })
 
     return JsonResponse({
+
         "status": "success",
+
         "filters": {
             "range": rng,
             "unit": unit_filter,
             "start_date": start.isoformat(),
             "end_date": end.isoformat()
         },
+
         "units": units,
+
         "x_ts": x_ts,
+
         "join_series": join_series,
+
         "resign_series": resign_series,
+
         "unit_join_vals": unit_join_vals,
+
         "unit_resign_vals": unit_resign_vals,
-        "unit_daily_join_series": unit_daily_join_series,
-        "unit_daily_resign_series": unit_daily_resign_series
+
+        "unit_daily_join_series":
+            unit_daily_join_series,
+
+        "unit_daily_resign_series":
+            unit_daily_resign_series
     })
 
 
@@ -2459,7 +3067,6 @@ def labour_attendance_api(request):
 
 
 def bitcheckhour(request):
-    # Get date from query params (YYYY-MM-DD)
     date_str = request.GET.get("date")
 
     if date_str:
@@ -2471,8 +3078,7 @@ def bitcheckhour(request):
                 status=400
             )
     else:
-        # Default to today's date
-        filter_date = timezone.localdate()
+        filter_date = timezone.now().date()
 
     data = (
         BitcheckHour.objects.using("demo")
@@ -2521,6 +3127,59 @@ def measurement_report(request):
             "status": False,
             "error": str(e)
         })
+
+
+def dyeing_data(request):
+    qs = VueDyeingRatenew.objects.using("test").values().order_by("-date")
+    data = list(qs)
+
+    # Convert datetime -> date string (YYYY-MM-DD) to avoid timezone shifts on the client
+    for item in data:
+        dt = item.get('date')
+        if dt:
+            try:
+                # convert to localtime if using timezones
+                if getattr(settings, 'USE_TZ', False):
+                    dt_local = timezone.localtime(dt)
+                else:
+                    dt_local = dt
+                item['date'] = dt_local.strftime('%Y-%m-%d')
+            except Exception:
+                # fallback: stringify date portion
+                try:
+                    item['date'] = str(dt).split(' ')[0]
+                except Exception:
+                    pass
+
+    return JsonResponse(data, safe=False)
+
+def dyeing_order_details(request):
+    orderno = request.GET.get("orderno")
+    print("orderno==", orderno)
+
+    queryset = (
+        Txorderdetstyles.objects
+        .using("test")
+        .filter(orderno=orderno)
+        .values()
+    )
+
+    data = []
+
+    for obj in queryset:
+        raw_path = obj.get("mainimagepath")
+
+        if raw_path:
+            filename = raw_path.replace("\\", "/").split("/")[-1]
+            obj["mainimagepath"] = (
+                f"https://hfapi.herofashion.com/Order_images/{filename}"
+            )
+        else:
+            obj["mainimagepath"] = ""
+
+        data.append(obj)
+
+    return JsonResponse(data[0] if data else {}, safe=False)
 
 def GetCuttingDetails(request):
     jobno = request.GET.get("jobno")

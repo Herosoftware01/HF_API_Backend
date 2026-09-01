@@ -24,8 +24,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = 'django-insecure--jpqy*__tak#1#7_0u^g5gt=n@rlpjvp5mstua5m^&i7+!8uad'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
-# DEBUG = False
+DEBUG = os.getenv('DJANGO_DEBUG', 'False').lower() in ('1', 'true', 'yes')
 
 # ALLOWED_HOSTS = ['hfapi.herofashion.com','10.1.21.153','localhost','127.0.0.1','10.1.21.13','10.1.21.154','10.1.21.110']
 ALLOWED_HOSTS = ['*']
@@ -33,13 +32,12 @@ ALLOWED_HOSTS = ['*']
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "https://hf.herofashion.com",
-    "https://web.herofashion.com",
     "https://hf.herofashion.com",
+    "https://web.herofashion.com",
     "https://hfapi.herofashion.com",
     "https://sync.herofashion.com",
     "https://dev.herofashion.com",
-    "http://10.1.21.13:3000",
-    "http://10.1.21.80:3600",
+    "http://10.1.21.80:3000",
     "https://hfempdtls.netlify.app",
     "http://10.1.21.110:7003",
     "http://10.1.21.156:3000",
@@ -55,19 +53,19 @@ CSRF_TRUSTED_ORIGINS = [
     "https://sync.herofashion.com",
     "https://web.herofashion.com",
     "https://dev.herofashion.com",
-    "http://10.1.21.13:3000",
     "https://hfempdtls.netlify.app",
     "http://10.1.21.110:7003",
     "http://10.1.21.156:3000",
+    "http://10.1.21.80:3000",
     
 ]
 # settings.py
 
-CSRF_COOKIE_SAMESITE = 'Lax' if DEBUG else 'None'
-CSRF_COOKIE_SECURE = not DEBUG
+# CSRF_COOKIE_SAMESITE = 'Lax' if DEBUG else 'None'
+# CSRF_COOKIE_SECURE = not DEBUG
 
-SESSION_COOKIE_SAMESITE = 'Lax' if DEBUG else 'None'
-SESSION_COOKIE_SECURE = not DEBUG
+# SESSION_COOKIE_SAMESITE = 'Lax' if DEBUG else 'None'
+# SESSION_COOKIE_SECURE = not DEBUG
 
 
 APPEND_SLASH = False
@@ -102,6 +100,8 @@ INSTALLED_APPS = [
     'bundle_tracking',
     'production_live_scan',
     'fashionr',
+    'software_cost',
+    
 ]
 
 DATA_UPLOAD_MAX_MEMORY_SIZE = 1024 * 1024 * 200
@@ -111,10 +111,14 @@ X_FRAME_OPTIONS = 'ALLOWALL'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-if DEBUG:
-    SECURE_CROSS_ORIGIN_OPENER_POLICY = None
-else:
-    SECURE_CROSS_ORIGIN_OPENER_POLICY = "same-origin"
+
+# if DEBUG:
+#     SECURE_CROSS_ORIGIN_OPENER_POLICY = None
+# else:
+#     SECURE_CROSS_ORIGIN_OPENER_POLICY = "same-origin"
+
+# DEBUG = False
+DEBUG = True
 
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
@@ -321,12 +325,14 @@ MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 STAFF_IMAGES_URL = '/staff_images/'
-STAFF_IMAGES_ROOT = r'\\10.1.21.11\e\Staff_Employee_Images'
+STAFF_IMAGES_ROOT = r'\\10.1.21.11\d\Staff_Employee_Images'
+
+ORDER_IMAGES_URL = '/Order_images/'
+ORDER_IMAGES_ROOT = r'\\10.1.21.11\d\Order_Images'
 
 PDF_STORAGE_PATH = r"\\adminserver\File Sharing\AAAA Hero\Syncfusion Pdf Reports"
 
-# Email configuration
-
+# Email configurationcmd
 
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = 'smtp.gmail.com'

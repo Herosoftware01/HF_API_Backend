@@ -8,6 +8,82 @@ from collections import defaultdict
 from rest_framework import generics, permissions
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework import status
+from django.core.mail import send_mail
+from django.core.cache import cache
+from django.contrib.auth import get_user_model
+from django.conf import settings
+import random
+from django.template.loader import render_to_string # New import
+from django.utils.html import strip_tags # New import
+
+User = get_user_model()
+
+class RequestOTPView(APIView):
+    def post(self, request):
+        username = request.data.get('username')
+        
+        try:
+            user = User.objects.get(username=username)
+            otp = str(random.randint(100000, 999999))
+            
+            cache.set(f"password_reset_otp_{username}", otp, timeout=600)
+            
+            # 1. Prepare template context using first_name
+            context = {
+                'first_name': user.first_name if user.first_name else "User",
+                'otp': otp
+            }
+            
+            # 2. Render HTML string from template
+            html_content = render_to_string('emails/otp_email.html', context)
+            
+            # 3. Create plain text fallback
+            text_content = strip_tags(html_content)
+            
+            # 4. Send email with HTML parameter
+            send_mail(
+                subject='Password Reset OTP - Hero Fashion',
+                message=text_content,          
+                from_email=settings.EMAIL_HOST_USER,
+                recipient_list=[user.email],
+                html_message=html_content,     
+                fail_silently=False,
+            )
+            
+            email_parts = user.email.split('@')
+            masked_email = f"{email_parts[0][:2]}***@{email_parts[1]}"
+            
+            return Response({"message": f"OTP sent to {masked_email}"}, status=status.HTTP_200_OK)
+            
+        except User.DoesNotExist:
+            return Response({"error": "User with this ID does not exist."}, status=status.HTTP_404_NOT_FOUND)
+
+class ResetPasswordView(APIView):
+    def post(self, request):
+        username = request.data.get('username')
+        otp = request.data.get('otp')
+        new_password = request.data.get('new_password')
+        confirm_password = request.data.get('confirm_password')
+
+        if new_password != confirm_password:
+            return Response({"error": "Passwords do not match."}, status=status.HTTP_400_BAD_REQUEST)
+
+        cached_otp = cache.get(f"password_reset_otp_{username}")
+        
+        if not cached_otp or cached_otp != otp:
+            return Response({"error": "Invalid or expired OTP."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            user = User.objects.get(username=username)
+            user.set_password(new_password)
+            user.save()
+            
+            # Clear the OTP from cache after successful reset
+            cache.delete(f"password_reset_otp_{username}")
+            
+            return Response({"message": "Password reset successfully. You can now log in."}, status=status.HTTP_200_OK)
+        except User.DoesNotExist:
+            return Response({"error": "User not found."}, status=status.HTTP_404_NOT_FOUND)
 
 
 class LoginView(TokenObtainPairView):
@@ -70,6 +146,7 @@ class SidebarView(APIView):
             menu = rm.menu
             menu_dict[menu.id] = {
                 "id": menu.id,
+                
                 "name": menu.name,
                 "icon": request.build_absolute_uri(menu.icon.url) if menu.icon else None,
                 "submenus": []

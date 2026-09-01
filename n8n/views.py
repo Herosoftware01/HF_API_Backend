@@ -31,6 +31,7 @@ def liveprdn(request):
     response_data = []
     for rec in data:    
         response_data.append({
+            "rowno": rec.rowno,
             "unit": rec.unit,
             "jobno": rec.jobno,
             "tb": rec.tb,
@@ -48,63 +49,179 @@ def liveprdn(request):
             "pack": rec.pack,
             "mist": rec.mist,
             "rejqty": rec.rejqty,
+            "o_finaldelvdate": rec.o_finaldelvdate,
+            "o_merch": rec.o_merch,
+            "o_styledesc": rec.o_styledesc,
+            "buyer": rec.buyer,
+            "img": rec.img,
+            "tbpic": (
+                f"https://app.herofashion.com/order_image/"
+                f"{str(rec.tbpic).replace(chr(92), '/').split('/')[-1]}"
+                if rec.tbpic else ""
+            )
         })
     return JsonResponse(response_data, safe=False)
 
 
 @csrf_exempt
 def html_to_image(request):
-    try:
-        data = json.loads(request.body)
-        html_content = data.get("html")
 
-        if not html_content:
-            return JsonResponse(
-                {"error": "html field is required"},
-                status=400
-            )
+    # Only allow POST
+    if request.method != "POST":
+        return JsonResponse(
+            {
+                "status": False,
+                "error": "Only POST method is allowed"
+            },
+            status=405
+        )
+
+    # Check request body
+    if not request.body:
+        return JsonResponse(
+            {
+                "status": False,
+                "error": "Request body is empty"
+            },
+            status=400
+        )
+
+    # Parse JSON
+    try:
+        data = json.loads(request.body.decode("utf-8"))
+    except json.JSONDecodeError as e:
+        return JsonResponse(
+            {
+                "status": False,
+                "error": "Invalid JSON",
+                "details": str(e)
+            },
+            status=400
+        )
+
+    # Get HTML
+    html_content = data.get("html")
+
+    if not html_content:
+        return JsonResponse(
+            {
+                "status": False,
+                "error": "html field is required"
+            },
+            status=400
+        )
+
+    # wkhtmltoimage path
+    wkhtmltoimage = r"C:\Program Files\wkhtmltopdf\bin\wkhtmltoimage.exe"
+
+    if not os.path.exists(wkhtmltoimage):
+        return JsonResponse(
+            {
+                "status": False,
+                "error": "wkhtmltoimage.exe not found",
+                "path": wkhtmltoimage
+            },
+            status=500
+        )
+
+    try:
 
         with tempfile.TemporaryDirectory() as temp_dir:
 
             html_file = os.path.join(temp_dir, "input.html")
             png_file = os.path.join(temp_dir, "output.png")
 
-            with open(html_file, "w", encoding="utf-8") as f:
+            # Write HTML file
+            with open(
+                html_file,
+                "w",
+                encoding="utf-8"
+            ) as f:
                 f.write(html_content)
 
-            subprocess.run([
-                r"C:\Program Files\wkhtmltopdf\bin\wkhtmltoimage.exe",
-                "--quality", "100",
-                "--enable-local-file-access",
-                html_file,
-                png_file
-            ], check=True)
-
-            img = Image.open(png_file)
-
-            output = io.BytesIO()
-
-            img.save(
-                output,
-                format="PNG",
-                optimize=True,
-                compress_level=9
+            # Convert HTML -> PNG
+            result = subprocess.run(
+                [
+                    wkhtmltoimage,
+                    "--quality",
+                    "100",
+                    "--enable-local-file-access",
+                    html_file,
+                    png_file
+                ],
+                capture_output=True,
+                text=True,
+                check=False
             )
 
-            image_data = output.getvalue()
+            # Check wkhtmltoimage error
+            if result.returncode != 0:
 
-            # Optional: reject if > 5 MB
+                return JsonResponse(
+                    {
+                        "status": False,
+                        "error": "HTML to image conversion failed",
+                        "details": result.stderr.strip()
+                    },
+                    status=500
+                )
+
+            # Check generated PNG
+            if not os.path.exists(png_file):
+
+                return JsonResponse(
+                    {
+                        "status": False,
+                        "error": "PNG file was not generated"
+                    },
+                    status=500
+                )
+
+            # Open image
+            with Image.open(png_file) as img:
+
+                output = io.BytesIO()
+
+                img.save(
+                    output,
+                    format="PNG",
+                    optimize=True,
+                    compress_level=9
+                )
+
+                image_data = output.getvalue()
+
+            # Image size
             size_mb = len(image_data) / (1024 * 1024)
 
             if size_mb > 5:
-                return JsonResponse({
-                    "error": f"Image size is {size_mb:.2f} MB (> 5 MB)"
-                }, status=400)
 
-        return HttpResponse(
+                return JsonResponse(
+                    {
+                        "status": False,
+                        "error": "Image size exceeds 5 MB",
+                        "size_mb": round(size_mb, 2)
+                    },
+                    status=400
+                )
+
+        # Return PNG
+        response = HttpResponse(
             image_data,
             content_type="image/png"
         )
 
+        response["Content-Disposition"] = 'inline; filename="output.png"'
+
+        return response
+
     except Exception as e:
-        return JsonResponse({"error": str(e)}, status=500)
+
+        return JsonResponse(
+            {
+                "status": False,
+                "error": "Internal server error",
+                "details": str(e)
+            },
+            status=500
+        )
