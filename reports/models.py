@@ -776,6 +776,27 @@ class StickerHour(models.Model):
         db_table = 'view_sticker_hour'
 
 
+class VueRepCutPend(models.Model):
+    slno = models.BigIntegerField(primary_key=True)
+    dt = models.DateTimeField(blank=True, null=True)
+    day = models.IntegerField(blank=True, null=True)
+    jobno = models.CharField(max_length=50)
+    topbottom_des = models.CharField(db_column='TopBottom_des', max_length=50, blank=True, null=True)
+    clrcombo = models.CharField(max_length=50)
+    siz = models.CharField(max_length=35)
+    lotno = models.CharField(max_length=50)
+    panel_description = models.CharField(max_length=8000, blank=True, null=True)
+    mistake_pcs = models.IntegerField(db_column='Mistake_Pcs', blank=True, null=True)
+    mistake_panel_count = models.IntegerField(db_column='Mistake_Panel_Count', blank=True, null=True)
+    merge_pcs = models.IntegerField(db_column='Merge_Pcs')  
+    replace_cutting_pcs = models.IntegerField(db_column='Replace_Cutting_Pcs') 
+    status = models.CharField(db_column='Status', max_length=7)
+    pendpc = models.IntegerField()
+
+    class Meta:
+        managed = False
+        db_table = 'vue_rep_cut_pend'
+        
 class VueDyeingRatenew(models.Model):
     rowno = models.BigIntegerField(db_column='RowNo', primary_key=True)  # Field name made lowercase.
     prs = models.CharField(max_length=35)

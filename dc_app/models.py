@@ -1,7 +1,7 @@
 from django.db import models
 
 class ViewCuttingDelPrint(models.Model):
-    rowno = models.BigIntegerField(db_column='RowNo', primary_key=True)  # Field name made lowercase.
+    rowno = models.BigIntegerField(db_column='RowNo', primary_key=True) 
     itemno = models.SmallIntegerField(db_column='ItemNo')  # Field name made lowercase.
     name = models.CharField(max_length=35)
     b = models.CharField(max_length=8000, blank=True, null=True)
@@ -302,6 +302,26 @@ class ViewUnitPcdelivery(models.Model):
     class Meta:
         managed = False
         db_table = 'view_unit_pcdelivery'
+
+
+class ViewCutsecFabricdelivery(models.Model):
+    rlno = models.CharField(db_column='RlNo', max_length=50, primary_key=True)
+    dcaddres = models.CharField(max_length=750, blank=True, null=True)
+    delto = models.CharField(max_length=750, blank=True, null=True)
+    dt = models.DateTimeField(db_column='Dt')
+    dcno = models.IntegerField()
+    purpose_name = models.CharField(db_column='Purpose_Name', max_length=80)
+    jobno = models.CharField(max_length=50, blank=True, null=True)
+    clr = models.CharField(max_length=50, blank=True, null=True)
+    fab = models.CharField(max_length=35)
+    lotno = models.CharField(max_length=10, blank=True, null=True)
+    name = models.CharField(db_column='Name', max_length=35)
+    wgtkgs = models.DecimalField(db_column='WgtKgs', max_digits=18, decimal_places=3)
+    mtr = models.DecimalField(max_digits=18, decimal_places=2, blank=True, null=True)
+
+    class Meta:
+        managed = False
+        db_table = 'view_cutsec_fabricdelivery'
 
 
 class ViewGdwnFabricDeliveryPlan(models.Model):

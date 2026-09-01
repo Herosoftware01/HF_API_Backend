@@ -40,11 +40,12 @@ CORS_ALLOWED_ORIGINS = [
     "http://10.1.21.80:3000",
     "https://hfempdtls.netlify.app",
     "http://10.1.21.110:7003",
+    "http://10.1.21.156:3000",
     
 ]
 
 CSRF_TRUSTED_ORIGINS = [
-    "http://10.1.21.158:3000/",
+    "http://10.1.21.158:3000",
     "http://localhost:3000",
     "http://10.1.21.110:7003",
     "https://hf.herofashion.com",
@@ -54,6 +55,7 @@ CSRF_TRUSTED_ORIGINS = [
     "https://dev.herofashion.com",
     "https://hfempdtls.netlify.app",
     "http://10.1.21.110:7003",
+    "http://10.1.21.156:3000",
     "http://10.1.21.80:3000",
     
 ]
@@ -120,9 +122,9 @@ DEBUG = True
 
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
+    'django.middleware.common.CommonMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
-    'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
