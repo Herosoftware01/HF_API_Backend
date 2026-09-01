@@ -301,6 +301,8 @@ def subcategory_master_api(request):
                 "status": False,
                 "message": "Subcategory not found"
             }, status=404)
+
+
 @csrf_exempt
 def task_master_api(request):
     if request.method == 'GET':
@@ -310,7 +312,7 @@ def task_master_api(request):
             list(data.values(
                 'id',
                 'project_id',
-                'code_id',       # This maps to the User ID from user_master
+                'code_id',       # Matches frontend
                 'task_name',
                 'task_description',
                 'assing_date',
@@ -325,9 +327,9 @@ def task_master_api(request):
         try:
             body = json.loads(request.body)
 
-            # Get IDs from frontend
+            # FIX: Look for 'code_id' exactly as React sends it
             proj_id = body.get('project_id')
-            user_id = body.get('user_id')
+            user_id = body.get('code_id') 
 
             # Convert empty values to None
             if proj_id == "":
@@ -338,7 +340,7 @@ def task_master_api(request):
             # Create task
             obj = task_master.objects.create(
                 project_id=proj_id,
-                code_id=user_id,   # Save user_master ID here
+                code_id=user_id,   
                 task_name=body.get('task_name'),
                 assing_date=body.get('assing_date'),
                 task_description=body.get('task_description', ''),
@@ -359,7 +361,6 @@ def task_master_api(request):
                 "message": str(e)
             }, status=400)
 
-    # ADDED PUT METHOD FOR EDITING TASKS
     elif request.method == 'PUT':
         try:
             body = json.loads(request.body)
@@ -370,8 +371,9 @@ def task_master_api(request):
 
             obj = task_master.objects.get(id=task_id)
 
+            # FIX: Look for 'code_id' exactly as React sends it
             proj_id = body.get('project_id')
-            user_id = body.get('user_id')
+            user_id = body.get('code_id')
 
             obj.project_id = None if proj_id == "" else proj_id
             obj.code_id = None if user_id == "" else user_id
@@ -390,7 +392,6 @@ def task_master_api(request):
         except Exception as e:
             return JsonResponse({"status": False, "message": str(e)}, status=400)
 
-    # ADDED DELETE METHOD FOR DELETING TASKS
     elif request.method == 'DELETE':
         try:
             body = json.loads(request.body)
