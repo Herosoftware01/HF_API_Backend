@@ -1,7 +1,7 @@
 from django.db import models
 
 class ViewCuttingDelPrint(models.Model):
-    rowno = models.BigIntegerField(db_column='RowNo', primary_key=True) 
+    rowno = models.BigIntegerField(db_column='RowNo', primary_key=True)  # Field name made lowercase.
     itemno = models.SmallIntegerField(db_column='ItemNo')  # Field name made lowercase.
     name = models.CharField(max_length=35)
     b = models.CharField(max_length=8000, blank=True, null=True)
@@ -21,26 +21,28 @@ class ViewCuttingDelPrint(models.Model):
     jobno = models.CharField(db_column='JobNo', max_length=50)  # Field name made lowercase.
     topbottom_des = models.CharField(db_column='TopBottom_des', max_length=50, blank=True, null=True)  # Field name made lowercase.
     sample_descr = models.CharField(db_column='Sample_Descr', max_length=50, blank=True, null=True)  # Field name made lowercase.
+    username = models.CharField(db_column='Username', max_length=50, blank=True, null=True)  # Field name made lowercase.
 
     class Meta:
         managed = False
         db_table = 'view_cutting_del_print'
 
 class CuttingPrintembdel(models.Model):
-    rowno = models.BigIntegerField(db_column='RowNo', primary_key=True) 
+    rowno = models.BigIntegerField(db_column='RowNo', primary_key=True)  # Field name made lowercase.
     frm = models.CharField(max_length=750, blank=True, null=True)
     toad = models.CharField(max_length=750, blank=True, null=True)
     id = models.IntegerField()
     dt = models.DateTimeField()
     jobno = models.CharField(max_length=50)
-    topbottom_des = models.CharField(db_column='TopBottom_des', max_length=50, blank=True, null=True) 
-    process_des = models.CharField(db_column='Process_des', max_length=150, blank=True, null=True) 
-    qrid = models.IntegerField(db_column='QRID') 
+    topbottom_des = models.CharField(db_column='TopBottom_des', max_length=50, blank=True, null=True)  # Field name made lowercase.
+    process_des = models.CharField(db_column='Process_des', max_length=150, blank=True, null=True)  # Field name made lowercase.
+    qrid = models.IntegerField(db_column='QRID')  # Field name made lowercase.
     comboclr = models.CharField(max_length=50)
     lotno = models.CharField(max_length=50)
-    portion_des = models.CharField(db_column='Portion_des', max_length=50, blank=True, null=True) 
-    name = models.CharField(db_column='Name', max_length=35) 
+    portion_des = models.CharField(db_column='Portion_des', max_length=50, blank=True, null=True)  # Field name made lowercase.
+    name = models.CharField(db_column='Name', max_length=35)  # Field name made lowercase.
     noofpcs = models.IntegerField()
+    username = models.CharField(db_column='Username', max_length=50, blank=True, null=True)  # Field name made lowercase.
 
     class Meta:
         managed = False
@@ -90,11 +92,12 @@ class ViewYarnProcessDelivery(models.Model):
 
 
 class ViewKnitDelivery(models.Model):
-    sl = models.BigIntegerField(db_column='Sl',primary_key=True)  # Field name made lowercase.
+    sl = models.BigIntegerField(db_column='Sl', primary_key=True)  # Field name made lowercase.
     itemno1 = models.SmallIntegerField()
+    companyid = models.SmallIntegerField()
+    year = models.SmallIntegerField()
     n = models.CharField(db_column='N', max_length=19, blank=True, null=True)  # Field name made lowercase.
     companyname = models.CharField(db_column='CompanyName', max_length=12)  # Field name made lowercase.
-    companyid = models.IntegerField(db_column='CompanyID') 
     address1 = models.CharField(db_column='Address1', max_length=50, blank=True, null=True)  # Field name made lowercase.
     address2 = models.CharField(db_column='Address2', max_length=50, blank=True, null=True)  # Field name made lowercase.
     address3 = models.CharField(db_column='Address3', max_length=50, blank=True, null=True)  # Field name made lowercase.
@@ -124,10 +127,12 @@ class ViewKnitDelivery(models.Model):
     loose_cones = models.IntegerField(db_column='Loose_Cones', blank=True, null=True)  # Field name made lowercase.
     full_weight = models.DecimalField(db_column='Full_Weight', max_digits=18, decimal_places=4)  # Field name made lowercase.
     loose_weight = models.DecimalField(db_column='Loose_Weight', max_digits=18, decimal_places=4)  # Field name made lowercase.
+    employeename = models.CharField(max_length=35)
 
     class Meta:
         managed = False
         db_table = 'view_knit_delivery'
+
 
 class VueAccProdDel(models.Model):
     rowno = models.BigIntegerField(db_column='RowNo', primary_key=True)  # Field name made lowercase.
@@ -151,21 +156,24 @@ class VueAccProdDel(models.Model):
     supadd3 = models.CharField(max_length=50)
     supgst = models.CharField(max_length=66)
     n = models.CharField(db_column='N', max_length=19, blank=True, null=True)  # Field name made lowercase.
+    year = models.SmallIntegerField(db_column='Year')  # Field name made lowercase.
+    companyid = models.SmallIntegerField(db_column='CompanyID')  # Field name made lowercase.
     no = models.IntegerField()
     date = models.DateTimeField(db_column='Date')  # Field name made lowercase.
     orderno = models.CharField(db_column='OrderNo', max_length=50, blank=True, null=True)  # Field name made lowercase.
     companyname = models.CharField(max_length=12)
-    companyid = models.IntegerField(db_column='CompanyID')
     address1 = models.CharField(db_column='Address1', max_length=50, blank=True, null=True)  # Field name made lowercase.
     address2 = models.CharField(db_column='Address2', max_length=50, blank=True, null=True)  # Field name made lowercase.
     address3 = models.CharField(db_column='Address3', max_length=50, blank=True, null=True)  # Field name made lowercase.
     place = models.CharField(max_length=66, blank=True, null=True)
     regno = models.CharField(db_column='RegNo', max_length=20, blank=True, null=True)  # Field name made lowercase.
     phone1 = models.CharField(db_column='Phone1', max_length=50, blank=True, null=True)  # Field name made lowercase.
+    loginemployee = models.CharField(max_length=35, blank=True, null=True)
 
     class Meta:
         managed = False
         db_table = 'vue_acc_prod_del'
+
 
 class VueAccProcDel(models.Model):
     rowno = models.BigIntegerField(db_column='RowNo', primary_key=True)  # Field name made lowercase.
@@ -176,7 +184,6 @@ class VueAccProcDel(models.Model):
     quantity = models.DecimalField(max_digits=18, decimal_places=4)
     uom = models.CharField(max_length=25, blank=True, null=True)
     uomscale = models.IntegerField(blank=True, null=True)
-    companyid = models.IntegerField(db_column='CompanyID') 
     siz = models.CharField(max_length=50)
     colour = models.CharField(max_length=50)
     acc_grp = models.CharField(max_length=35)
@@ -194,6 +201,7 @@ class VueAccProcDel(models.Model):
     no = models.IntegerField()
     date = models.DateTimeField(db_column='Date')  # Field name made lowercase.
     orderno = models.CharField(db_column='OrderNo', max_length=50, blank=True, null=True)  # Field name made lowercase.
+    companyid = models.SmallIntegerField(db_column='CompanyID')  # Field name made lowercase.
     companyname = models.CharField(max_length=12)
     address1 = models.CharField(db_column='Address1', max_length=50, blank=True, null=True)  # Field name made lowercase.
     address2 = models.CharField(db_column='Address2', max_length=50, blank=True, null=True)  # Field name made lowercase.
@@ -202,24 +210,23 @@ class VueAccProcDel(models.Model):
     regno = models.CharField(db_column='RegNo', max_length=20, blank=True, null=True)  # Field name made lowercase.
     phone1 = models.CharField(db_column='Phone1', max_length=50, blank=True, null=True)  # Field name made lowercase.
     dye_clr = models.CharField(max_length=50, blank=True, null=True)
+    loginemployee = models.CharField(db_column='LoginEmployee', max_length=35, blank=True, null=True)  # Field name made lowercase.
 
     class Meta:
-      managed = False
-      db_table = 'vue_acc_proc_del'
+        managed = False
+        db_table = 'vue_acc_proc_del'
 
 
 class VueAccInhTransfer(models.Model):
-    rowno = models.BigIntegerField(db_column='RowNo',  primary_key=True)  # Field name made lowercase.
+    rowno = models.BigIntegerField(db_column='RowNo', primary_key=True)  # Field name made lowercase.
     altquantity = models.DecimalField(db_column='AltQuantity', max_digits=18, decimal_places=4, blank=True, null=True)  # Field name made lowercase.
     auom = models.CharField(max_length=25, blank=True, null=True)
     auomscale = models.IntegerField(blank=True, null=True)
     quantity = models.DecimalField(max_digits=18, decimal_places=4)
-    no = models.IntegerField()
     uom = models.CharField(max_length=25, blank=True, null=True)
     uomscale = models.IntegerField(blank=True, null=True)
     siz = models.CharField(max_length=50, blank=True, null=True)
     colour = models.CharField(max_length=50, blank=True, null=True)
-    companyid = models.IntegerField(db_column='CompanyID') 
     acc_grp = models.CharField(max_length=35)
     acc_name = models.CharField(max_length=35)
     incharge = models.CharField(max_length=35)
@@ -228,6 +235,8 @@ class VueAccInhTransfer(models.Model):
     n = models.CharField(db_column='N', max_length=19, blank=True, null=True)  # Field name made lowercase.
     date = models.DateTimeField(db_column='Date')  # Field name made lowercase.
     orderno = models.CharField(db_column='OrderNo', max_length=50, blank=True, null=True)  # Field name made lowercase.
+    no = models.IntegerField()
+    companyid = models.SmallIntegerField(db_column='CompanyID')  # Field name made lowercase.
     companyname = models.CharField(max_length=12)
     address1 = models.CharField(db_column='Address1', max_length=50, blank=True, null=True)  # Field name made lowercase.
     address2 = models.CharField(db_column='Address2', max_length=50, blank=True, null=True)  # Field name made lowercase.
@@ -235,10 +244,12 @@ class VueAccInhTransfer(models.Model):
     place = models.CharField(max_length=66, blank=True, null=True)
     regno = models.CharField(db_column='RegNo', max_length=20, blank=True, null=True)  # Field name made lowercase.
     phone1 = models.CharField(db_column='Phone1', max_length=50, blank=True, null=True)  # Field name made lowercase.
+    employee_name = models.CharField(max_length=35)
 
     class Meta:
         managed = False
         db_table = 'vue_acc_inh_transfer'
+
 
 
 class ViewFabricDeliveryProcess(models.Model):
@@ -278,10 +289,12 @@ class ViewFabricDeliveryProcess(models.Model):
     state_name = models.CharField(db_column='state_Name', max_length=30, blank=True, null=True)  # Field name made lowercase.
     state_code = models.CharField(max_length=2, blank=True, null=True)
     place = models.CharField(max_length=35, blank=True, null=True)
+    login = models.CharField(max_length=35, blank=True, null=True)
 
     class Meta:
         managed = False
         db_table = 'view_fabric_delivery_process'
+
 
 class ViewUnitPcdelivery(models.Model):
     slno = models.BigIntegerField(primary_key=True)
@@ -339,10 +352,12 @@ class ViewGdwnFabricDeliveryPlan(models.Model):
     kg = models.DecimalField(max_digits=38, decimal_places=3, blank=True, null=True)
     mtr = models.DecimalField(max_digits=38, decimal_places=2, blank=True, null=True)
     rlno = models.CharField(max_length=8000, blank=True, null=True)
+    username = models.CharField(max_length=50)
 
     class Meta:
         managed = False
         db_table = 'view_gdwn_fabric_delivery_plan'
+
 
 class VueRibDeliveryDetails(models.Model):
     slno = models.BigIntegerField(db_column='SlNo', primary_key=True)  # Field name made lowercase.
@@ -359,6 +374,7 @@ class VueRibDeliveryDetails(models.Model):
     lotno = models.CharField(db_column='LOTNO', max_length=10, blank=True, null=True)  # Field name made lowercase.
     siz = models.CharField(max_length=35)
     delpc = models.IntegerField()
+    username = models.CharField(db_column='Username', max_length=50, blank=True, null=True)  # Field name made lowercase.
 
     class Meta:
         managed = False
@@ -426,6 +442,7 @@ class ViewMistakeqtyPrint(models.Model):
     lotno = models.CharField(db_column='Lotno', max_length=50)  # Field name made lowercase.
     qty = models.IntegerField(db_column='Qty')  # Field name made lowercase.
     trstype = models.CharField(db_column='Trstype', max_length=50)  # Field name made lowercase.
+    username = models.CharField(db_column='Username', max_length=50, blank=True, null=True)  # Field name made lowercase.
 
     class Meta:
         managed = False

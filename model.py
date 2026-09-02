@@ -8,19 +8,23 @@
 from django.db import models
 
 
-class VueResignDtls(models.Model):
-    slno = models.BigIntegerField(db_column='SlNo', blank=True, null=True)  # Field name made lowercase.
-    code = models.IntegerField()
-    photo = models.CharField(max_length=400, blank=True, null=True)
-    name = models.CharField(max_length=100, blank=True, null=True)
-    mobile = models.CharField(max_length=50, blank=True, null=True)
-    dept = models.CharField(max_length=50, blank=True, null=True)
-    category = models.CharField(db_column='Category', max_length=50, blank=True, null=True)  # Field name made lowercase.
-    joindt = models.DateTimeField(db_column='JoinDt', blank=True, null=True)  # Field name made lowercase.
-    resigndt = models.DateTimeField(db_column='resignDt', blank=True, null=True)  # Field name made lowercase.
-    days_worked = models.IntegerField(db_column='Days_Worked', blank=True, null=True)  # Field name made lowercase.
-    unitcode = models.IntegerField(db_column='Unitcode', blank=True, null=True)  # Field name made lowercase.
+class VueCuttingPrintembdel(models.Model):
+    rowno = models.BigIntegerField(db_column='RowNo', blank=True, null=True)  # Field name made lowercase.
+    frm = models.CharField(max_length=750, blank=True, null=True)
+    toad = models.CharField(max_length=750, blank=True, null=True)
+    id = models.IntegerField()
+    dt = models.DateTimeField()
+    jobno = models.CharField(max_length=50)
+    topbottom_des = models.CharField(db_column='TopBottom_des', max_length=50, blank=True, null=True)  # Field name made lowercase.
+    process_des = models.CharField(db_column='Process_des', max_length=150, blank=True, null=True)  # Field name made lowercase.
+    qrid = models.IntegerField(db_column='QRID')  # Field name made lowercase.
+    comboclr = models.CharField(max_length=50)
+    lotno = models.CharField(max_length=50)
+    portion_des = models.CharField(db_column='Portion_des', max_length=50, blank=True, null=True)  # Field name made lowercase.
+    name = models.CharField(db_column='Name', max_length=35)  # Field name made lowercase.
+    noofpcs = models.IntegerField()
+    username = models.CharField(db_column='Username', max_length=50, blank=True, null=True)  # Field name made lowercase.
 
     class Meta:
         managed = False
-        db_table = 'vue_resign_Dtls'
+        db_table = 'vue_cutting_printembdel'
