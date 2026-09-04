@@ -50,6 +50,8 @@ class task_master(models.Model):
     task_name = models.CharField(max_length=100)
     assing_date = models.DateTimeField(auto_now_add=True)
     task_description = models.TextField(null=True, blank=True)
+    task_start_date = models.DateTimeField(null=True, blank=True)
+    task_end_date = models.DateTimeField(null=True, blank=True)
     task_status = models.CharField(max_length=50, default="Pending") # Changed to CharField for "Pending", "Completed", etc.
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

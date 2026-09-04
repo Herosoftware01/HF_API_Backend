@@ -304,9 +304,9 @@ def subcategory_master_api(request):
 
 
 @csrf_exempt
-def task_master_api(request):
+def task_master_api(request, id=None):
     if request.method == 'GET':
-        data = task_master.objects.all()
+        data = task_master.objects.all(id=id) if id else task_master.objects.all()
 
         return JsonResponse(
             list(data.values(
@@ -317,6 +317,8 @@ def task_master_api(request):
                 'task_description',
                 'assing_date',
                 'task_status',
+                'task_start_date',
+                'task_end_date',
                 'created_at',
                 'updated_at'
             )),
@@ -378,6 +380,8 @@ def task_master_api(request):
             obj.project_id = None if proj_id == "" else proj_id
             obj.code_id = None if user_id == "" else user_id
             obj.task_name = body.get('task_name', obj.task_name)
+            obj.task_start_date = body.get('task_start_date', obj.task_start_date)
+            obj.task_end_date = body.get('task_end_date', obj.task_end_date)
             obj.task_description = body.get('task_description', obj.task_description)
             obj.task_status = body.get('task_status', obj.task_status)
             obj.save()
