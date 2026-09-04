@@ -583,6 +583,7 @@ def workentry_pause_api(request):
 
                     "pause_start_time": pause.pause_start_time,
                     "pause_end_time": pause.pause_end_time,
+                    "pause_reason": pause.pause_reason,
 
                     "created_at": pause.created_at,
                     "updated_at": pause.updated_at,
@@ -609,6 +610,7 @@ def workentry_pause_api(request):
             workentry_id = body.get('workentry_id')
             pause_start_time = body.get('pause_start_time')
             pause_end_time = body.get('pause_end_time')
+            pause_reason = body.get('pause_reason')
 
             # Validate workentry
             if not workentry_id:
@@ -636,7 +638,8 @@ def workentry_pause_api(request):
             pause = workentry_pause.objects.create(
                 workentry=workentry,
                 pause_start_time=pause_start_time,
-                pause_end_time=pause_end_time if pause_end_time else None
+                pause_end_time=pause_end_time if pause_end_time else None,
+                pause_reason=pause_reason if pause_reason else None
             )
 
             return JsonResponse({
@@ -647,6 +650,7 @@ def workentry_pause_api(request):
                     "workentry_id": pause.workentry_id,
                     "pause_start_time": pause.pause_start_time,
                     "pause_end_time": pause.pause_end_time,
+                    "pause_reason": pause.pause_reason,
                     "created_at": pause.created_at,
                     "updated_at": pause.updated_at
                 }
