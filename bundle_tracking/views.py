@@ -580,6 +580,22 @@ def fetch_bundle_details(request):
     return JsonResponse({"status": "error", "message": "Invalid request"})
 
 
+def _resolve_unit_for_value(unit_id):
+    unit_code = str(unit_id).strip()
+
+    # 1. First, prioritize exact name match (e.g., "UNIT-4")
+    unit = MasUnit.objects.using("main").filter(unitname__iexact=unit_code).first()
+
+    # 2. Fallback: If it's a pure number (e.g., "55"), look up by unitcode
+    if not unit and unit_code.isdigit():
+        unit = MasUnit.objects.using("main").filter(unitcode=int(unit_code)).first()
+
+    # 3. Get the true database ID if the unit was found
+    unit_number = str(unit.unitcode) if unit else unit_code
+
+    return unit, unit_code, unit_number
+
+
 @csrf_exempt
 def update_child_bundle_scan(request):
     if request.method != "POST":
@@ -629,11 +645,14 @@ def update_child_bundle_scan(request):
 
     all_done = total_count == scanned_count and total_count > 0
 
-    # 4️⃣ UPDATE BundleReport
+    # 4️⃣ UPDATE BundleReport (Fixed to use correct resolved unit ID)
     if all_done:
+        unit, unit_code, unit_number = _resolve_unit_for_value(unit_id)
+        
         Bundlereport.objects.using("app").filter(
-            mbundle_id=mbundid,
-            unit_id=unit_id
+            mbundle_id=mbundid
+        ).filter(
+            Q(unit_id=unit_code) | Q(unit_id=unit_number)
         ).update(
             scan=1,
             r_date=timezone.now().date()
