@@ -86,6 +86,7 @@ class workentry_pause(models.Model):
     workentry = models.ForeignKey(TrsWorkentry, on_delete=models.CASCADE)
     pause_start_time = models.DateTimeField()
     pause_end_time = models.DateTimeField(blank=True, null=True)
+    pause_reason = models.TextField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
