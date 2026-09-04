@@ -89,7 +89,7 @@ def get_unit_bundle_report_data(request):
     queryset = UnitBundlereport.objects.using("app").all()
 
     # Default start from 2026-04-20 if no start_date provided
-    effective_from = parse_date(start_date) if start_date else date(2026, 7, 13)
+    effective_from = parse_date(start_date) if start_date else date(2026, 9, 6)
     queryset = queryset.filter(s_date__date__gte=effective_from)
 
     # end_date is optional, only apply if provided
@@ -204,7 +204,7 @@ def unit_bundle(request):
         queryset = queryset.filter(unitname__in=target_units)
 
     # Default start from 2026-04-20 if no from_date provided
-    effective_from = parse_date(from_date) if from_date else date(2026, 7, 13)
+    effective_from = parse_date(from_date) if from_date else date(2026, 9, 6)
     queryset = queryset.filter(r_dt__date__gte=effective_from)
 
     # to_date is optional, only apply if provided

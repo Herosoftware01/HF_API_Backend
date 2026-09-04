@@ -39,7 +39,7 @@ def bundle_home(request):
 
     ids = list(set(p["id"] for p in pcs21))
 
-    start_dt = datetime(2026, 7, 13, 0, 0, 0)
+    start_dt = datetime(2026, 9, 1, 0, 0, 0)
 
     pcs11_qs = TrsCdelPcs1.objects.using('demo').filter(
         id__in=ids,
@@ -227,7 +227,7 @@ def allocate_unit(request, unitname=None):
 
     ids = [p['id'] for p in pcs21_qs]
 
-    start_dt = datetime(2026, 7, 13, 0, 0, 0)
+    start_dt = datetime(2026, 9, 1, 0, 0, 0)
 
     pcs11_qs = TrsCdelPcs1.objects.using('demo').filter(
         id__in=ids,
@@ -409,7 +409,7 @@ def approve_bundle(request):
 
 
 def sub_bundle_report(request, unit_id):
-    start_dt = datetime(2026, 7, 13, 0, 0, 0)
+    start_dt = datetime(2026, 9, 1, 0, 0, 0)
 
     unit, unit_code, unit_number = _resolve_unit_for_value(unit_id)
 
@@ -526,7 +526,7 @@ def fetch_bundle_details(request):
     if request.method == "POST":
         mbundid = request.POST.get("mbundid")
         unit_id = request.POST.get("unit_id")
-        start_dt = datetime(2026, 7, 13, 0, 0, 0)
+        start_dt = datetime(2026, 9, 1, 0, 0, 0)
       
 
         print("mbundid, unit_id", mbundid, unit_id)

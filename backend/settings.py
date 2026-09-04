@@ -41,6 +41,7 @@ CORS_ALLOWED_ORIGINS = [
     "https://hfempdtls.netlify.app",
     "http://10.1.21.110:7003",
     "http://10.1.21.156:3000",
+    "http://10.1.21.15:3000",
     
 ]
 
@@ -57,6 +58,7 @@ CSRF_TRUSTED_ORIGINS = [
     "http://10.1.21.110:7003",
     "http://10.1.21.156:3000",
     "http://10.1.21.80:3000",
+    "http://10.1.21.15:3000",
     
 ]
 # settings.py
