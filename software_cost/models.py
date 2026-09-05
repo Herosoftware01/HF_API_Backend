@@ -50,6 +50,8 @@ class task_master(models.Model):
     task_name = models.CharField(max_length=100)
     assing_date = models.DateTimeField(auto_now_add=True)
     task_description = models.TextField(null=True, blank=True)
+    task_start_date = models.DateTimeField(null=True, blank=True)
+    task_end_date = models.DateTimeField(null=True, blank=True)
     task_status = models.CharField(max_length=50, default="Pending") # Changed to CharField for "Pending", "Completed", etc.
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -86,6 +88,7 @@ class workentry_pause(models.Model):
     workentry = models.ForeignKey(TrsWorkentry, on_delete=models.CASCADE)
     pause_start_time = models.DateTimeField()
     pause_end_time = models.DateTimeField(blank=True, null=True)
+    pause_reason = models.TextField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

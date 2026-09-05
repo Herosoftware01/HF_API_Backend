@@ -304,9 +304,9 @@ def subcategory_master_api(request):
 
 
 @csrf_exempt
-def task_master_api(request):
+def task_master_api(request, id=None):
     if request.method == 'GET':
-        data = task_master.objects.all()
+        data = task_master.objects.all(id=id) if id else task_master.objects.all()
 
         return JsonResponse(
             list(data.values(
@@ -317,6 +317,8 @@ def task_master_api(request):
                 'task_description',
                 'assing_date',
                 'task_status',
+                'task_start_date',
+                'task_end_date',
                 'created_at',
                 'updated_at'
             )),
@@ -361,25 +363,42 @@ def task_master_api(request):
                 "message": str(e)
             }, status=400)
 
-    elif request.method == 'PUT':
+    elif request.method in ['PUT', 'PATCH']:
         try:
             body = json.loads(request.body)
-            task_id = body.get('id')
+            
+            # Prioritize the 'id' from the URL, fallback to the body payload
+            task_id = id if id else body.get('id')
             
             if not task_id:
                 return JsonResponse({"status": False, "message": "Task ID is required for update"}, status=400)
 
             obj = task_master.objects.get(id=task_id)
 
-            # FIX: Look for 'code_id' exactly as React sends it
-            proj_id = body.get('project_id')
-            user_id = body.get('code_id')
-
-            obj.project_id = None if proj_id == "" else proj_id
-            obj.code_id = None if user_id == "" else user_id
-            obj.task_name = body.get('task_name', obj.task_name)
-            obj.task_description = body.get('task_description', obj.task_description)
-            obj.task_status = body.get('task_status', obj.task_status)
+            # For PUT/PATCH, safely update only the fields provided in the payload
+            if 'project_id' in body:
+                proj_id = body.get('project_id')
+                obj.project_id = None if proj_id == "" else proj_id
+                
+            if 'code_id' in body:
+                user_id = body.get('code_id')
+                obj.code_id = None if user_id == "" else user_id
+                
+            if 'task_name' in body:
+                obj.task_name = body.get('task_name')
+                
+            if 'task_start_date' in body:
+                obj.task_start_date = body.get('task_start_date')
+                
+            if 'task_end_date' in body:
+                obj.task_end_date = body.get('task_end_date')
+                
+            if 'task_description' in body:
+                obj.task_description = body.get('task_description')
+                
+            if 'task_status' in body:
+                obj.task_status = body.get('task_status')
+                
             obj.save()
 
             return JsonResponse({
@@ -583,6 +602,7 @@ def workentry_pause_api(request):
 
                     "pause_start_time": pause.pause_start_time,
                     "pause_end_time": pause.pause_end_time,
+                    "pause_reason": pause.pause_reason,
 
                     "created_at": pause.created_at,
                     "updated_at": pause.updated_at,
@@ -609,6 +629,7 @@ def workentry_pause_api(request):
             workentry_id = body.get('workentry_id')
             pause_start_time = body.get('pause_start_time')
             pause_end_time = body.get('pause_end_time')
+            pause_reason = body.get('pause_reason')
 
             # Validate workentry
             if not workentry_id:
@@ -636,7 +657,8 @@ def workentry_pause_api(request):
             pause = workentry_pause.objects.create(
                 workentry=workentry,
                 pause_start_time=pause_start_time,
-                pause_end_time=pause_end_time if pause_end_time else None
+                pause_end_time=pause_end_time if pause_end_time else None,
+                pause_reason=pause_reason if pause_reason else None
             )
 
             return JsonResponse({
@@ -647,6 +669,7 @@ def workentry_pause_api(request):
                     "workentry_id": pause.workentry_id,
                     "pause_start_time": pause.pause_start_time,
                     "pause_end_time": pause.pause_end_time,
+                    "pause_reason": pause.pause_reason,
                     "created_at": pause.created_at,
                     "updated_at": pause.updated_at
                 }

@@ -39,7 +39,7 @@ def bundle_home(request):
 
     ids = list(set(p["id"] for p in pcs21))
 
-    start_dt = datetime(2026, 7, 13, 0, 0, 0)
+    start_dt = datetime(2026, 9, 1, 0, 0, 0)
 
     pcs11_qs = TrsCdelPcs1.objects.using('demo').filter(
         id__in=ids,
@@ -227,7 +227,7 @@ def allocate_unit(request, unitname=None):
 
     ids = [p['id'] for p in pcs21_qs]
 
-    start_dt = datetime(2026, 7, 13, 0, 0, 0)
+    start_dt = datetime(2026, 9, 1, 0, 0, 0)
 
     pcs11_qs = TrsCdelPcs1.objects.using('demo').filter(
         id__in=ids,
@@ -409,7 +409,7 @@ def approve_bundle(request):
 
 
 def sub_bundle_report(request, unit_id):
-    start_dt = datetime(2026, 7, 13, 0, 0, 0)
+    start_dt = datetime(2026, 9, 1, 0, 0, 0)
 
     unit, unit_code, unit_number = _resolve_unit_for_value(unit_id)
 
@@ -526,7 +526,7 @@ def fetch_bundle_details(request):
     if request.method == "POST":
         mbundid = request.POST.get("mbundid")
         unit_id = request.POST.get("unit_id")
-        start_dt = datetime(2026, 7, 13, 0, 0, 0)
+        start_dt = datetime(2026, 9, 1, 0, 0, 0)
       
 
         print("mbundid, unit_id", mbundid, unit_id)
@@ -580,6 +580,22 @@ def fetch_bundle_details(request):
     return JsonResponse({"status": "error", "message": "Invalid request"})
 
 
+def _resolve_unit_for_value(unit_id):
+    unit_code = str(unit_id).strip()
+
+    # 1. First, prioritize exact name match (e.g., "UNIT-4")
+    unit = MasUnit.objects.using("main").filter(unitname__iexact=unit_code).first()
+
+    # 2. Fallback: If it's a pure number (e.g., "55"), look up by unitcode
+    if not unit and unit_code.isdigit():
+        unit = MasUnit.objects.using("main").filter(unitcode=int(unit_code)).first()
+
+    # 3. Get the true database ID if the unit was found
+    unit_number = str(unit.unitcode) if unit else unit_code
+
+    return unit, unit_code, unit_number
+
+
 @csrf_exempt
 def update_child_bundle_scan(request):
     if request.method != "POST":
@@ -629,11 +645,14 @@ def update_child_bundle_scan(request):
 
     all_done = total_count == scanned_count and total_count > 0
 
-    # 4️⃣ UPDATE BundleReport
+    # 4️⃣ UPDATE BundleReport (Fixed to use correct resolved unit ID)
     if all_done:
+        unit, unit_code, unit_number = _resolve_unit_for_value(unit_id)
+        
         Bundlereport.objects.using("app").filter(
-            mbundle_id=mbundid,
-            unit_id=unit_id
+            mbundle_id=mbundid
+        ).filter(
+            Q(unit_id=unit_code) | Q(unit_id=unit_number)
         ).update(
             scan=1,
             r_date=timezone.now().date()
