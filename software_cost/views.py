@@ -363,27 +363,42 @@ def task_master_api(request, id=None):
                 "message": str(e)
             }, status=400)
 
-    elif request.method == 'PUT':
+    elif request.method in ['PUT', 'PATCH']:
         try:
             body = json.loads(request.body)
-            task_id = body.get('id')
+            
+            # Prioritize the 'id' from the URL, fallback to the body payload
+            task_id = id if id else body.get('id')
             
             if not task_id:
                 return JsonResponse({"status": False, "message": "Task ID is required for update"}, status=400)
 
             obj = task_master.objects.get(id=task_id)
 
-            # FIX: Look for 'code_id' exactly as React sends it
-            proj_id = body.get('project_id')
-            user_id = body.get('code_id')
-
-            obj.project_id = None if proj_id == "" else proj_id
-            obj.code_id = None if user_id == "" else user_id
-            obj.task_name = body.get('task_name', obj.task_name)
-            obj.task_start_date = body.get('task_start_date', obj.task_start_date)
-            obj.task_end_date = body.get('task_end_date', obj.task_end_date)
-            obj.task_description = body.get('task_description', obj.task_description)
-            obj.task_status = body.get('task_status', obj.task_status)
+            # For PUT/PATCH, safely update only the fields provided in the payload
+            if 'project_id' in body:
+                proj_id = body.get('project_id')
+                obj.project_id = None if proj_id == "" else proj_id
+                
+            if 'code_id' in body:
+                user_id = body.get('code_id')
+                obj.code_id = None if user_id == "" else user_id
+                
+            if 'task_name' in body:
+                obj.task_name = body.get('task_name')
+                
+            if 'task_start_date' in body:
+                obj.task_start_date = body.get('task_start_date')
+                
+            if 'task_end_date' in body:
+                obj.task_end_date = body.get('task_end_date')
+                
+            if 'task_description' in body:
+                obj.task_description = body.get('task_description')
+                
+            if 'task_status' in body:
+                obj.task_status = body.get('task_status')
+                
             obj.save()
 
             return JsonResponse({
