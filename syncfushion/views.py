@@ -8,7 +8,7 @@ from django.http import JsonResponse
 from rest_framework import status
 from rest_framework import viewsets
 from .models import GridSetting,DiWasg,DiWasg_img,TrsMaildtls, SyncfushionKanban, SyncfusionGantt, BlockEditor, FashionrResult, ViewAccinwpend
-from .models import ViewAccessoryDel, TmpQms, ViewCutBalpend
+from .models import ViewAccessoryDel, TmpQms, ViewCutBalpend, ViewAccpopending
 from .serializers import GridSettingSerializer,TrsMaildtlsSerializer
 from rest_framework.permissions import IsAuthenticated  # optional
 import json
@@ -907,5 +907,14 @@ def CutBalpend(request):
             ) if req else 0,
         )
 
+    return JsonResponse(data, safe=False)
+
+def AccPoPend(request):
+    queryset = ViewAccpopending.objects.using("test").all()
+    data = list(queryset.values(
+        'slno',  'orderno', 'des', 'uom', 'fdelvdate',
+        'ag', 'img', 'balpoqty', 'clr'
+    ))
+   
     return JsonResponse(data, safe=False)
 

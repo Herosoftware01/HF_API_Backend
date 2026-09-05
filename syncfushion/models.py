@@ -163,16 +163,17 @@ class FashionrResult(models.Model):
         db_table = 'Fashionr_result'
 
 class ViewAccinwpend(models.Model):
-    poduedtfollow = models.CharField(db_column='poDuedtfollow', max_length=12)  # Field name made lowercase.
-    orddtfollow = models.CharField(db_column='ordDtfollow', max_length=11)  # Field name made lowercase.
+    o_styledesc = models.CharField(max_length=50, blank=True, null=True)
+    poduedtfollow = models.CharField(db_column='poDuedtfollow', max_length=12)
+    orddtfollow = models.CharField(db_column='ordDtfollow', max_length=11)
     img = models.CharField(max_length=450, blank=True, null=True)
     slno = models.BigIntegerField(primary_key=True)
     merch = models.CharField(max_length=35, blank=True, null=True)
     orderno = models.CharField(max_length=50, blank=True, null=True)
-    no = models.IntegerField(db_column='NO')  # Field name made lowercase.
-    date = models.DateTimeField(db_column='DATE')  # Field name made lowercase.
+    no = models.IntegerField(db_column='NO')
+    date = models.DateTimeField(db_column='DATE')
     duedate = models.DateTimeField(blank=True, null=True)
-    dueday = models.IntegerField(db_column='Dueday', blank=True, null=True)  # Field name made lowercase.
+    dueday = models.IntegerField(db_column='Dueday', blank=True, null=True)
     orderdt = models.DateField(blank=True, null=True)
     ordremday = models.IntegerField(blank=True, null=True)
     name = models.CharField(max_length=35, blank=True, null=True)
@@ -261,3 +262,38 @@ class TmpQms(models.Model):
         managed = False
         db_table = 'Tmp_Qms'
 
+class ViewAccpopending(models.Model):
+    slno = models.BigIntegerField(db_column='Slno', primary_key=True)
+    pers = models.DecimalField(db_column='Pers', max_digits=38, decimal_places=6, blank=True, null=True)
+    orderno = models.CharField(db_column='OrderNo', max_length=50)
+    trsqty = models.DecimalField(db_column='TrsQty', max_digits=38, decimal_places=4)
+    date = models.DateTimeField(db_column='Date', blank=True, null=True)
+    accessorygroupid = models.IntegerField(db_column='AccessoryGroupID')
+    accessoryid = models.IntegerField(db_column='AccessoryID')
+    colourid = models.IntegerField(db_column='ColourID')
+    accesizeid = models.IntegerField(db_column='AcceSizeID')
+    ordersizeid = models.IntegerField(db_column='OrderSizeID')
+    grp = models.CharField(db_column='Grp', max_length=35)
+    des = models.CharField(db_column='Des', max_length=35)
+    clr = models.CharField(db_column='Clr', max_length=50)
+    itemsiz = models.CharField(db_column='ItemSiz', max_length=50)
+    ordsiz = models.CharField(db_column='OrdSiz', max_length=35)
+    quantity = models.DecimalField(db_column='Quantity', max_digits=18, decimal_places=4)
+    uom = models.CharField(db_column='UOM', max_length=25)
+    supplier = models.CharField(db_column='Supplier', max_length=35)
+    phone1 = models.CharField(db_column='Phone1', max_length=50)
+    contactperson = models.CharField(db_column='ContactPerson', max_length=35)
+    ratekg = models.DecimalField(db_column='RateKG', max_digits=19, decimal_places=4)
+    poqty = models.DecimalField(db_column='POQty', max_digits=38, decimal_places=4)
+    altquantity = models.DecimalField(db_column='AltQuantity', max_digits=18, decimal_places=4)
+    balpoqty = models.DecimalField(db_column='BalPoQty', max_digits=38, decimal_places=4, blank=True, null=True)
+    altuom = models.CharField(db_column='AltUOM', max_length=25)
+    img = models.CharField(max_length=450, blank=True, null=True)
+    ratealt = models.DecimalField(db_column='RateALT', max_digits=19, decimal_places=4)
+    unit = models.CharField(max_length=50, blank=True, null=True)
+    fdelvdate = models.DateTimeField(db_column='o_FinalDelvdate', blank=True, null=True)
+    ag = models.IntegerField(blank=True, null=True)
+
+    class Meta:
+        managed = False
+        db_table = 'view_accpopending'

@@ -780,6 +780,7 @@ class VueRepCutPend(models.Model):
     slno = models.BigIntegerField(primary_key=True)
     dt = models.DateTimeField(blank=True, null=True)
     day = models.IntegerField(blank=True, null=True)
+    img = models.CharField(max_length=551, blank=True, null=True)
     jobno = models.CharField(max_length=50)
     topbottom_des = models.CharField(db_column='TopBottom_des', max_length=50, blank=True, null=True)
     clrcombo = models.CharField(max_length=50)
