@@ -12,6 +12,9 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 
 from pathlib import Path
 import os
+from dotenv import load_dotenv
+
+load_dotenv(Path(__file__).resolve().parent.parent / '.env')
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -184,13 +187,13 @@ WSGI_APPLICATION = 'backend.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'mssql',
-        'NAME': 'hfapi',
-        'USER': 'Python',
-        'PASSWORD': 'Python@001',
-        'HOST': '10.1.21.11',
-        'PORT': '1433',
+        'NAME': os.getenv('DB_NAME_DEFAULT'),
+        'USER': os.getenv('DB_USER'),
+        'PASSWORD': os.getenv('DB_PASSWORD'),
+        'HOST': os.getenv('DB_HOST'),
+        'PORT': os.getenv('DB_PORT'),
         'OPTIONS': {
-            'driver': 'ODBC Driver 17 for SQL Server',
+            'driver': os.getenv('DB_DRIVER'),
             'trusted_connection': "yes"
         },
         'CONN_MAX_AGE': 300,
@@ -198,78 +201,78 @@ DATABASES = {
 
     'demo': {
         'ENGINE': 'mssql',
-        'NAME': 'Tally2sql',
-        'USER': 'Python',
-        'PASSWORD': 'Python@001',
-        'HOST': '10.1.21.11',
-        'PORT': '1433',
+        'NAME': os.getenv('DB_NAME_DEMO'),
+        'USER': os.getenv('DB_USER'),
+        'PASSWORD': os.getenv('DB_PASSWORD'),
+        'HOST': os.getenv('DB_HOST'),
+        'PORT': os.getenv('DB_PORT'),
         'OPTIONS': {
-            'driver': 'ODBC Driver 17 for SQL Server',
+            'driver': os.getenv('DB_DRIVER'),
             'trusted_connection': "yes"
         },
         'CONN_MAX_AGE': 300,
     },
     'main': {
         'ENGINE': 'mssql',
-        'NAME': 'Garmentrk',
-        'USER': 'Python',
-        'PASSWORD': 'Python@001',
-        'HOST': '10.1.21.11',
-        'PORT': '1433',
+        'NAME': os.getenv('DB_NAME_MAIN'),
+        'USER': os.getenv('DB_USER'),
+        'PASSWORD': os.getenv('DB_PASSWORD'),
+        'HOST': os.getenv('DB_HOST'),
+        'PORT': os.getenv('DB_PORT'),
         'OPTIONS': {
-            'driver': 'ODBC Driver 17 for SQL Server',
+            'driver': os.getenv('DB_DRIVER'),
             'trusted_connection': "yes"
         },
         'CONN_MAX_AGE': 300,
     },
     'mssql1' : {
         'ENGINE': 'mssql',
-        'NAME': 'demo',
-        'USER': 'Python',
-        'PASSWORD': 'Python@001',
-        'HOST': '10.1.21.11',
-        'PORT': '1433',
+        'NAME': os.getenv('DB_NAME_MSSQL1'),
+        'USER': os.getenv('DB_USER'),
+        'PASSWORD': os.getenv('DB_PASSWORD'),
+        'HOST': os.getenv('DB_HOST'),
+        'PORT': os.getenv('DB_PORT'),
         'OPTIONS': {
-                'driver': 'ODBC Driver 17 for SQL Server',
+            'driver': os.getenv('DB_DRIVER'),
                 'trusted_connection': "yes"
             },
         'CONN_MAX_AGE': 300,
     },
      'app' : {
         'ENGINE': 'mssql',
-        'NAME': 'Django',
-        'USER': 'Python',
-        'PASSWORD': 'Python@001',
-        'HOST': '10.1.21.11',
-        'PORT': '1433',
+        'NAME': os.getenv('DB_NAME_APP'),
+        'USER': os.getenv('DB_USER'),
+        'PASSWORD': os.getenv('DB_PASSWORD'),
+        'HOST': os.getenv('DB_HOST'),
+        'PORT': os.getenv('DB_PORT'),
         'OPTIONS': {
-                'driver': 'ODBC Driver 17 for SQL Server',
+            'driver': os.getenv('DB_DRIVER'),
                 'trusted_connection': "yes"
             },
         'CONN_MAX_AGE': 300,
     },
      'demo1': {
             'ENGINE': 'mssql',
-            'NAME': 'NewPowerBi',
-            'USER': 'Python',
-            'PASSWORD': 'Python@001',
-            'HOST': '10.1.21.11',
-            'PORT': '1433',
+            'NAME': os.getenv('DB_NAME_DEMO1'),
+            'USER': os.getenv('DB_USER'),
+            'PASSWORD': os.getenv('DB_PASSWORD'),
+            'HOST': os.getenv('DB_HOST'),
+            'PORT': os.getenv('DB_PORT'),
             'OPTIONS': {
-                'driver': 'ODBC Driver 17 for SQL Server',
+                'driver': os.getenv('DB_DRIVER'),
                 'trusted_connection': "yes"
             },
             'CONN_MAX_AGE': 300,
     },
     'test': {
             'ENGINE': 'mssql',
-            'NAME': 'testerphero',
-            'USER': 'Python',
-            'PASSWORD': 'Python@001',
-            'HOST': '10.1.21.11',
-            'PORT': '1433',
+            'NAME': os.getenv('DB_NAME_TEST'),
+            'USER': os.getenv('DB_USER'),
+            'PASSWORD': os.getenv('DB_PASSWORD'),
+            'HOST': os.getenv('DB_HOST'),
+            'PORT': os.getenv('DB_PORT'),
             'OPTIONS': {
-                'driver': 'ODBC Driver 17 for SQL Server',
+                'driver': os.getenv('DB_DRIVER'),
                 'trusted_connection': "yes"
             },
             'CONN_MAX_AGE': 300,
