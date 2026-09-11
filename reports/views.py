@@ -1,4 +1,4 @@
-from .models import VueHoldwage, Empwisesal, Employeeworking, Holdwagepaid,ResignDtls,Empjoin,AttStaff,StaffAbsent,StaffAtt,ContractSec
+from .models import ViewRepcutPend, Repcutpending, View_Master_RepcutPend, Master_Replace_Cutpend, VueHoldwage, Empwisesal, Employeeworking, Holdwagepaid,ResignDtls,Empjoin,AttStaff,StaffAbsent,StaffAtt,ContractSec, VueRepCutPend, VueDyeingRatenew, Txorderdetstyles
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 import os
@@ -2721,3 +2721,201 @@ def dyeing_order_details(request):
         data.append(obj)
 
     return JsonResponse(data[0] if data else {}, safe=False)
+
+
+def GetCuttingDetails(request):
+    jobno = request.GET.get("jobno")
+
+    if not jobno:
+        return JsonResponse(
+            {"error": "jobno parameter is required"},
+            status=400
+        )
+
+    with connections["demo"].cursor() as cursor:
+        cursor.execute(
+            "EXEC sp_GetCuttingDetails @jobno=%s",
+            [jobno]
+        )
+
+        columns = [col[0] for col in cursor.description]
+        data = [
+            dict(zip(columns, row))
+            for row in cursor.fetchall()
+        ]
+
+    return JsonResponse(data, safe=False)
+
+def GetAprodDetails(request):
+    jobno = request.GET.get("jobno")
+
+    if not jobno:
+        return JsonResponse(
+            {"error": "jobno parameter is required"},
+            status=400
+        )
+
+    with connections["demo"].cursor() as cursor:
+        cursor.execute(
+            "EXEC sp_GetAprodDetails @jobno=%s",
+            [jobno]
+        )
+
+        columns = [col[0] for col in cursor.description]
+        data = [
+            dict(zip(columns, row))
+            for row in cursor.fetchall()
+        ]
+
+    return JsonResponse(data, safe=False)
+
+def RepCutPending(request):
+    jobno = request.GET.get("jobno")
+    queryset = VueRepCutPend.objects.using('demo').all()
+
+    if jobno:
+        queryset = queryset.filter(jobno=jobno)
+        
+    data = list(queryset.values())
+
+    return JsonResponse(data, safe=False)
+
+def RepcutPending(request):
+    jobno = request.GET.get("jobno")
+    queryset = ViewRepcutPend.objects.using('demo').all()
+
+    if jobno:
+        queryset = queryset.filter(jobno=jobno).order_by('slno')
+        
+    data = list(queryset.values())
+
+    return JsonResponse(data, safe=False)
+
+@csrf_exempt
+def Cutting_Replace_Pending(request):
+
+    if request.method == "GET":
+
+        jobno = request.GET.get("jobno")
+        queryset = Repcutpending.objects.using('demo').all()
+
+        if jobno:
+            queryset = queryset.filter(jobno=jobno)
+
+        data = list(queryset.values())
+        return JsonResponse(data, safe=False)
+
+    elif request.method == "POST":
+
+        data = json.loads(request.body)
+
+        for item in data:
+
+            exists = Repcutpending.objects.using('demo').filter(
+                jobno=item["jobno"],
+                size=item["size"],
+                topbottom=item["topbottom"],
+                parts=item["parts"]
+            ).exists()
+
+            if not exists:
+                Repcutpending.objects.using('demo').create(
+                    jobno=item["jobno"],
+                    size=item["size"],
+                    topbottom=item["topbottom"],
+                    parts=item["parts"],
+                    weight=item["weight"],
+                    average=item["average"],
+                    percentage=item["percentage"]
+                )
+
+        return JsonResponse({
+            "message": "Records created"
+        }, status=201)
+
+
+    elif request.method == "PUT":
+
+        data = json.loads(request.body)
+
+        Repcutpending.objects.using('demo').filter(
+            slno=data["slno"]
+        ).update(
+            weight=data["weight"],
+            average=data["average"],
+            percentage=data["percentage"]
+        )
+
+        return JsonResponse({
+            "message": "Record updated"
+        })
+
+
+    return JsonResponse({
+        "message": "Method not allowed"
+    }, status=405)
+
+
+def Master_Repcut(request):
+
+    queryset = View_Master_RepcutPend.objects.using('demo').all()
+    data = list(queryset.values())
+    return JsonResponse(data, safe=False)
+
+@csrf_exempt
+def Master_Repcut_Details(request):
+
+    if request.method == "GET":
+
+        styleid = request.GET.get("styleid")
+        queryset = Master_Replace_Cutpend.objects.using('demo').all()
+
+        if styleid:
+            queryset = queryset.filter(styleid=styleid)
+
+        data = list(queryset.values())
+        return JsonResponse(data, safe=False)
+
+    elif request.method == "POST":
+        
+        data = json.loads(request.body)
+
+        for item in data:
+
+            exists = Master_Replace_Cutpend.objects.using('demo').filter(
+                styleid=item["styleid"],
+                size=item["size"],
+                topbottom=item["topbottom"],
+                parts=item["parts"]
+            ).exists()
+
+            if not exists:
+                Master_Replace_Cutpend.objects.using('demo').create(
+                    styleid=item["styleid"],
+                    size=item["size"],
+                    topbottom=item["topbottom"],
+                    parts=item["parts"],
+                    weight=item["weight"],
+                    average=item["average"],
+                    percentage=item["percentage"]
+                )
+
+        return JsonResponse({
+            "message": "Records created"
+        }, status=201)
+
+    elif request.method == "PUT":
+
+        data = json.loads(request.body)
+
+        Master_Replace_Cutpend.objects.using('demo').filter(
+            slno=data["slno"]
+        ).update(
+            weight=data["weight"],
+            average=data["average"],
+            percentage=data["percentage"]
+        )
+
+        return JsonResponse({
+            "message": "Record updated"
+        })

@@ -47,4 +47,12 @@ urlpatterns = [
     path('dyeing_data/', views.dyeing_data , name='dyeing_data'),
     path('dyeing_order_details/', views.dyeing_order_details , name='dyeing_order_details'),
 
+    # Cutting Reports
+    path('cutting_details/', views.GetCuttingDetails, name='get_cutting_details'),
+    path('aprod_details/', views.GetAprodDetails, name='get_aprod_details'),
+    path('repcut_pend/', views.RepcutPending, name='RepCutPending'),
+    path('rep_cut_pend/', views.RepCutPending, name='RepCutPending'),
+    path('cutting_replace_pending/', views.Cutting_Replace_Pending, name='Cutting_Replace_Pending'),
+    path('master_repcut/', views.Master_Repcut, name='Master_Repcut'),
+    path('master_repcut_details/', views.Master_Repcut_Details, name='Master_Repcut_Details'),
     ] 
