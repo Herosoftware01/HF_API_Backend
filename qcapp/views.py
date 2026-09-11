@@ -6,7 +6,7 @@ from rest_framework.views import APIView
 from zoneinfo import ZoneInfo
 from rest_framework.response import Response
 from rest_framework import status, permissions
-from .models import QcAdminMistake,cut_sample_data_final,Cont_employee,sequency_data,cut_sample_data,cut_sample_data_final,VueUser,Unit,Needle_change,Line,roving_qc_mistake,qc_piece_final, MachineAllocation, machine_details, emp_allocate, Empwisesal, VueProcessSequence,qc_hourly_approval,VueUloginRole,QcHourlyApproval 
+from .models import QcAdminMistake,cut_sample_data_final,Cont_employee,sequency_data,cut_sample_data,cut_sample_data_final,VueUser,Unit,Needle_change,Line,roving_qc_mistake,qc_piece_final, MachineAllocation, machine_details, emp_allocate, Empwisesal, VueProcessSequence,qc_hourly_approval,VueUloginRole,QcHourlyApproval,MeasurementMas, MeasurementData 
 from .serializers import QcAdminMistakeSerializer,UnitSerializer,MachineTrasnsferSerializer,MachineSerializer,LineSerializer, MachineAllocationSerializer, VueProcessSequenceSerializer
 from collections import defaultdict
 from django.shortcuts import get_object_or_404
@@ -894,6 +894,25 @@ class EmpAllocateAPIView(APIView):
                 {"error": "unit and line are required"},
                 status=400
             )
+            
+            
+        
+        same_allocation = emp_allocate.objects.filter(
+            emp_code=emp_code,
+            machine_id=machine_id,
+            jobno=jobno,
+            top_bottom=top_bottom,
+            seq=sequence,
+            date__date=today
+        ).exists()
+
+        if same_allocation:
+            return Response(
+                {
+                    "error": "Already allocated today"
+                },
+                status=400
+            )
 
         # -------------------------
         # EMPLOYEE ALREADY ONLINE ?
@@ -975,35 +994,6 @@ class EmpAllocateAPIView(APIView):
             "allocation_id": allocation.id,
             "steps_saved": len(steps)
         })
-
-        # # -------------------------
-        # # SAVE SEQUENCE
-        # # -------------------------
-        # if steps:
-        #     for step in steps:
-        #         try:
-        #             obj = sequency_data.objects.create(
-        #                 emp_allocate_id=allocation,   # ✅ FIXED (most likely issue)
-        #                 seq=step,
-        #                 jobno=jobno,
-        #                 top_bottom=top_bottom,
-        #                 date=timezone.now()
-        #             )
-        #             print("SAVED:", obj.id, step)
-
-        #         except Exception as e:
-        #             import traceback
-        #             print("SEQUENCE SAVE ERROR:", str(e))
-        #             print(traceback.format_exc())
-        #             return Response({"error": str(e)}, status=500)
-
-        # return Response({
-        #     "message": "Saved successfully",
-        #     "allocation_id": allocation.id,
-        #     "steps_saved": len(steps)
-        # })
-    
-    
 
 
 @api_view(['GET'])
@@ -2851,3 +2841,230 @@ def qc_hourly_approval_api(request):
     datas=list(data.values())
     return JsonResponse(datas, safe=False)  
 
+
+
+@api_view(["POST"])
+def save_measurements(request):
+
+    try:
+
+        data = request.data
+
+        print("SAVE REQUEST:")
+        print(data)
+
+        # ==========================================
+        # MASTER DATA
+        # ==========================================
+
+        jobno = data.get("jobno")
+        bundle_no = data.get("bundle_no")
+        tob_bottom = data.get("tob_bottom")
+        pcs = data.get("pcs")
+        color = data.get("color")
+        size = data.get("size")
+
+        # ==========================================
+        # VALIDATION
+        # ==========================================
+
+        if not jobno:
+            return Response(
+                {
+                    "success": False,
+                    "message": "Job No is required"
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if not bundle_no:
+            return Response(
+                {
+                    "success": False,
+                    "message": "Bundle No is required"
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # ==========================================
+        # MEASUREMENT DATA
+        # ==========================================
+
+        mes_id = data.get("mes_id")
+
+        mesurement_name = data.get(
+            "mesurement_name"
+        )
+
+        d_type = data.get(
+            "d_type"
+        )
+
+        standard = data.get(
+            "standard"
+        )
+
+        tol = data.get(
+            "tol"
+        )
+
+        group = data.get(
+            "group"
+        )
+
+        input_value = data.get(
+            "input_value"
+        )
+
+        # ==========================================
+        # INPUT VALIDATION
+        # ==========================================
+
+        if input_value is None or input_value == "":
+            return Response(
+                {
+                    "success": False,
+                    "message": "Measurement value is required"
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # ==========================================
+        # MASTER
+        # ==========================================
+        # Same Job + Bundle இருந்தால்
+        # புதிய master create செய்ய வேண்டாம்
+        # ==========================================
+
+        master = MeasurementMas.objects.filter(
+            jobno=jobno,
+            bundle_no=bundle_no
+        ).first()
+
+        if not master:
+
+            master = MeasurementMas.objects.create(
+                jobno=jobno,
+                bundle_no=bundle_no,
+                tob_bottom=tob_bottom or "",
+                pcs=int(pcs or 0),
+                color=color or "",
+                size=size or "",
+            )
+
+        # ==========================================
+        # MEASUREMENT DATA
+        # ==========================================
+
+        detail = MeasurementData.objects.filter(
+            jobno=jobno,
+            mes_id=mes_id or 0,
+            group=group or "",
+            d_type=d_type or ""
+        ).first()
+
+        # ==========================================
+        # UPDATE EXISTING
+        # ==========================================
+
+        if detail:
+
+            detail.mesurement_name = (
+                mesurement_name or ""
+            )
+
+            detail.standard = (
+                standard or ""
+            )
+
+            detail.tol = (
+                tol or ""
+            )
+
+            detail.input_value = str(
+                input_value
+            )
+
+            detail.save()
+
+            message = "Measurement updated successfully"
+
+        # ==========================================
+        # CREATE NEW
+        # ==========================================
+
+        else:
+
+            detail = MeasurementData.objects.create(
+
+                jobno=jobno,
+
+                mes_id=mes_id or 0,
+
+                mesurement_name=(
+                    mesurement_name or ""
+                ),
+
+                d_type=(
+                    d_type or ""
+                ),
+
+                standard=(
+                    standard or ""
+                ),
+
+                tol=(
+                    tol or ""
+                ),
+
+                group=(
+                    group or ""
+                ),
+
+                input_value=str(
+                    input_value
+                ),
+            )
+
+            message = "Measurement saved successfully"
+
+        # ==========================================
+        # RESPONSE
+        # ==========================================
+
+        return Response(
+            {
+                "success": True,
+                "message": message,
+
+                "master_id": master.id,
+
+                "measurement_id": detail.id,
+
+                "data": {
+                    "jobno": jobno,
+                    "bundle_no": bundle_no,
+                    "mes_id": detail.mes_id,
+                    "mesurement_name": detail.mesurement_name,
+                    "group": detail.group,
+                    "d_type": detail.d_type,
+                    "input_value": detail.input_value,
+                }
+            },
+            status=status.HTTP_200_OK
+        )
+
+    except Exception as e:
+
+        print(
+            "SAVE MEASUREMENT ERROR:",
+            str(e)
+        )
+
+        return Response(
+            {
+                "success": False,
+                "message": str(e),
+            },
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )

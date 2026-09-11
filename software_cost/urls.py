@@ -2,6 +2,7 @@ from django.urls import path
 from . import views
 
 urlpatterns = [
+    path('role_menu_permissions/', views.manage_role_permissions, name='manage_role_permissions'),
     path('trs_workentry/', views.trs_workentry, name='trs_workentry'),
     path('trs_workentry/<int:id>/', views.trs_workentry, name='trs_workentry'),
     path('workentry_pause/',views.workentry_pause_api, name='workentry_pause_api'),

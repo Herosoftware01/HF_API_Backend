@@ -1,5 +1,5 @@
 from django.shortcuts import render
-from datetime import datetime
+from datetime import datetime, date
 from django.http import JsonResponse
 from django.views.decorators.http import require_GET
 from rest_framework.views import APIView
@@ -17,6 +17,7 @@ import json
 from django.db import connections
 from django.db.models import Q
 from rest_framework.decorators import api_view
+
 
 
 @require_GET
@@ -492,8 +493,10 @@ class GetUnitDataAPIView(APIView):
             date_obj = datetime.strptime(selected_date, '%Y-%m-%d')
             data = unit_input.objects.filter(unit=unit, line=line, entry_date__date=date_obj).order_by('-entry_date')
         else:
-            four_days_ago = datetime.now() - timedelta(days=4)
-            data = unit_input.objects.filter(unit=unit, line=line, entry_date__gte=four_days_ago).order_by('-entry_date')
+            # four_days_ago = datetime.now() - timedelta(days=1)
+            today = date.today()
+            print("Today's date:", today)
+            data = unit_input.objects.filter(unit=unit, line=line, entry_date__gte=today).order_by('-entry_date')
 
         if job_no is not None:
             job_no = job_no.strip()
@@ -558,7 +561,8 @@ class EndUnitDataAPIView(APIView):
             date_obj = datetime.strptime(selected_date, '%Y-%m-%d')
             data = end_line_data.objects.filter(unit=unit, line=line, entry_date__date=date_obj)
         else:
-            four_days_ago = datetime.now() - timedelta(days=4)
+            # four_days_ago = datetime.now() - timedelta(days=4)
+            four_days_ago = date.today()
             data = end_line_data.objects.filter(unit=unit, line=line, entry_date__gte=four_days_ago)
 
         if job_no is not None:
@@ -621,7 +625,8 @@ class GetUnitAssemply(APIView):
             date_obj = datetime.strptime(selected_date, '%Y-%m-%d')
             data = Assembly_data.objects.filter(unit=unit, line=line, entry_date__date=date_obj).order_by('-entry_date')
         else:
-            four_days_ago = datetime.now() - timedelta(days=4)
+            # four_days_ago = datetime.now() - timedelta(days=4)
+            four_days_ago = date.today()
             data = Assembly_data.objects.filter(unit=unit, line=line, entry_date__gte=four_days_ago).order_by('-entry_date')
 
         # JSON response

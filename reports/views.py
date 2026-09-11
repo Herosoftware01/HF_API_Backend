@@ -1063,7 +1063,48 @@ def resign_report(request):
             "avg_days": 0,
             "this_month_count": 0
         }, status=500)
-    
+        
+        
+def resign_join_report(request):
+    try:
+        from_date = request.GET.get("from_date")
+        to_date = request.GET.get("to_date")
+
+        if not from_date or not to_date:
+            return JsonResponse({
+                "status": False,
+                "error": "from_date and to_date are required"
+            }, status=400)
+
+        with connections['main'].cursor() as cursor:
+
+            cursor.execute(
+                """
+                EXEC sp_ResignJoinEmployee
+                    @fromDate = %s,
+                    @toDate = %s
+                """,
+                [from_date, to_date]
+            )
+
+            columns = [col[0] for col in cursor.description]
+            rows = cursor.fetchall()
+
+        data = [
+            dict(zip(columns, row))
+            for row in rows
+        ]
+
+        return JsonResponse({
+            "status": True,
+            "data": data
+        })
+
+    except Exception as e:
+        return JsonResponse({
+            "status": False,
+            "error": str(e)
+        }, status=500)
 
 def empatlev(request):
     leave_records = (

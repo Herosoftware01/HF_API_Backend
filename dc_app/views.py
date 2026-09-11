@@ -388,7 +388,7 @@ def gate_module_api_details(request):
     })
 
 
-def get_user_by_username(request, id):
+def get_user_by_username(request):
     
     data = HerofashionUser.objects.all()
 
@@ -438,62 +438,93 @@ AVAILABLE_MODULES = [
     {"module_id": "unit_pcs", "module_name": "Unit Pcs Delivery"},
 ]
 
-@csrf_exempt
-def get_available_roles(request):
-    if request.method == "GET":
-        User = get_user_model()
-        roles = User.objects.exclude(role__isnull=True).exclude(role__exact='').values_list('role', flat=True).distinct()
-        return JsonResponse(list(roles), safe=False, status=200)
-    return JsonResponse({"error": "Method not allowed"}, status=405)
 
 @csrf_exempt
-def get_all_modules(request):
-    if request.method == "GET":
-        return JsonResponse(AVAILABLE_MODULES, safe=False, status=200)
-    return JsonResponse({"error": "Method not allowed"}, status=405)
-
-@csrf_exempt
-def get_role_permissions(request, role):
-    if request.method == "GET":
-        permissions = RoleModulePermission.objects.filter(role__iexact=role)
+def manage_role_permissions(request, role_param=None):
+    """
+    Single function handling CRUD for Role Permissions.
+    GET: Reads permissions for a role.
+    POST: Creates or Updates permissions.
+    DELETE: Deletes/Resets permissions for a role.
+    """
+    
+    # ------------------ READ (GET) ------------------
+    if request.method == 'GET':
+        # Depending on url routing, role might come from URL param or query string
+        role = role_param or request.GET.get('role')
         
-        if not permissions.exists():
-            default_permissions = [
-                {**mod, "is_enabled": False} for mod in AVAILABLE_MODULES
-            ]
-            return JsonResponse(default_permissions, safe=False, status=200)
+        if not role:
+            return JsonResponse({"error": "Role is required"}, status=400)
+            
+        # Fetch existing DB permissions for this role
+        db_permissions = RoleModulePermission.objects.filter(role=role)
+        db_perm_dict = {p.module_id: p.is_enabled for p in db_permissions}
+        
+        # Build response based on single source of truth (AVAILABLE_MODULES)
+        response_data = []
+        for mod in AVAILABLE_MODULES:
+            response_data.append({
+                "module_id": mod["module_id"],
+                "module_name": mod["module_name"],
+                # Default to False if not found in DB
+                "is_enabled": db_perm_dict.get(mod["module_id"], False) 
+            })
+            
+        # Returning array directly to match your React component's expected data format
+        return JsonResponse(response_data, safe=False)
 
-        data = list(permissions.values('module_id', 'module_name', 'is_enabled'))
-        return JsonResponse(data, safe=False, status=200)
-    return JsonResponse({"error": "Method not allowed"}, status=405)
 
-@csrf_exempt
-def save_role_permissions(request):
-    if request.method == "POST":
+    # ------------------ CREATE / UPDATE (POST) ------------------
+    elif request.method == 'POST':
         try:
-            body_data = json.loads(request.body.decode('utf-8'))
-        except json.JSONDecodeError:
-            return JsonResponse({"error": "Invalid JSON format."}, status=400)
-
-        role = body_data.get('role')
-        permissions_data = body_data.get('permissions', [])
-
-        if not role or not permissions_data:
-            return JsonResponse({"error": "Role and permissions data are required."}, status=400)
-
-        try:
-            with transaction.atomic():
-                for perm in permissions_data:
+            data = json.loads(request.body)
+            role = data.get('role')
+            permissions = data.get('permissions', [])
+            
+            if not role:
+                return JsonResponse({"status": False, "message": "Role is required"}, status=400)
+                
+            # Iterate and save using update_or_create to handle both Create and Update
+            for perm in permissions:
+                module_id = perm.get('module_id')
+                is_enabled = perm.get('is_enabled', False)
+                
+                # Fetch module_name securely from the constant to prevent arbitrary data injection
+                module_name = next((m['module_name'] for m in AVAILABLE_MODULES if m['module_id'] == module_id), None)
+                
+                if module_name:
                     RoleModulePermission.objects.update_or_create(
                         role=role,
-                        module_id=perm.get('module_id'),
+                        module_id=module_id,
                         defaults={
-                            'module_name': perm.get('module_name'),
-                            'is_enabled': perm.get('is_enabled', False)
+                            'module_name': module_name,
+                            'is_enabled': is_enabled
                         }
                     )
-            return JsonResponse({"message": "Permissions saved successfully."}, status=200)
-        except Exception as e:
-            return JsonResponse({"error": str(e)}, status=500)
+                    
+            return JsonResponse({"status": True, "message": "Permissions saved successfully"})
             
-    return JsonResponse({"error": "Method not allowed"}, status=405)
+        except json.JSONDecodeError:
+            return JsonResponse({"status": False, "message": "Invalid JSON format"}, status=400)
+        except Exception as e:
+            return JsonResponse({"status": False, "message": str(e)}, status=500)
+
+
+    # ------------------ DELETE (DELETE) ------------------
+    elif request.method == 'DELETE':
+        try:
+            data = json.loads(request.body)
+            role = data.get('role')
+            
+            if not role:
+                return JsonResponse({"status": False, "message": "Role is required for deletion"}, status=400)
+                
+            # Deletes all custom permissions for this role, effectively resetting them to default (OFF)
+            RoleModulePermission.objects.filter(role=role).delete()
+            return JsonResponse({"status": True, "message": f"Permissions for {role} reset successfully"})
+            
+        except Exception as e:
+            return JsonResponse({"status": False, "message": str(e)}, status=500)
+
+    else:
+        return JsonResponse({"status": False, "message": "Method not allowed"}, status=405)

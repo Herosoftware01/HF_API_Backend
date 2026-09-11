@@ -2,8 +2,347 @@ from django.forms.models import model_to_dict
 from django.http import JsonResponse
 import json
 from django.utils import timezone
+from datetime import timedelta
 from django.views.decorators.csrf import csrf_exempt
-from .models import TrsWorkentry,user_master,project_master,category_master,subcategory_master,task_master,workentry_pause
+from .models import Workentry,user_master,project_master,category_master,subcategory_master,task_master,workentry_pause,role_menu_permissions
+
+
+
+AVAILABLE_MENU = ['Master', 'Work Entry', 'Reports', 'Task']
+
+@csrf_exempt
+def manage_role_permissions(request, role_param=None):
+
+    # ============================================================
+    # GET - LIST / SINGLE
+    # ============================================================
+    if request.method == 'GET':
+        try:
+
+            # ----------------------------------------------------
+            # Get Single Role
+            # ----------------------------------------------------
+            if role_param:
+
+                try:
+                    role_perm = role_menu_permissions.objects.get(
+                        role_name=role_param
+                    )
+                except role_menu_permissions.DoesNotExist:
+                    return JsonResponse({
+                        "status": False,
+                        "message": f"Role not found: {role_param}"
+                    }, status=404)
+
+                try:
+                    permissions = json.loads(
+                        role_perm.menu_permissions
+                    )
+                except (json.JSONDecodeError, TypeError):
+                    permissions = []
+
+                return JsonResponse({
+                    "status": True,
+                    "message": "Role permission fetched successfully",
+                    "data": {
+                        "id": role_perm.id,
+                        "role_name": role_perm.role_name,
+                        "menu_permissions": permissions,
+                        "created_at": role_perm.created_at,
+                        "updated_at": role_perm.updated_at
+                    }
+                })
+
+            # ----------------------------------------------------
+            # Get All Roles
+            # ----------------------------------------------------
+            roles = role_menu_permissions.objects.all().order_by(
+                '-id'
+            )
+
+            data = []
+
+            for role in roles:
+
+                try:
+                    permissions = json.loads(
+                        role.menu_permissions
+                    )
+                except (json.JSONDecodeError, TypeError):
+                    permissions = []
+
+                data.append({
+                    "id": role.id,
+                    "role_name": role.role_name,
+                    "menu_permissions": permissions,
+                    "created_at": role.created_at,
+                    "updated_at": role.updated_at
+                })
+
+            return JsonResponse({
+                "status": True,
+                "message": "Role permissions fetched successfully",
+                "count": len(data),
+                "data": data
+            })
+
+        except Exception as e:
+
+            return JsonResponse({
+                "status": False,
+                "message": str(e)
+            }, status=500)
+
+    # ============================================================
+    # POST - CREATE
+    # ============================================================
+    elif request.method == 'POST':
+
+        try:
+            body = json.loads(request.body)
+
+            role_name = body.get('role_name')
+            permissions = body.get('menu_permissions', [])
+
+            # ----------------------------------------------------
+            # Validate role name
+            # ----------------------------------------------------
+            if not role_name:
+                return JsonResponse({
+                    "status": False,
+                    "message": "role_name is required"
+                }, status=400)
+
+            role_name = role_name.strip()
+
+            # ----------------------------------------------------
+            # Validate permissions
+            # ----------------------------------------------------
+            if not isinstance(permissions, list):
+                return JsonResponse({
+                    "status": False,
+                    "message": "menu_permissions must be an array"
+                }, status=400)
+
+            invalid_permissions = [
+                perm for perm in permissions
+                if perm not in AVAILABLE_MENU
+            ]
+
+            if invalid_permissions:
+
+                return JsonResponse({
+                    "status": False,
+                    "message": "Invalid menu permission",
+                    "invalid_permissions": invalid_permissions,
+                    "available_menu": AVAILABLE_MENU
+                }, status=400)
+
+            # ----------------------------------------------------
+            # Check duplicate role
+            # ----------------------------------------------------
+            if role_menu_permissions.objects.filter(
+                role_name=role_name
+            ).exists():
+
+                return JsonResponse({
+                    "status": False,
+                    "message": f"Role already exists: {role_name}"
+                }, status=409)
+
+            # ----------------------------------------------------
+            # Create
+            # ----------------------------------------------------
+            role_perm = role_menu_permissions.objects.create(
+                role_name=role_name,
+                menu_permissions=json.dumps(permissions)
+            )
+
+            return JsonResponse({
+                "status": True,
+                "message": "Role permissions created successfully",
+                "data": {
+                    "id": role_perm.id,
+                    "role_name": role_perm.role_name,
+                    "menu_permissions": permissions,
+                    "created_at": role_perm.created_at,
+                    "updated_at": role_perm.updated_at
+                }
+            }, status=201)
+
+        except json.JSONDecodeError:
+
+            return JsonResponse({
+                "status": False,
+                "message": "Invalid JSON request body"
+            }, status=400)
+
+        except Exception as e:
+
+            return JsonResponse({
+                "status": False,
+                "message": str(e)
+            }, status=500)
+
+    # ============================================================
+    # PUT - UPDATE
+    # ============================================================
+    elif request.method == 'PUT':
+
+        try:
+
+            if not role_param:
+                return JsonResponse({
+                    "status": False,
+                    "message": "Role parameter is required"
+                }, status=400)
+
+            # ----------------------------------------------------
+            # Find role
+            # ----------------------------------------------------
+            try:
+                role_perm = role_menu_permissions.objects.get(
+                    role_name=role_param
+                )
+            except role_menu_permissions.DoesNotExist:
+
+                return JsonResponse({
+                    "status": False,
+                    "message": f"Role not found: {role_param}"
+                }, status=404)
+
+            body = json.loads(request.body)
+
+            # ----------------------------------------------------
+            # Get permissions
+            # ----------------------------------------------------
+            permissions = body.get(
+                'menu_permissions',
+                None
+            )
+
+            if permissions is None:
+
+                return JsonResponse({
+                    "status": False,
+                    "message": "menu_permissions is required"
+                }, status=400)
+
+            if not isinstance(permissions, list):
+
+                return JsonResponse({
+                    "status": False,
+                    "message": "menu_permissions must be an array"
+                }, status=400)
+
+            # ----------------------------------------------------
+            # Validate permissions
+            # ----------------------------------------------------
+            invalid_permissions = [
+                perm for perm in permissions
+                if perm not in AVAILABLE_MENU
+            ]
+
+            if invalid_permissions:
+
+                return JsonResponse({
+                    "status": False,
+                    "message": "Invalid menu permission",
+                    "invalid_permissions": invalid_permissions,
+                    "available_menu": AVAILABLE_MENU
+                }, status=400)
+
+            # ----------------------------------------------------
+            # Update
+            # ----------------------------------------------------
+            role_perm.menu_permissions = json.dumps(
+                permissions
+            )
+
+            role_perm.save()
+
+            return JsonResponse({
+                "status": True,
+                "message": "Role permissions updated successfully",
+                "data": {
+                    "id": role_perm.id,
+                    "role_name": role_perm.role_name,
+                    "menu_permissions": permissions,
+                    "created_at": role_perm.created_at,
+                    "updated_at": role_perm.updated_at
+                }
+            })
+
+        except json.JSONDecodeError:
+
+            return JsonResponse({
+                "status": False,
+                "message": "Invalid JSON request body"
+            }, status=400)
+
+        except Exception as e:
+
+            return JsonResponse({
+                "status": False,
+                "message": str(e)
+            }, status=500)
+
+    # ============================================================
+    # DELETE
+    # ============================================================
+    elif request.method == 'DELETE':
+
+        try:
+
+            if not role_param:
+                return JsonResponse({
+                    "status": False,
+                    "message": "Role parameter is required"
+                }, status=400)
+
+            # ----------------------------------------------------
+            # Find role
+            # ----------------------------------------------------
+            try:
+                role_perm = role_menu_permissions.objects.get(
+                    role_name=role_param
+                )
+            except role_menu_permissions.DoesNotExist:
+
+                return JsonResponse({
+                    "status": False,
+                    "message": f"Role not found: {role_param}"
+                }, status=404)
+
+            role_name = role_perm.role_name
+
+            # ----------------------------------------------------
+            # Delete
+            # ----------------------------------------------------
+            role_perm.delete()
+
+            return JsonResponse({
+                "status": True,
+                "message": "Role permissions deleted successfully",
+                "data": {
+                    "role_name": role_name
+                }
+            })
+
+        except Exception as e:
+
+            return JsonResponse({
+                "status": False,
+                "message": str(e)
+            }, status=500)
+
+    # ============================================================
+    # METHOD NOT ALLOWED
+    # ============================================================
+    return JsonResponse({
+        "status": False,
+        "message": "Method not allowed"
+    }, status=405)
 
 
 @csrf_exempt
@@ -22,6 +361,7 @@ def user_master_api(request):
                 code=body.get('code'),
                 user_role=body.get('user_role'),
                 cost_per_hour=body.get('cost_per_hour'),
+                working_hours_per_day=body.get('working_hours_per_day'),
                 user_status=body.get('user_status'),
                 created_at=timezone.now(),
                 updated_at=timezone.now()
@@ -46,6 +386,7 @@ def user_master_api(request):
             obj.user_name = body.get('user_name', obj.user_name)
             obj.user_role = body.get('user_role', obj.user_role)
             obj.cost_per_hour = body.get('cost_per_hour', obj.cost_per_hour)
+            obj.working_hours_per_day = body.get('working_hours_per_day', obj.working_hours_per_day)
             obj.user_status = body.get('user_status', obj.user_status)
             obj.updated_at = timezone.now()
 
@@ -303,6 +644,16 @@ def subcategory_master_api(request):
             }, status=404)
 
 
+def safe_parse_duration(duration_val):
+    if not duration_val:
+        return None
+    try:
+        # Handles raw ints (2), string ints ("2"), and Django formats ("2 00:00:00")
+        days = int(str(duration_val).split()[0])
+        return timedelta(days=days)
+    except (ValueError, TypeError):
+        return None
+
 @csrf_exempt
 def task_master_api(request, id=None):
     if request.method == 'GET':
@@ -316,10 +667,11 @@ def task_master_api(request, id=None):
                 'task_name',
                 'task_description',
                 'assing_date',
+                'task_priority',
+                'task_duration',
                 'task_status',
                 'task_start_date',
                 'task_end_date',
-                'created_at',
                 'updated_at'
             )),
             safe=False
@@ -345,6 +697,9 @@ def task_master_api(request, id=None):
                 code_id=user_id,   
                 task_name=body.get('task_name'),
                 assing_date=body.get('assing_date'),
+                task_priority=body.get('task_priority', 'Medium'),
+                # Convert the raw duration into a timedelta object
+                task_duration=safe_parse_duration(body.get('task_duration')),
                 task_description=body.get('task_description', ''),
                 task_status=body.get('task_status', 'Pending')
             )
@@ -386,6 +741,13 @@ def task_master_api(request, id=None):
                 
             if 'task_name' in body:
                 obj.task_name = body.get('task_name')
+
+            if 'task_priority' in body:
+                obj.task_priority = body.get('task_priority')
+
+            if 'task_duration' in body:
+                # Convert the raw duration into a timedelta object
+                obj.task_duration = safe_parse_duration(body.get('task_duration'))
                 
             if 'task_start_date' in body:
                 obj.task_start_date = body.get('task_start_date')
@@ -438,7 +800,6 @@ def task_master_api(request, id=None):
     }, status=405)
 
 
-
 @csrf_exempt
 def trs_workentry(request, id=None):
 
@@ -446,16 +807,16 @@ def trs_workentry(request, id=None):
     if request.method == 'GET':
         if id:
             try:
-                data = TrsWorkentry.objects.get(id=id)
+                data = Workentry.objects.get(id=id)
                 return JsonResponse(model_to_dict(data), safe=False)
-            except TrsWorkentry.DoesNotExist:
+            except Workentry.DoesNotExist:
                 return JsonResponse(
                     {"status": False, "message": "Record not found"},
                     status=404
                 )
 
         else:
-            data = TrsWorkentry.objects.using('default').all()
+            data = Workentry.objects.using('default').all()
 
             # Filters from query params
             name = request.GET.get('name')
@@ -481,7 +842,7 @@ def trs_workentry(request, id=None):
         try:
             body = json.loads(request.body)
 
-            obj = TrsWorkentry.objects.create(
+            obj = Workentry.objects.create(
                 username=body.get('username'),
                 entrydate=body.get('entrydate'),
                 project=body.get('project'),
@@ -521,7 +882,7 @@ def trs_workentry(request, id=None):
 
             body = json.loads(request.body)
 
-            obj = TrsWorkentry.objects.get(id=id)
+            obj = Workentry.objects.get(id=id)
 
             obj.username = body.get('username', obj.username)
             obj.entrydate = body.get('entrydate', obj.entrydate)
@@ -547,7 +908,7 @@ def trs_workentry(request, id=None):
                 "message": "Record updated successfully"
             })
 
-        except TrsWorkentry.DoesNotExist:
+        except Workentry.DoesNotExist:
             return JsonResponse({
                 "status": False,
                 "message": "Record not found"
@@ -562,7 +923,7 @@ def trs_workentry(request, id=None):
                     "message": "ID is required"
                 }, status=400)
 
-            obj = TrsWorkentry.objects.get(id=id)
+            obj = Workentry.objects.get(id=id)
             obj.delete()
 
             return JsonResponse({
@@ -570,7 +931,7 @@ def trs_workentry(request, id=None):
                 "message": "Record deleted successfully"
             })
 
-        except TrsWorkentry.DoesNotExist:
+        except Workentry.DoesNotExist:
             return JsonResponse({
                 "status": False,
                 "message": "Record not found"
@@ -646,8 +1007,8 @@ def workentry_pause_api(request):
 
             # Check workentry exists
             try:
-                workentry = TrsWorkentry.objects.get(id=workentry_id)
-            except TrsWorkentry.DoesNotExist:
+                workentry = Workentry.objects.get(id=workentry_id)
+            except Workentry.DoesNotExist:
                 return JsonResponse({
                     "status": False,
                     "message": "Workentry not found"
@@ -718,9 +1079,9 @@ def workentry_pause_api(request):
                 workentry_id = body.get('workentry_id')
 
                 try:
-                    workentry = TrsWorkentry.objects.get(id=workentry_id)
+                    workentry = Workentry.objects.get(id=workentry_id)
                     pause.workentry = workentry
-                except TrsWorkentry.DoesNotExist:
+                except Workentry.DoesNotExist:
                     return JsonResponse({
                         "status": False,
                         "message": "Workentry not found"

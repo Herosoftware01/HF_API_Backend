@@ -33,7 +33,7 @@ class FrCutplanMas(models.Model):
 
 # CutPlan Child Table: SizeAndQuantityList
 class FrCutplanSizeandQuantityList(models.Model):
-    cutplanid = models.ForeignKey('FrCutplanMas', models.DO_NOTHING, db_column='CutPlanId', primary_key=True)
+    cutplanid = models.OneToOneField('FrCutplanMas', models.DO_NOTHING, db_column='CutPlanId', primary_key=True)
     sizename = models.CharField(db_column='SizeName', max_length=50, blank=True, null=True) 
     qty = models.IntegerField(db_column='Qty', blank=True, null=True) 
 
@@ -44,7 +44,7 @@ class FrCutplanSizeandQuantityList(models.Model):
 
 # CutPlan Child Table: TotalMarkerList
 class FrCutplanTotalMarkerList(models.Model):
-    cutplanid = models.ForeignKey('FrCutplanMas', models.DO_NOTHING, db_column='CutPlanId', primary_key=True)
+    cutplanid = models.OneToOneField('FrCutplanMas', models.DO_NOTHING, db_column='CutPlanId', primary_key=True)
     orderinformationfabric = models.CharField(db_column='OrderInformationFabric', max_length=100, blank=True, null=True)
     fabricname = models.CharField(db_column='FabricName', max_length=100, blank=True, null=True)
     gsm = models.IntegerField(db_column='Gsm', blank=True, null=True)
@@ -98,7 +98,7 @@ class FrCutplanTotalmarkerlistdet(models.Model):
 
 # CutPlan Child Table: TotalMarkerListImages
 class FrCutplanTotalmarkerlistimages(models.Model):
-    cutplanid = models.ForeignKey('FrCutplanMas', models.DO_NOTHING, db_column='CutPlanId', primary_key=True)
+    cutplanid = models.OneToOneField('FrCutplanMas', models.DO_NOTHING, db_column='CutPlanId', primary_key=True)
     markerid = models.ForeignKey('FrCutplanTotalmarkerlistdet', models.DO_NOTHING, db_column='MarkerId', blank=True, null=True)
     markerimage = models.TextField(db_column='MarkerImage', blank=True, null=True)
     fabricwidth = models.DecimalField(db_column='FabricWidth', max_digits=18, decimal_places=3, blank=True, null=True)
