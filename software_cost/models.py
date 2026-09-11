@@ -95,3 +95,14 @@ class workentry_pause(models.Model):
 
     def __str__(self):
         return f"Pause for {self.workentry.username} on {self.workentry.entrydate}"
+
+
+class role_menu_permissions(models.Model):
+    id = models.AutoField(primary_key=True)
+    role_name = models.CharField(max_length=100, unique=True)
+    menu_permissions = models.CharField(max_length=100)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return self.role_name

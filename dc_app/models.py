@@ -528,3 +528,5 @@ class RoleModulePermission(models.Model):
 
     def __str__(self):
         return f"{self.role} - {self.module_name} ({'ON' if self.is_enabled else 'OFF'})"
+
+
