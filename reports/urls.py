@@ -35,8 +35,6 @@ urlpatterns = [
     path('empleave/', views.empatlev, name='empleave'), 
     path('emp_pre_abe/', views.labour_attendance_api, name='labour_attendance_api'),
 
-
-
     # Finance Reports
     path('bill_age/', views.bill, name='bill_age'),
     path('pass_age/', views.pass_data_api, name='pass_age'),
