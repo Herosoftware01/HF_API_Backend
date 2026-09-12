@@ -2,6 +2,14 @@ from django.urls import path
 from . import views
 from .views import UnitInputAPIView,EndUnitDataAPIView,EndUnitInputAPIView,GetUnitDataAPIView,GetUnitAssemply
 
+
+from .views import (
+    UserListView,
+    UnitListView,
+    UserUnitPermissionView,
+    UserUnitPermissionListView
+)
+
 urlpatterns = [
     
     path('live_scan_data/', views.live_scan_data, name='live_scan_data'),
@@ -18,4 +26,23 @@ urlpatterns = [
     path("save_process_dependency/",views.save_process_dependency,name="save_process_dependency"),
     path("verify_process_dependency/", views.verify_process_dependency, name="verify_process_dependency"),
     path("delete_process_dependency/", views.delete_process_dependency, name="delete_process_dependency"),
+
+    path(
+        "users/",
+        UserListView.as_view(),
+        name="user-list"
+    ),
+
+    path(
+        "units/",
+        UnitListView.as_view(),
+        name="unit-list"
+    ),
+
+    path(
+        "user-unit-permission/",
+        UserUnitPermissionView.as_view(),
+        name="user-unit-permission"
+    ),
+    path('user-unit-permission-list/', UserUnitPermissionListView.as_view(), name='user-unit-permission-list'),
 ]  

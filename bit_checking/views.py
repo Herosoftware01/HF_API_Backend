@@ -623,16 +623,12 @@ def delete_checking(request):
 
 @csrf_exempt
 def delete_single_checking(request):
-
     if request.method != "POST":
         return JsonResponse({
             "status": False
         })
-
     try:
-
         body = json.loads(request.body)
-
         plan_no = body.get("plan_no")
         descriptions = body.get("descriptions")
         scaner_id = body.get("scaner_id")
@@ -643,16 +639,12 @@ def delete_single_checking(request):
             qr_id=scaner_id,
             typ=types
         ).exists()
-
         if final_exists:
-
             return JsonResponse({
                 "status": False,
                 "message":
                 "Final data already saved. Use main DELETE button."
             })
-
-   
         bit_checking_updates.objects.filter(
             plan_no=plan_no,
             descriptions=descriptions,
@@ -671,29 +663,23 @@ def delete_single_checking(request):
             "status": False,
             "message": str(e)
         })
-    
 
 
 def pending_scaner_ids(request):
-
     from_date = parse_datetime("2026-05-18 06:13:27.396456")
-
     existing_qr_ids = list(
         BitcheckingPlyDetails.objects.using('demo').values_list(
             'qr_id',
             flat=True
         )
     )
-
     queryset = bit_start_end_time.objects.filter(
         start__gte=from_date
     ).exclude(
         qrid__in=existing_qr_ids,
     ).order_by('qrid', 'start')
-
     seen = set()
     unique_data = []
-
     for row in queryset:
         if row.qrid not in seen:
             seen.add(row.qrid)
@@ -704,7 +690,8 @@ def pending_scaner_ids(request):
                 "scaner_id": row.qrid,
                 "emp_id": row.empid,
                 "date": row.start,
-                "has_update": has_update
+                "has_update": has_update,
+                "types": row.types
             })
 
     return JsonResponse({
@@ -759,52 +746,52 @@ def qc_start(request):
     })
 
 
-@csrf_exempt
-def delete_pending_scanner(request):
+# @csrf_exempt
+# def delete_pending_scanner(request):
 
-    if request.method == "POST":
+#     if request.method == "POST":
 
-        try:
+#         try:
 
-            body = json.loads(request.body)
+#             body = json.loads(request.body)
 
-            qrid = body.get("qrid")
-            types = body.get("types")
+#             qrid = body.get("qrid")
+#             types = body.get("types")
 
-            if not qrid:
-                return JsonResponse({
-                    "status": False,
-                    "message": "QR ID missing"
-                })
+#             if not qrid:
+#                 return JsonResponse({
+#                     "status": False,
+#                     "message": "QR ID missing"
+#                 })
 
-            deleted_count, _ = bit_start_end_time.objects.filter(
-                qrid=qrid,
-                types=types
-            ).delete()
+#             deleted_count, _ = bit_start_end_time.objects.filter(
+#                 qrid=qrid,
+#                 types=types
+#             ).delete()
 
-            if deleted_count > 0:
+#             if deleted_count > 0:
 
-                return JsonResponse({
-                    "status": True,
-                    "message": "Deleted Successfully"
-                })
+#                 return JsonResponse({
+#                     "status": True,
+#                     "message": "Deleted Successfully"
+#                 })
 
-            return JsonResponse({
-                "status": False,
-                "message": "No matching record found"
-            })
+#             return JsonResponse({
+#                 "status": False,
+#                 "message": "No matching record found"
+#             })
 
-        except Exception as e:
+#         except Exception as e:
 
-            return JsonResponse({
-                "status": False,
-                "message": str(e)
-            })
+#             return JsonResponse({
+#                 "status": False,
+#                 "message": str(e)
+#             })
 
-    return JsonResponse({
-        "status": False,
-        "message": "Invalid Request"
-    })
+#     return JsonResponse({
+#         "status": False,
+#         "message": "Invalid Request"
+#     })
 
 
 
@@ -1261,46 +1248,6 @@ def delete_single_checking(request):
             "message": str(e)
         })
     
-
-
-def pending_scaner_ids(request):
-
-    from_date = parse_datetime("2026-05-18 06:13:27.396456")
-
-    existing_qr_ids = list(
-        BitcheckingPlyDetails.objects.using('demo').values_list(
-            'qr_id',
-            flat=True
-        )
-    )
-
-    queryset = bit_start_end_time.objects.filter(
-        start__gte=from_date
-    ).exclude(
-        qrid__in=existing_qr_ids,
-    ).order_by('qrid', 'start')
-
-    seen = set()
-    unique_data = []
-
-    for row in queryset:
-        if row.qrid not in seen:
-            seen.add(row.qrid)
-            has_update = bit_checking_updates.objects.filter(
-                scaner_id=row.qrid
-            ).exists()
-            unique_data.append({
-                "scaner_id": row.qrid,
-                "emp_id": row.empid,
-                "date": row.start,
-                "has_update": has_update
-            })
-
-    return JsonResponse({
-        "status": "success",
-        "count": len(unique_data),
-        "data": unique_data
-    })
 
 
 from django.utils import timezone
