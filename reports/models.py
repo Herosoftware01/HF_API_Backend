@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from django.db import models
 
 class VueHoldwage(models.Model):
@@ -957,3 +959,52 @@ class Txorderdetstyles(models.Model):
     class Meta:
         managed = False
         db_table = 'txOrderDetStyles'
+
+class ViewRepcutPend(models.Model):
+    slno = models.BigIntegerField(primary_key=True)
+    jobno = models.CharField(max_length=50, blank=True, null=True)
+    siz = models.CharField(db_column='Siz', max_length=50, blank=True, null=True) 
+    det_main_part = models.CharField(max_length=50, blank=True, null=True)
+    det_part = models.CharField(max_length=70, blank=True, null=True)
+
+    class Meta:
+        managed = False
+        db_table = 'view_repcut_pend'
+
+class Repcutpending(models.Model):
+    slno = models.AutoField(db_column='SlNo', primary_key=True) 
+    jobno = models.CharField(db_column='JobNo', max_length=20) 
+    size = models.CharField(db_column='Size', max_length=20) 
+    topbottom = models.CharField(db_column='TopBottom', max_length=50, blank=True, null=True) 
+    parts = models.CharField(db_column='Parts', max_length=50, blank=True, null=True) 
+    weight = models.DecimalField(db_column='Weight', max_digits=10, decimal_places=2, blank=True, null=True)
+    average = models.DecimalField(db_column='Average', max_digits=10, decimal_places=2, blank=True, null=True) 
+    percentage = models.DecimalField(db_column='Percentage', max_digits=10, decimal_places=2, blank=True, null=True) 
+    datetym = models.DateTimeField(db_column='Datetym', default=datetime.now)
+
+    class Meta:
+        managed = False
+        db_table = 'RepcutPending'
+
+class View_Master_RepcutPend(models.Model):
+    siz = models.CharField(db_column='Siz', max_length=50, primary_key=True) 
+    det_main_part = models.CharField(max_length=50, blank=True, null=True)
+    det_part = models.CharField(max_length=70, blank=True, null=True)
+
+    class Meta:
+        managed = False
+        db_table = 'view_mrep_cut_pend'
+
+class Master_Replace_Cutpend(models.Model):
+    slno = models.AutoField(db_column='SlNo', primary_key=True)
+    styleid = models.IntegerField(db_column='StyleID')
+    size = models.CharField(db_column='Size', max_length=20, blank=True, null=True)
+    topbottom = models.CharField(db_column='TopBottom', max_length=50, blank=True, null=True)
+    parts = models.CharField(db_column='Parts', max_length=50, blank=True, null=True)
+    weight = models.DecimalField(db_column='Weight', max_digits=10, decimal_places=2, blank=True, null=True)
+    average = models.DecimalField(db_column='Average', max_digits=10, decimal_places=2, blank=True, null=True) 
+    percentage = models.DecimalField(db_column='Percentage', max_digits=10, decimal_places=2, blank=True, null=True) 
+
+    class Meta:
+        managed = False
+        db_table = 'Master_Repcutpend'
