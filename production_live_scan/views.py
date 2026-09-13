@@ -17,6 +17,17 @@ import json
 from django.db import connections
 from django.db.models import Q
 from rest_framework.decorators import api_view
+from django.utils.decorators import method_decorator
+from django.views.decorators.csrf import csrf_exempt
+
+
+
+from django.views import View
+from .models import user_unit_permission
+from herofashion.models import User
+from qcapp.models import Unit
+
+import json
 
 
 
@@ -1203,3 +1214,171 @@ def delete_process_dependency(request):
         })
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=400)
+
+
+
+
+################################# Unit Permission API #################################
+
+
+@method_decorator(csrf_exempt, name="dispatch")
+class UserUnitPermissionView(View):
+    def get(self, request):
+        user_id = request.GET.get("user_id")
+        app = request.GET.get("app")
+        if not user_id:
+            return JsonResponse({
+                "success": False,
+                "message": "User is required"
+            }, status=400)
+        if not app:
+            return JsonResponse({
+                "success": False,
+                "message": "App is required"
+            }, status=400)
+        permissions = user_unit_permission.objects.filter(
+            user_id=user_id,
+            app=app
+        ).values_list(
+            "unit_id",
+            flat=True
+        )
+        return JsonResponse({
+            "success": True,
+            "user_id": int(user_id),
+            "app": app,
+            "unit_ids": list(permissions)
+        })
+    def post(self, request):
+        try:
+            data = json.loads(request.body)
+            user_id = data.get("user_id")
+            app = data.get("app")
+            unit_ids = data.get("unit_ids", [])
+            if not user_id:
+                return JsonResponse({
+                    "success": False,
+                    "message": "User is required"
+                }, status=400)
+            if app not in ["qcapp", "live_app"]:
+                return JsonResponse({
+                    "success": False,
+                    "message": "Invalid app"
+                }, status=400)
+            user = User.objects.filter(
+                id=user_id
+            ).first()
+            if not user:
+                return JsonResponse({
+                    "success": False,
+                    "message": "User not found"
+                }, status=404)
+
+            units = Unit.objects.filter(
+                id__in=unit_ids
+            )
+            valid_unit_ids = list(
+                units.values_list("id", flat=True)
+            )
+
+            with transaction.atomic():
+                user_unit_permission.objects.filter(
+                    user_id=user_id,
+                    app=app
+                ).delete()
+                permission_data = []
+
+                for unit_id in valid_unit_ids:
+
+                    permission_data.append(
+                        user_unit_permission(
+                            user_id=user_id,
+                            app=app,
+                            unit_id=unit_id
+                        )
+                    )
+                user_unit_permission.objects.bulk_create(
+                    permission_data
+                )
+            return JsonResponse({
+                "success": True,
+                "message": "Permission saved successfully",
+                "user_id": user_id,
+                "app": app,
+                "unit_ids": valid_unit_ids
+            })
+        except Exception as e:
+
+            return JsonResponse({
+                "success": False,
+                "message": str(e)
+            }, status=500)
+
+@method_decorator(csrf_exempt, name="dispatch")
+class UserListView(View):
+
+    def get(self, request):
+
+        users = User.objects.filter(
+            is_active=True
+        ).values(
+            "id",
+            "username",
+            "first_name",
+            "last_name"
+        )
+
+        return JsonResponse(
+            list(users),
+            safe=False
+        )
+
+@method_decorator(csrf_exempt, name="dispatch")
+class UnitListView(View):
+
+    def get(self, request):
+
+        units = Unit.objects.all().values(
+            "id",
+            "name"
+        )
+
+        return JsonResponse(
+            list(units),
+            safe=False
+        )
+
+
+@method_decorator(csrf_exempt, name="dispatch")
+class UserUnitPermissionListView(View):
+    def get(self, request):
+        try:
+            permissions = user_unit_permission.objects.select_related('user').all()
+            
+            # Grouping or listing raw permissions nicely
+            data = []
+            # Or group by user and app
+            grouped = {}
+            for p in permissions:
+                key = (p.user_id, p.app)
+                if key not in grouped:
+                    grouped[key] = {
+                        "user_id": p.user_id,
+                        "username": p.user.username if p.user else "",
+                        "app": p.app,
+                        "unit_ids": []
+                    }
+                grouped[key]["unit_ids"].append(p.unit_id)
+                
+            return JsonResponse({
+                "success": True,
+                "results": list(grouped.values())
+            })
+        except Exception as e:
+            return JsonResponse({
+                "success": False,
+                "message": str(e)
+            }, status=500)
+
+
+################################### End of Unit Permission API #################################
