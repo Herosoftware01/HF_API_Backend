@@ -57,6 +57,7 @@ class task_master(models.Model):
     task_duration = models.DurationField(null=True, blank=True)
     task_status = models.CharField(max_length=50, default="Pending") # Changed to CharField for "Pending", "Completed", etc.
     updated_at = models.DateTimeField(auto_now=True)
+    task_status1 = models.BooleanField(default=False)
 
     def __str__(self):
         return self.task_name
@@ -79,6 +80,7 @@ class Workentry(models.Model):
     createddate = models.DateTimeField(db_column='CreatedDate', blank=True, null=True)  # Field name made lowercase.
     modifieddate = models.DateTimeField(db_column='ModifiedDate', blank=True, null=True)  # Field name made lowercase.
     durationminutes = models.IntegerField(db_column='DurationMinutes', blank=True, null=True)  # Field name made lowercase.
+    status = models.BooleanField(db_column='Status', default=False)  # Field name made lowercase.
 
     def __str__(self):
         return f"{self.username} - {self.entrydate}"
