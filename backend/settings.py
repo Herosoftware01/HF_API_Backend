@@ -187,8 +187,8 @@ DATABASES = {
     'default': {
         'ENGINE': 'mssql',
         'NAME': 'hfapi',
-        'USER': 'Python',
-        'PASSWORD': 'Python@001',
+        'USER': 'Sa',
+        'PASSWORD': 'Hero@$@321',
         'HOST': '10.1.21.11',
         'PORT': '1433',
         'OPTIONS': {
@@ -201,8 +201,8 @@ DATABASES = {
     'demo': {
         'ENGINE': 'mssql',
         'NAME': 'Tally2sql',
-        'USER': 'Python',
-        'PASSWORD': 'Python@001',
+        'USER': 'Sa',
+        'PASSWORD': 'Hero@$@321',
         'HOST': '10.1.21.11',
         'PORT': '1433',
         'OPTIONS': {
@@ -214,8 +214,8 @@ DATABASES = {
     'main': {
         'ENGINE': 'mssql',
         'NAME': 'Garmentrk',
-        'USER': 'Python',
-        'PASSWORD': 'Python@001',
+        'USER': 'Sa',
+        'PASSWORD': 'Hero@$@321',
         'HOST': '10.1.21.11',
         'PORT': '1433',
         'OPTIONS': {
@@ -227,8 +227,8 @@ DATABASES = {
     'mssql1' : {
         'ENGINE': 'mssql',
         'NAME': 'demo',
-        'USER': 'Python',
-        'PASSWORD': 'Python@001',
+        'USER': 'Sa',
+        'PASSWORD': 'Hero@$@321',
         'HOST': '10.1.21.11',
         'PORT': '1433',
         'OPTIONS': {
@@ -240,8 +240,8 @@ DATABASES = {
      'app' : {
         'ENGINE': 'mssql',
         'NAME': 'Django',
-        'USER': 'Python',
-        'PASSWORD': 'Python@001',
+        'USER': 'Sa',
+        'PASSWORD': 'Hero@$@321',
         'HOST': '10.1.21.11',
         'PORT': '1433',
         'OPTIONS': {
@@ -253,8 +253,8 @@ DATABASES = {
      'demo1': {
             'ENGINE': 'mssql',
             'NAME': 'NewPowerBi',
-            'USER': 'Python',
-            'PASSWORD': 'Python@001',
+            'USER': 'Sa',
+            'PASSWORD': 'Hero@$@321',
             'HOST': '10.1.21.11',
             'PORT': '1433',
             'OPTIONS': {
@@ -266,8 +266,8 @@ DATABASES = {
     'test': {
             'ENGINE': 'mssql',
             'NAME': 'testerphero',
-            'USER': 'Python',
-            'PASSWORD': 'Python@001',
+            'USER': 'Sa',
+            'PASSWORD': 'Hero@$@321',
             'HOST': '10.1.21.11',
             'PORT': '1433',
             'OPTIONS': {

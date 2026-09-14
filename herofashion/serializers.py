@@ -3,28 +3,93 @@ from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from .models import *
 from rest_framework import generics, permissions
 
+# class MyTokenSerializer(TokenObtainPairSerializer):
+#     @classmethod
+#     def get_token(cls, user):
+#         token = super().get_token(user)
+#         token["role"] = user.role.name if user.role else None
+#         return token
+
+#     def validate(self, attrs):
+#         data = super().validate(attrs)
+#         user = self.user
+
+#         # ✅ Default path logic
+#         default_path = user.default_submenu.path if user.default_submenu else "/dashboard"
+
+#         data.update({
+#             "user": {
+#                 "id": user.id,
+#                 "username": user.username,
+#                 "default_path": default_path
+#             }
+#         })
+#         return data
+
+
+def get_client_ip(request):
+    if not request:
+        return None
+
+    x_forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR")
+
+    if x_forwarded_for:
+        return x_forwarded_for.split(",")[0].strip()
+
+    return request.META.get("REMOTE_ADDR")
+
+
 class MyTokenSerializer(TokenObtainPairSerializer):
     @classmethod
     def get_token(cls, user):
         token = super().get_token(user)
         token["role"] = user.role.name if user.role else None
         return token
-
     def validate(self, attrs):
-        data = super().validate(attrs)
-        user = self.user
+        request = self.context.get("request")
+        username = attrs.get("username")
+        password = attrs.get("password")
+        try:
+            data = super().validate(attrs)
+            user = self.user
+            # SUCCESS LOGIN LOG
+            LoginLog.objects.create(
+                user=user,
+                user_id_logged=user.id,
+                username=user.username,
+                ip_address=get_client_ip(request),
+                status="SUCCESS",
+                password_entered=bool(password)
+            )
 
-        # ✅ Default path logic
-        default_path = user.default_submenu.path if user.default_submenu else "/dashboard"
+            default_path = (
+                user.default_submenu.path
+                if user.default_submenu
+                else "/dashboard"
+            )
 
-        data.update({
-            "user": {
-                "id": user.id,
-                "username": user.username,
-                "default_path": default_path
-            }
-        })
-        return data
+            data.update({
+                "user": {
+                    "id": user.id,
+                    "username": user.username,
+                    "default_path": default_path
+                }
+            })
+
+            return data
+
+        except Exception:
+            # FAILED LOGIN LOG
+            LoginLog.objects.create(
+                user=None,
+                user_id_logged=None,
+                username=username,
+                ip_address=get_client_ip(request),
+                status="FAILED",
+                password_entered=bool(password)
+            )
+
+            raise
 
 
 class RoleSerializer(serializers.ModelSerializer):

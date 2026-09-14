@@ -104,4 +104,41 @@ class end_line_data(models.Model):
     lot = models.CharField(max_length=50)
 
 
+
+
+################################## USer Permission Models ########################################
+
+
+class user_unit_permission(models.Model):
+
+    APP_CHOICES = (
+        ("qcapp", "QC App"),
+        ("live_app", "Live App"),
+    )
+
+    user = models.ForeignKey(
+        "herofashion.User",
+        on_delete=models.CASCADE,
+        related_name="unit_permissions"
+    )
+
+    app = models.CharField(
+        max_length=20,
+        choices=APP_CHOICES
+    )
+
+    unit = models.ForeignKey(
+        "qcapp.unit",
+        on_delete=models.CASCADE
+    )
+
+    class Meta:
+        db_table = "user_unit_permission"
+
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "app", "unit"],
+                name="unique_user_app_unit"
+            )
+        ]
     
