@@ -990,6 +990,7 @@ def resign_report(request):
                 "emp_name": r.name,
                 "dept": getattr(r, "dept", ""),
                 "joindt": r.joindt,
+                "last_working_date": r.ldt,
                 "resign_date": r.resigndt,
                 "category": getattr(r, "category", ""),
                 "mobile": getattr(r, "mobile", ""),

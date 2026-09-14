@@ -408,6 +408,7 @@ class ResignDtls(models.Model):
     joindt = models.DateTimeField(db_column='JoinDt', blank=True, null=True)  # Field name made lowercase.
     resigndt = models.DateTimeField(db_column='resignDt', blank=True, null=True)  # Field name made lowercase.
     days_worked = models.IntegerField(db_column='Days_Worked', blank=True, null=True)  # Field name made lowercase.
+    ldt = models.DateTimeField(db_column='Ldt', blank=True, null=True)  # Field name made lowercase.
 
     class Meta:
         managed = False
