@@ -672,7 +672,8 @@ def task_master_api(request, id=None):
                 'task_status',
                 'task_start_date',
                 'task_end_date',
-                'updated_at'
+                'updated_at',
+                'task_status1'
             )),
             safe=False
         )
@@ -698,6 +699,7 @@ def task_master_api(request, id=None):
                 task_name=body.get('task_name'),
                 assing_date=body.get('assing_date'),
                 task_priority=body.get('task_priority', 'Medium'),
+                task_status1 = body.get('task_status1', False),
                 # Convert the raw duration into a timedelta object
                 task_duration=safe_parse_duration(body.get('task_duration')),
                 task_description=body.get('task_description', ''),
@@ -758,9 +760,15 @@ def task_master_api(request, id=None):
             if 'task_description' in body:
                 obj.task_description = body.get('task_description')
                 
-            if 'task_status' in body:
-                obj.task_status = body.get('task_status')
-                
+            # ADD THIS:
+            if 'task_status1' in body:
+                val = body.get('task_status1')
+                # normalize in case it arrives as a string ("true"/"false") instead of a real bool
+                if isinstance(val, str):
+                    obj.task_status1 = val.strip().lower() in ('true', '1', 'yes')
+                else:
+                    obj.task_status1 = bool(val)
+
             obj.save()
 
             return JsonResponse({
@@ -827,7 +835,7 @@ def trs_workentry(request, id=None):
                 data = data.filter(username__icontains=name)
 
             if project:
-                data = data.filter(projectname__icontains=project)
+                data = data.filter(project__icontains=project)
 
             if entry_date:
                 data = data.filter(entrydate=entry_date)
@@ -843,20 +851,21 @@ def trs_workentry(request, id=None):
             body = json.loads(request.body)
 
             obj = Workentry.objects.create(
-                username=body.get('username'),
-                entrydate=body.get('entrydate'),
-                project=body.get('project'),
-                category=body.get('category'),
-                subcat=body.get('subcat'),
-                startdatetime=body.get('startdatetime'),
-                task_id=body.get('task_id'),
-                description=body.get('description'),
-                enddatetime=body.get('enddatetime'),
-                endstatus=body.get('endstatus'),
-                duration=body.get('duration'),
-                durationminutes=body.get('durationminutes'),
+                username=body.get("username"),
+                entrydate=body.get("entrydate"),
+                project=body.get("project"),
+                category=body.get("category"),
+                subcat=body.get("subcat"),
+                status=body.get("status", False),  # default to False if not provided
+                startdatetime=body.get("startdatetime"),
+                task_id_id=body.get("task_id"),  # fixed
+                description=body.get("description"),
+                enddatetime=body.get("enddatetime"),
+                endstatus=body.get("endstatus"),
+                duration=body.get("duration"),
+                durationminutes=body.get("durationminutes"),
                 createddate=timezone.now(),
-                modifieddate=timezone.now()
+                modifieddate=timezone.now(),
             )
 
             return JsonResponse({
@@ -890,7 +899,7 @@ def trs_workentry(request, id=None):
             obj.category = body.get('category', obj.category)
             obj.subcat = body.get('subcat', obj.subcat)
             obj.startdatetime = body.get('startdatetime', obj.startdatetime)
-            obj.task_id = body.get('task_id', obj.task_id)
+            obj.task_id_id = body.get("task_id", obj.task_id_id)
             obj.description = body.get('description', obj.description)
             obj.enddatetime = body.get('enddatetime', obj.enddatetime)
             obj.endstatus = body.get('endstatus', obj.endstatus)
@@ -899,6 +908,7 @@ def trs_workentry(request, id=None):
                 'durationminutes',
                 obj.durationminutes
             )
+            obj.status = body.get('status', obj.status)   # ADD THIS
             obj.modifieddate = timezone.now()
 
             obj.save()
