@@ -176,6 +176,8 @@ def CuttingSecFabric(request, dcno):
     queryset = ViewCutsecFabricdelivery.objects.using('demo').filter(dcno=dcno)
     data = list(queryset.values())
     return JsonResponse(data, safe=False)
+
+
 def rib_delivery_print(request):
     dcno = request.GET.get("dc")  # Example: ?id=101
 
