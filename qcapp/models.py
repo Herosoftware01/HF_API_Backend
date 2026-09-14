@@ -544,28 +544,28 @@ class QcHourlyApproval(models.Model):
         db_table = 'qcapp_qc_hourly_approval'
         
 
-class MeasurementMas(models.Model):
-    jobno = models.CharField(max_length=50)
-    bundle_no = models.CharField(max_length=50)
-    tob_bottom = models.CharField(max_length=50)
-    pcs = models.IntegerField()
-    color = models.CharField(max_length=100)
-    size = models.CharField(max_length=50)
-    date = models.DateTimeField(auto_now_add=True)
+# class MeasurementMas(models.Model):
+#     jobno = models.CharField(max_length=50)
+#     bundle_no = models.CharField(max_length=50)
+#     tob_bottom = models.CharField(max_length=50)
+#     pcs = models.IntegerField()
+#     color = models.CharField(max_length=100)
+#     size = models.CharField(max_length=50)
+#     date = models.DateTimeField(auto_now_add=True)
 
-    def __str__(self):
-        return f"{self.jobno} - {self.bundle_no}"
+#     def __str__(self):
+#         return f"{self.jobno} - {self.bundle_no}"
 
 
-class MeasurementData(models.Model):
-    mes_id = models.IntegerField()
-    mesurement_name = models.CharField(max_length=50)
-    d_type = models.CharField(max_length=50)
-    standard = models.CharField(max_length=50)
-    tol = models.CharField(max_length=100)
-    group = models.CharField(max_length=50)
-    input_value = models.CharField(max_length=50)
+# class MeasurementData(models.Model):
+#     mes_id = models.IntegerField()
+#     mesurement_name = models.CharField(max_length=50)
+#     d_type = models.CharField(max_length=50)
+#     standard = models.CharField(max_length=50)
+#     tol = models.CharField(max_length=100)
+#     group = models.CharField(max_length=50)
+#     input_value = models.CharField(max_length=50)
 
-    def __str__(self):
-        return f"{self.mesurement_name} - {self.group}"
+#     def __str__(self):
+#         return f"{self.mesurement_name} - {self.group}"
     
