@@ -2880,13 +2880,15 @@ def Cutting_Replace_Pending(request):
 
         data = json.loads(request.body)
 
-        Repcutpending.objects.using('demo').filter(
-            slno=data["slno"]
-        ).update(
-            weight=data["weight"],
-            average=data["average"],
-            percentage=data["percentage"]
-        )
+        for item in data:
+
+            Repcutpending.objects.using('demo').filter(
+                slno=item["slno"]
+            ).update(
+                weight=item["weight"],
+                average=item["average"],
+                percentage=item["percentage"]
+            )
 
         return JsonResponse({
             "message": "Record updated"
@@ -2950,13 +2952,15 @@ def Master_Repcut_Details(request):
 
         data = json.loads(request.body)
 
-        Master_Replace_Cutpend.objects.using('demo').filter(
-            slno=data["slno"]
-        ).update(
-            weight=data["weight"],
-            average=data["average"],
-            percentage=data["percentage"]
-        )
+        for item in data:
+
+            Master_Replace_Cutpend.objects.using('demo').filter(
+                slno=item["slno"]
+            ).update(
+                weight=item["weight"],
+                average=item["average"],
+                percentage=item["percentage"]
+            )
 
         return JsonResponse({
             "message": "Record updated"
