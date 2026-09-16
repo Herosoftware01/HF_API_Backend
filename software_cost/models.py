@@ -57,6 +57,7 @@ class task_master(models.Model):
     task_duration = models.DurationField(null=True, blank=True)
     task_status = models.CharField(max_length=50, default="Pending") # Changed to CharField for "Pending", "Completed", etc.
     updated_at = models.DateTimeField(auto_now=True)
+    task_status1 = models.BooleanField(default=False)
 
     def __str__(self):
         return self.task_name
@@ -71,7 +72,7 @@ class Workentry(models.Model):
     category = models.CharField(db_column='Category', max_length=100, db_collation='Latin1_General_CI_AI', blank=True, null=True)  # Field name made lowercase.
     subcat = models.CharField(db_column='SubCat', max_length=100, db_collation='Latin1_General_CI_AI', blank=True, null=True)  # Field name made lowercase.
     startdatetime = models.DateTimeField(db_column='StartDateTime', blank=True, null=True)  # Field name made lowercase.
-    startstatus = models.CharField(db_column='StartStatus', max_length=20, db_collation='Latin1_General_CI_AI', blank=True, null=True)  # Field name made lowercase.
+    task_id = models.ForeignKey(task_master, on_delete=models.CASCADE, db_column='TaskID', default=None, null=True)  # Field name made lowercase.
     description = models.TextField(db_column='Description', db_collation='Latin1_General_CI_AI', blank=True, null=True)  # Field name made lowercase.
     enddatetime = models.DateTimeField(db_column='EndDateTime', blank=True, null=True)  # Field name made lowercase.
     endstatus = models.CharField(db_column='EndStatus', max_length=20, db_collation='Latin1_General_CI_AI', blank=True, null=True)  # Field name made lowercase.
@@ -79,6 +80,7 @@ class Workentry(models.Model):
     createddate = models.DateTimeField(db_column='CreatedDate', blank=True, null=True)  # Field name made lowercase.
     modifieddate = models.DateTimeField(db_column='ModifiedDate', blank=True, null=True)  # Field name made lowercase.
     durationminutes = models.IntegerField(db_column='DurationMinutes', blank=True, null=True)  # Field name made lowercase.
+    status = models.BooleanField(db_column='Status', default=False)  # Field name made lowercase.
 
     def __str__(self):
         return f"{self.username} - {self.entrydate}"

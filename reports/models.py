@@ -408,6 +408,7 @@ class ResignDtls(models.Model):
     joindt = models.DateTimeField(db_column='JoinDt', blank=True, null=True)  # Field name made lowercase.
     resigndt = models.DateTimeField(db_column='resignDt', blank=True, null=True)  # Field name made lowercase.
     days_worked = models.IntegerField(db_column='Days_Worked', blank=True, null=True)  # Field name made lowercase.
+    ldt = models.DateTimeField(db_column='Ldt', blank=True, null=True)  # Field name made lowercase.
 
     class Meta:
         managed = False
@@ -997,7 +998,7 @@ class View_Master_RepcutPend(models.Model):
 
 class Master_Replace_Cutpend(models.Model):
     slno = models.AutoField(db_column='SlNo', primary_key=True)
-    styleid = models.IntegerField(db_column='StyleID')
+    styleid = models.CharField(max_length=20, db_column='StyleID')
     size = models.CharField(db_column='Size', max_length=20, blank=True, null=True)
     topbottom = models.CharField(db_column='TopBottom', max_length=50, blank=True, null=True)
     parts = models.CharField(db_column='Parts', max_length=50, blank=True, null=True)
