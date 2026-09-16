@@ -818,6 +818,7 @@ class Employee_and_staff_login_APIView(APIView):
             })
 
         return Response(data)
+
 class EmpAllocateAPIView(APIView):
 
     def post(self, request):
@@ -847,6 +848,7 @@ class EmpAllocateAPIView(APIView):
         # -------------------------
         # VALIDATION
         # -------------------------
+
         if not emp_code or not machine_id:
             return Response(
                 {"error": "emp_code and machine_id are required"},
@@ -858,6 +860,7 @@ class EmpAllocateAPIView(APIView):
         # ==================================================
         # STATUS UPDATE (ONLINE / OFFLINE)
         # ==================================================
+
         if "status" in data and sequence is None:
 
             allocation = (
@@ -865,7 +868,9 @@ class EmpAllocateAPIView(APIView):
                 .filter(
                     emp_code=emp_code,
                     machine_id=machine_id,
-                    date__date=today
+                    date__date=today,
+                    unit=unit,
+                    line=line
                 )
                 .order_by("-id")
                 .first()
@@ -894,8 +899,6 @@ class EmpAllocateAPIView(APIView):
                 {"error": "unit and line are required"},
                 status=400
             )
-            
-            
         
         same_allocation = emp_allocate.objects.filter(
             emp_code=emp_code,
@@ -903,20 +906,44 @@ class EmpAllocateAPIView(APIView):
             jobno=jobno,
             top_bottom=top_bottom,
             seq=sequence,
-            date__date=today
+            date__date=today,
+            line=line,
+            unit=unit
         ).exists()
 
+        # if same_allocation:
+            
+        #     return Response(
+        #         {
+        #             "error": "Already allocated today"
+        #         },
+        #         status=400
+        #     )
+
         if same_allocation:
+            status_update = emp_allocate.objects.filter(
+                emp_code=emp_code,
+                machine_id=machine_id,
+                jobno=jobno,
+                top_bottom=top_bottom,
+                seq=sequence,
+                date__date=today,
+                line=line,
+                unit=unit
+            ).update(status=True)
+
             return Response(
                 {
-                    "error": "Already allocated today"
+                    # "error": "Already allocated today",
+                    "message": "Already allocated today && Online process successfully",
                 },
-                status=400
+                # status=400
             )
 
         # -------------------------
         # EMPLOYEE ALREADY ONLINE ?
         # -------------------------
+
         employee_online = emp_allocate.objects.filter(
             emp_code=emp_code,
             date__date=today,
