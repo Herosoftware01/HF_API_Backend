@@ -681,14 +681,15 @@ def assembly_emp(request):
         date__date=filter_date,
         unit=unit_obj.id,
         line=line_obj.id,
-        status=1
+        # status=1
     ).values(
         'emp_code',
         'machine',
         'machine__Identity',
         'seq',
         'jobno',
-        'top_bottom'
+        'top_bottom',
+        'status',
     ))
 
 
