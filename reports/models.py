@@ -982,6 +982,7 @@ class Repcutpending(models.Model):
     weight = models.DecimalField(db_column='Weight', max_digits=10, decimal_places=2, blank=True, null=True)
     average = models.DecimalField(db_column='Average', max_digits=10, decimal_places=2, blank=True, null=True) 
     percentage = models.DecimalField(db_column='Percentage', max_digits=10, decimal_places=2, blank=True, null=True) 
+    totalavg = models.DecimalField(db_column='GrandTotalAvg', max_digits=10, decimal_places=2, blank=True, null=True) 
     datetym = models.DateTimeField(db_column='Datetym', default=datetime.now)
 
     class Meta:

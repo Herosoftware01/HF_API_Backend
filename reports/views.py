@@ -2870,7 +2870,8 @@ def Cutting_Replace_Pending(request):
                     parts=item["parts"],
                     weight=item["weight"],
                     average=item["average"],
-                    percentage=item["percentage"]
+                    percentage=item["percentage"],
+                    totalavg=item["totalavg"]
                 )
 
         return JsonResponse({
@@ -2889,7 +2890,8 @@ def Cutting_Replace_Pending(request):
             ).update(
                 weight=item["weight"],
                 average=item["average"],
-                percentage=item["percentage"]
+                percentage=item["percentage"],
+                totalavg=item["totalavg"]
             )
 
         return JsonResponse({
