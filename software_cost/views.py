@@ -57,12 +57,12 @@ def manage_role_permissions(request, role_param=None):
             # ----------------------------------------------------
             # Get All Roles
             # ----------------------------------------------------
-            roles = role_menu_permissions.objects.all().order_by(
-                '-id'
-            )
+            roles = role_menu_permissions.objects.all().order_by('-id')
+            role_name = request.GET.get('role_name')
+            if role_name:
+                roles = roles.filter(role_name__iexact=role_name.strip())
 
             data = []
-
             for role in roles:
 
                 try:
@@ -88,7 +88,6 @@ def manage_role_permissions(request, role_param=None):
             })
 
         except Exception as e:
-
             return JsonResponse({
                 "status": False,
                 "message": str(e)
@@ -275,7 +274,6 @@ def manage_role_permissions(request, role_param=None):
             })
 
         except json.JSONDecodeError:
-
             return JsonResponse({
                 "status": False,
                 "message": "Invalid JSON request body"
@@ -309,7 +307,6 @@ def manage_role_permissions(request, role_param=None):
                     role_name=role_param
                 )
             except role_menu_permissions.DoesNotExist:
-
                 return JsonResponse({
                     "status": False,
                     "message": f"Role not found: {role_param}"
@@ -351,6 +348,17 @@ def user_master_api(request):
 
     if request.method == 'GET':
         data = user_master.objects.all()
+        user_id = request.GET.get('id')
+        code = request.GET.get('code')
+        user_status = request.GET.get('user_status')
+
+        if user_id:
+            data = data.filter(id=user_id)
+        if code:
+            data = data.filter(code__iexact=code.strip())
+        if user_status:
+            data = data.filter(user_status=user_status.lower() in ('true', '1', 'yes'))
+
         return JsonResponse(list(data.values()),
          safe=False)
 
@@ -429,6 +437,14 @@ def project_master_api(request):
 
     if request.method == 'GET':
         data = project_master.objects.all()
+        project_id = request.GET.get('id')
+        project_name = request.GET.get('project_name')
+
+        if project_id:
+            data = data.filter(id=project_id)
+        if project_name:
+            data = data.filter(project_name__icontains=project_name.strip())
+
         return JsonResponse(list(data.values()),
          safe=False)
 
@@ -500,6 +516,14 @@ def project_master_api(request):
 def category_master_api(request):
     if request.method == 'GET':
         data = category_master.objects.all()
+        category_id = request.GET.get('id')
+        category_name = request.GET.get('category_name')
+
+        if category_id:
+            data = data.filter(id=category_id)
+        if category_name:
+            data = data.filter(category_name__icontains=category_name.strip())
+
         return JsonResponse(list(data.values()), safe=False)
 
     elif request.method == 'POST':
@@ -567,6 +591,17 @@ def category_master_api(request):
 def subcategory_master_api(request):
     if request.method == 'GET':
         data = subcategory_master.objects.all()
+        subcategory_id = request.GET.get('id')
+        category_id = request.GET.get('category_id')
+        subcategory_name = request.GET.get('subcategory_name')
+
+        if subcategory_id:
+            data = data.filter(id=subcategory_id)
+        if category_id:
+            data = data.filter(category_id=category_id)
+        if subcategory_name:
+            data = data.filter(subcategory_name__icontains=subcategory_name.strip())
+
         return JsonResponse(list(data.values()), safe=False)
 
     elif request.method == 'POST':
@@ -698,7 +733,20 @@ def safe_parse_duration(duration_val):
 @csrf_exempt
 def task_master_api(request, id=None):
     if request.method == 'GET':
-        data = task_master.objects.filter(id=id) if id else task_master.objects.all()
+        data = task_master.objects.all()
+        task_id = id or request.GET.get('id')
+        project_id = request.GET.get('project_id')
+        code_id = request.GET.get('code_id')
+        task_status = request.GET.get('task_status')
+
+        if task_id:
+            data = data.filter(id=task_id)
+        if project_id:
+            data = data.filter(project_id=project_id)
+        if code_id:
+            data = data.filter(code_id=code_id)
+        if task_status:
+            data = data.filter(task_status__iexact=task_status.strip())
 
         return JsonResponse(
             list(data.values(
@@ -852,7 +900,10 @@ def trs_workentry(request, id=None):
                 return JsonResponse(model_to_dict(data), safe=False)
             except Workentry.DoesNotExist:
                 return JsonResponse(
-                    {"status": False, "message": "Record not found"},
+                    {
+                        "status": False,
+                        "message": "Record not found"
+                    },
                     status=404
                 )
 
@@ -995,6 +1046,13 @@ def workentry_pause_api(request):
     if request.method == 'GET':
         try:
             pauses = workentry_pause.objects.select_related('workentry').all()
+            pause_id = request.GET.get('id')
+            workentry_id = request.GET.get('workentry_id')
+
+            if pause_id:
+                pauses = pauses.filter(id=pause_id)
+            if workentry_id:
+                pauses = pauses.filter(workentry_id=workentry_id)
 
             data = []
 
