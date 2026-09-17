@@ -818,6 +818,7 @@ class Employee_and_staff_login_APIView(APIView):
             })
 
         return Response(data)
+
 class EmpAllocateAPIView(APIView):
 
     def post(self, request):
@@ -865,7 +866,9 @@ class EmpAllocateAPIView(APIView):
                 .filter(
                     emp_code=emp_code,
                     machine_id=machine_id,
-                    date__date=today
+                    date__date=today,
+                    unit=unit,
+                    line=line
                 )
                 .order_by("-id")
                 .first()
@@ -903,15 +906,29 @@ class EmpAllocateAPIView(APIView):
             jobno=jobno,
             top_bottom=top_bottom,
             seq=sequence,
-            date__date=today
+            date__date=today,
+            line=line,
+            unit=unit
         ).exists()
 
         if same_allocation:
+            status_update = emp_allocate.objects.filter(
+                emp_code=emp_code,
+                machine_id=machine_id,
+                jobno=jobno,
+                top_bottom=top_bottom,
+                seq=sequence,
+                date__date=today,
+                line=line,
+                unit=unit
+            ).update(status=True)
+
             return Response(
                 {
-                    "error": "Already allocated today"
+                    # "error": "Already allocated today",
+                    "message": "Already allocated today && Online process successfully",
                 },
-                status=400
+                # status=400
             )
 
         # -------------------------
@@ -2310,11 +2327,17 @@ def qcroving(request):
 
     qc_queryset = qc_piece_data.objects.all()
 
+    if unit:
+        qc_queryset = qc_queryset.filter(unit=unit)
+
     # Date Filter
     if date:
         qc_queryset = qc_queryset.filter(date__date=date)
     else:
         qc_queryset = qc_queryset.filter(date__date=timezone.now().date())
+
+    def normalized_key(*values):
+        return tuple(str(value or "").strip().casefold() for value in values)
 
     # ----------------------------
     # Summary Query
@@ -2331,7 +2354,10 @@ def qcroving(request):
             "size",
         ).annotate(
             mistake_count=Sum("mistake_count"),
-            max_date=Max("date")
+            max_date=Max("date"),
+            total_pieces=Max("total_pieces"),
+            checked_piece=Max("piece_no"),
+            qc_line=Max("line")
         )
     )
 
@@ -2357,7 +2383,7 @@ def qcroving(request):
     )
 
     for p in piece_queryset:
-        key = (
+        key = normalized_key(
             p["bundle_id"],
             p["machine_id"],
             p["jobno"],
@@ -2397,6 +2423,9 @@ def qcroving(request):
     # ----------------------------
     final_queryset = qc_piece_final.objects.using("default").all()
 
+    if unit:
+        final_queryset = final_queryset.filter(unit=unit)
+
     if date:
         final_queryset = final_queryset.filter(date__date=date)
     else:
@@ -2405,7 +2434,7 @@ def qcroving(request):
     final_map = {}
 
     for f in final_queryset:
-        key = (
+        key = normalized_key(
             f.bundle_id,
             f.machine_id,
             f.jobno,
@@ -2435,7 +2464,7 @@ def qcroving(request):
         # Use the aggregated max_date instead of standard date
         timeline = get_shift(row["max_date"])
 
-        key = (
+        key = normalized_key(
             row["bundle_id"],
             row["machine_id"],
             row["jobno"],
@@ -2446,9 +2475,9 @@ def qcroving(request):
         final_data = final_map.get(
             key,
             {
-                "total_pieces": 0,
-                "checked_piece": 0,
-                "line": None,
+                "total_pieces": row["total_pieces"] or 0,
+                "checked_piece": row["checked_piece"] or 0,
+                "line": row["qc_line"],
             },
         )
 
