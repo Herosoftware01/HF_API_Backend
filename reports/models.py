@@ -975,12 +975,14 @@ class ViewRepcutPend(models.Model):
 class Repcutpending(models.Model):
     slno = models.AutoField(db_column='SlNo', primary_key=True) 
     jobno = models.CharField(db_column='JobNo', max_length=20) 
+    styleid = models.CharField(db_column='StyleID', max_length=20)
     size = models.CharField(db_column='Size', max_length=20) 
     topbottom = models.CharField(db_column='TopBottom', max_length=50, blank=True, null=True) 
     parts = models.CharField(db_column='Parts', max_length=50, blank=True, null=True) 
     weight = models.DecimalField(db_column='Weight', max_digits=10, decimal_places=2, blank=True, null=True)
     average = models.DecimalField(db_column='Average', max_digits=10, decimal_places=2, blank=True, null=True) 
     percentage = models.DecimalField(db_column='Percentage', max_digits=10, decimal_places=2, blank=True, null=True) 
+    totalavg = models.DecimalField(db_column='GrandTotalAvg', max_digits=10, decimal_places=2, blank=True, null=True) 
     datetym = models.DateTimeField(db_column='Datetym', default=datetime.now)
 
     class Meta:
@@ -1005,6 +1007,8 @@ class Master_Replace_Cutpend(models.Model):
     weight = models.DecimalField(db_column='Weight', max_digits=10, decimal_places=2, blank=True, null=True)
     average = models.DecimalField(db_column='Average', max_digits=10, decimal_places=2, blank=True, null=True) 
     percentage = models.DecimalField(db_column='Percentage', max_digits=10, decimal_places=2, blank=True, null=True) 
+    grandtotal = models.DecimalField(db_column='GrandTotal', max_digits=10, decimal_places=2, blank=True, null=True) 
+    totalavg = models.DecimalField(db_column='GrandTotalAvg', max_digits=10, decimal_places=2, blank=True, null=True) 
 
     class Meta:
         managed = False
