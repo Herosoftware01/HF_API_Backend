@@ -2339,11 +2339,7 @@ def qcroving(request):
     def normalized_key(*values):
         return tuple(str(value or "").strip().casefold() for value in values)
 
-    # ----------------------------
-    # Summary Query
-    # ----------------------------
-    # Removed "date" from values to prevent duplicating identical bundles.
-    # Grouping identical bundles and using Max("date") to get a single timestamp.
+    # 1. Summary Query
     qc_list = list(
         qc_queryset.values(
             "machine_id",
@@ -2361,55 +2357,39 @@ def qcroving(request):
         )
     )
 
-    # ----------------------------
-    # Mistake Details
-    # ----------------------------
-    piece_map = {}
+    # --- OPTIMIZATION START ---
+    # Extract only the IDs present in today's active QC data
+    active_machine_ids = set(r["machine_id"] for r in qc_list if r.get("machine_id"))
+    active_bundle_ids = set(r["bundle_id"] for r in qc_list if r.get("bundle_id"))
+    # --- OPTIMIZATION END ---
 
+    # 2. Mistake Details
+    piece_map = {}
     piece_queryset = (
         qc_queryset
         .exclude(category="no_mistake")
         .exclude(mistake_count=0)
-        .values(
-            "machine_id",
-            "bundle_id",
-            "jobno",
-            "seq",
-            "size",
-            "piece_no",
-            "mistake_name",
-        )
+        .values("machine_id", "bundle_id", "jobno", "seq", "size", "piece_no", "mistake_name")
         .order_by("piece_no")
     )
 
     for p in piece_queryset:
-        key = normalized_key(
-            p["bundle_id"],
-            p["machine_id"],
-            p["jobno"],
-            p["seq"],
-            p["size"],
-        )
-
+        key = normalized_key(p["bundle_id"], p["machine_id"], p["jobno"], p["seq"], p["size"])
         piece_map.setdefault(key, []).append({
             "piece_no": p["piece_no"],
             "mistake_name": p["mistake_name"],
         })
 
-    # ----------------------------
-    # Machine Map
-    # ----------------------------
+    # 3. Machine Map - OPTIMIZED (Only fetch relevant machines)
     machines = {
-        m.Identity: m
-        for m in machine_details.objects.all()
+        m.Identity: m 
+        for m in machine_details.objects.filter(Identity__in=active_machine_ids)
     }
 
-    # ----------------------------
-    # Employee Map
-    # ----------------------------
+    # 4. Employee Map - OPTIMIZED (Only fetch relevant employees)
     emp_map = {}
-    emp_queryset = emp_allocate.objects.select_related("machine")
-
+    emp_queryset = emp_allocate.objects.select_related("machine").filter(machine__Identity__in=active_machine_ids)
+    
     if unit:
         emp_queryset = emp_queryset.filter(unit=unit)
 
@@ -2418,10 +2398,8 @@ def qcroving(request):
             if e.machine.Identity not in emp_map:
                 emp_map[e.machine.Identity] = e
 
-    # ----------------------------
-    # Final QC Data
-    # ----------------------------
-    final_queryset = qc_piece_final.objects.using("default").all()
+    # 5. Final QC Data - OPTIMIZED (Only fetch relevant bundles)
+    final_queryset = qc_piece_final.objects.using("default").filter(bundle_id__in=active_bundle_ids)
 
     if unit:
         final_queryset = final_queryset.filter(unit=unit)
@@ -2432,45 +2410,25 @@ def qcroving(request):
         final_queryset = final_queryset.filter(date__date=timezone.now().date())
 
     final_map = {}
-
     for f in final_queryset:
-        key = normalized_key(
-            f.bundle_id,
-            f.machine_id,
-            f.jobno,
-            f.seq,
-            f.size,
-        )
-
+        key = normalized_key(f.bundle_id, f.machine_id, f.jobno, f.seq, f.size)
         final_map[key] = {
             "total_pieces": f.total_pieces,
             "checked_piece": f.checked_piece,
             "line": f.line, 
         }
 
-    # ----------------------------
-    # Result
-    # ----------------------------
+    # 6. Result Assembly
     result = []
-
     for row in qc_list:
-
         machine = machines.get(row["machine_id"])
         emp = emp_map.get(row["machine_id"])
 
         if unit and emp is None:
             continue
 
-        # Use the aggregated max_date instead of standard date
         timeline = get_shift(row["max_date"])
-
-        key = normalized_key(
-            row["bundle_id"],
-            row["machine_id"],
-            row["jobno"],
-            row["seq"],
-            row["size"],
-        )
+        key = normalized_key(row["bundle_id"], row["machine_id"], row["jobno"], row["seq"], row["size"])
 
         final_data = final_map.get(
             key,
@@ -2482,10 +2440,11 @@ def qcroving(request):
         )
 
         mistakes = piece_map.get(key, [])
+        m_count = row["mistake_count"] or 0
 
-        if row["mistake_count"] == 0:
+        if m_count == 0:
             status = "Perfect"
-        elif row["mistake_count"] <= 2:
+        elif m_count <= 2:
             status = "Good"
         else:
             status = "Priority"
@@ -2493,27 +2452,20 @@ def qcroving(request):
         result.append({
             "machine_pk": machine.id if machine else None,
             "identity": machine.Identity if machine else None,
-
             "emp_code": emp.emp_code if emp else None,
             "unit": emp.unit if emp else None,
             "line": final_data["line"], 
-
             "date": row["max_date"].strftime("%d/%m/%Y %H:%M:%S") if row["max_date"] else None,
             "timeline": timeline,
-
             "jobno": row["jobno"],
             "product": row["product"],
             "size": row["size"],
             "seq": row["seq"],
             "bundle_id": row["bundle_id"],
-
             "total_pieces": final_data["total_pieces"],
             "checked_piece": final_data["checked_piece"],
-
-            "mistake_count": row["mistake_count"],
+            "mistake_count": m_count,
             "status": status,
-
-            # List of pieces having mistakes
             "mistakes": mistakes,
         })
 

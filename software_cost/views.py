@@ -1,3 +1,5 @@
+import os
+
 from django.forms.models import model_to_dict
 from django.http import JsonResponse
 import json
@@ -897,7 +899,20 @@ def trs_workentry(request, id=None):
         if id:
             try:
                 data = Workentry.objects.get(id=id)
-                return JsonResponse(model_to_dict(data), safe=False)
+
+                response_data = model_to_dict(data)
+
+                # Photo URL
+                if data.image:
+                    filename = os.path.basename(data.image.name)
+                    response_data['image'] = (
+                        f"http://10.1.21.99:8200/workentry_images/{filename}"
+                    )
+                else:
+                    response_data['image'] = None
+
+                return JsonResponse(response_data, safe=False)
+
             except Workentry.DoesNotExist:
                 return JsonResponse(
                     {
@@ -924,40 +939,112 @@ def trs_workentry(request, id=None):
             if entry_date:
                 data = data.filter(entrydate=entry_date)
 
-            return JsonResponse(
-                list(data.values()),
-                safe=False
-            )
+            response_data = []
+
+            for rec in data:
+                record = model_to_dict(rec)
+
+                # Photo URL
+                if rec.image:
+                    filename = os.path.basename(rec.image.name)
+                    record['image'] = (
+                        f"http://10.1.21.99:8200/workentry_images/{filename}"
+                    )
+                else:
+                    record['image'] = None
+
+                response_data.append(record)
+
+        return JsonResponse(
+            response_data,
+            safe=False
+        )
 
     # INSERT
+    # INSERT OR UPDATE (Handles both JSON and FormData for Image Uploads)
     elif request.method == 'POST':
         try:
-            body = json.loads(request.body)
+            is_multipart = request.content_type.startswith('multipart/form-data')
+            body = request.POST if is_multipart else json.loads(request.body)
+            image_file = request.FILES.get('image') if is_multipart else None
 
-            obj = Workentry.objects.create(
-                username=body.get("username"),
-                entrydate=body.get("entrydate"),
-                project=body.get("project"),
-                category=body.get("category"),
-                subcat=body.get("subcat"),
-                status=body.get("status", False),  # default to False if not provided
-                startdatetime=body.get("startdatetime"),
-                task_id_id=body.get("task_id"),  # fixed
-                description=body.get("description"),
-                enddatetime=body.get("enddatetime"),
-                endstatus=body.get("endstatus"),
-                duration=body.get("duration"),
-                durationminutes=body.get("durationminutes"),
-                createddate=timezone.now(),
-                modifieddate=timezone.now(),
-            )
+            # Helpers to handle FormData string conversions
+            def parse_bool(val, default=False):
+                if isinstance(val, str):
+                    return val.lower() == 'true'
+                return val if val is not None else default
 
+            def parse_null(val):
+                return val if val not in ["", "null", "None"] else None
+
+            if id:
+                # UPDATE LOGIC
+                obj = Workentry.objects.get(id=id)
+                obj.username = body.get('username', obj.username)
+                obj.entrydate = body.get('entrydate', obj.entrydate)
+                obj.project = body.get('project', obj.project)
+                obj.category = body.get('category', obj.category)
+                obj.subcat = body.get('subcat', obj.subcat)
+                obj.startdatetime = body.get('startdatetime', obj.startdatetime)
+                
+                new_task = parse_null(body.get("task_id"))
+                if new_task:
+                    obj.task_id_id = new_task
+                    
+                obj.description = body.get('description', obj.description)
+                obj.enddatetime = body.get('enddatetime', obj.enddatetime)
+                obj.endstatus = body.get('endstatus', obj.endstatus)
+                obj.duration = body.get('duration', obj.duration)
+                
+                new_dur = parse_null(body.get('durationminutes'))
+                if new_dur:
+                    obj.durationminutes = new_dur
+                    
+                obj.status = parse_bool(body.get('status', obj.status))
+                obj.modifieddate = timezone.now()
+
+                if image_file:
+                    obj.image = image_file
+
+                obj.save()
+
+                return JsonResponse({
+                    "status": True,
+                    "message": "Record updated successfully"
+                })
+
+            else:
+                # INSERT LOGIC
+                obj = Workentry.objects.create(
+                    username=body.get("username"),
+                    entrydate=body.get("entrydate"),
+                    project=body.get("project"),
+                    category=body.get("category"),
+                    subcat=body.get("subcat"),
+                    status=parse_bool(body.get("status", False)),
+                    startdatetime=body.get("startdatetime"),
+                    task_id_id=parse_null(body.get("task_id")),
+                    description=body.get("description"),
+                    enddatetime=body.get("enddatetime"),
+                    endstatus=body.get("endstatus"),
+                    duration=body.get("duration"),
+                    durationminutes=parse_null(body.get("durationminutes")),
+                    createddate=timezone.now(),
+                    modifieddate=timezone.now(),
+                    image=image_file
+                )
+
+                return JsonResponse({
+                    "status": True,
+                    "message": "Record created successfully",
+                    "id": obj.id
+                })
+
+        except Workentry.DoesNotExist:
             return JsonResponse({
-                "status": True,
-                "message": "Record created successfully",
-                "id": obj.id
-            })
-
+                "status": False,
+                "message": "Record not found"
+            }, status=404)
         except Exception as e:
             return JsonResponse({
                 "status": False,

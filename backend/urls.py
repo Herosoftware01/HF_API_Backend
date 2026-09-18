@@ -48,4 +48,5 @@ if settings.DEBUG:
     urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
     urlpatterns += static(settings.STAFF_IMAGES_URL, document_root=settings.STAFF_IMAGES_ROOT)
     urlpatterns += static(settings.ORDER_IMAGES_URL, document_root=settings.ORDER_IMAGES_ROOT)
+    urlpatterns += static(settings.WORKENTRY_IMAGES_URL, document_root=settings.WORKENTRY_IMAGES_ROOT)
 
