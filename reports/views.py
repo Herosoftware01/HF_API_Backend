@@ -2855,6 +2855,7 @@ def Cutting_Replace_Pending(request):
 
             exists = Repcutpending.objects.using('demo').filter(
                 jobno=item["jobno"],
+                styleid=item["styleid"],
                 size=item["size"],
                 topbottom=item["topbottom"],
                 parts=item["parts"]
@@ -2863,12 +2864,14 @@ def Cutting_Replace_Pending(request):
             if not exists:
                 Repcutpending.objects.using('demo').create(
                     jobno=item["jobno"],
+                    styleid=item["styleid"],
                     size=item["size"],
                     topbottom=item["topbottom"],
                     parts=item["parts"],
                     weight=item["weight"],
                     average=item["average"],
-                    percentage=item["percentage"]
+                    percentage=item["percentage"],
+                    totalavg=item["totalavg"]
                 )
 
         return JsonResponse({
@@ -2887,7 +2890,8 @@ def Cutting_Replace_Pending(request):
             ).update(
                 weight=item["weight"],
                 average=item["average"],
-                percentage=item["percentage"]
+                percentage=item["percentage"],
+                totalavg=item["totalavg"]
             )
 
         return JsonResponse({
@@ -2941,7 +2945,9 @@ def Master_Repcut_Details(request):
                     parts=item["parts"],
                     weight=item["weight"],
                     average=item["average"],
-                    percentage=item["percentage"]
+                    percentage=item["percentage"],
+                    grandtotal=item["grandtotal"],
+                    totalavg=item["totalavg"]
                 )
 
         return JsonResponse({
@@ -2958,10 +2964,28 @@ def Master_Repcut_Details(request):
                 slno=item["slno"]
             ).update(
                 weight=item["weight"],
+                parts=item["parts"],
+                size=item["size"],
+                topbottom=item["topbottom"],
                 average=item["average"],
-                percentage=item["percentage"]
+                percentage=item["percentage"],
+                grandtotal=item["grandtotal"],
+                totalavg=item["totalavg"]
             )
 
         return JsonResponse({
             "message": "Record updated"
+        })
+
+    elif request.method == "DELETE":
+
+        data = json.loads(request.body)
+
+        for item in data:
+            Master_Replace_Cutpend.objects.using('demo').filter(
+                slno=item["slno"]
+            ).delete()
+
+        return JsonResponse({
+            "message": "Records deleted successfully"
         })

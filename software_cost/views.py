@@ -1,3 +1,5 @@
+import os
+
 from django.forms.models import model_to_dict
 from django.http import JsonResponse
 import json
@@ -57,12 +59,12 @@ def manage_role_permissions(request, role_param=None):
             # ----------------------------------------------------
             # Get All Roles
             # ----------------------------------------------------
-            roles = role_menu_permissions.objects.all().order_by(
-                '-id'
-            )
+            roles = role_menu_permissions.objects.all().order_by('-id')
+            role_name = request.GET.get('role_name')
+            if role_name:
+                roles = roles.filter(role_name__iexact=role_name.strip())
 
             data = []
-
             for role in roles:
 
                 try:
@@ -88,7 +90,6 @@ def manage_role_permissions(request, role_param=None):
             })
 
         except Exception as e:
-
             return JsonResponse({
                 "status": False,
                 "message": str(e)
@@ -275,7 +276,6 @@ def manage_role_permissions(request, role_param=None):
             })
 
         except json.JSONDecodeError:
-
             return JsonResponse({
                 "status": False,
                 "message": "Invalid JSON request body"
@@ -309,7 +309,6 @@ def manage_role_permissions(request, role_param=None):
                     role_name=role_param
                 )
             except role_menu_permissions.DoesNotExist:
-
                 return JsonResponse({
                     "status": False,
                     "message": f"Role not found: {role_param}"
@@ -351,6 +350,17 @@ def user_master_api(request):
 
     if request.method == 'GET':
         data = user_master.objects.all()
+        user_id = request.GET.get('id')
+        code = request.GET.get('code')
+        user_status = request.GET.get('user_status')
+
+        if user_id:
+            data = data.filter(id=user_id)
+        if code:
+            data = data.filter(code__iexact=code.strip())
+        if user_status:
+            data = data.filter(user_status=user_status.lower() in ('true', '1', 'yes'))
+
         return JsonResponse(list(data.values()),
          safe=False)
 
@@ -429,6 +439,14 @@ def project_master_api(request):
 
     if request.method == 'GET':
         data = project_master.objects.all()
+        project_id = request.GET.get('id')
+        project_name = request.GET.get('project_name')
+
+        if project_id:
+            data = data.filter(id=project_id)
+        if project_name:
+            data = data.filter(project_name__icontains=project_name.strip())
+
         return JsonResponse(list(data.values()),
          safe=False)
 
@@ -500,6 +518,14 @@ def project_master_api(request):
 def category_master_api(request):
     if request.method == 'GET':
         data = category_master.objects.all()
+        category_id = request.GET.get('id')
+        category_name = request.GET.get('category_name')
+
+        if category_id:
+            data = data.filter(id=category_id)
+        if category_name:
+            data = data.filter(category_name__icontains=category_name.strip())
+
         return JsonResponse(list(data.values()), safe=False)
 
     elif request.method == 'POST':
@@ -567,6 +593,17 @@ def category_master_api(request):
 def subcategory_master_api(request):
     if request.method == 'GET':
         data = subcategory_master.objects.all()
+        subcategory_id = request.GET.get('id')
+        category_id = request.GET.get('category_id')
+        subcategory_name = request.GET.get('subcategory_name')
+
+        if subcategory_id:
+            data = data.filter(id=subcategory_id)
+        if category_id:
+            data = data.filter(category_id=category_id)
+        if subcategory_name:
+            data = data.filter(subcategory_name__icontains=subcategory_name.strip())
+
         return JsonResponse(list(data.values()), safe=False)
 
     elif request.method == 'POST':
@@ -646,36 +683,78 @@ def subcategory_master_api(request):
 
 
 def safe_parse_duration(duration_val):
-    if not duration_val:
+    if duration_val is None or duration_val == "":
         return None
-        
+
     val_str = str(duration_val).strip()
-    
+
     try:
-        # 1. Handle ISO-8601 format sent by React (e.g., "P3D")
-        if val_str.startswith('P') and 'D' in val_str:
-            # Extracts just the number between P and D
-            match = re.search(r'P(\d+)D', val_str)
+        # --------------------------------------------------
+        # 1. ISO-8601 duration
+        # PT2H       -> 2 hours
+        # PT2H30M    -> 2 hours 30 minutes
+        # PT45M      -> 45 minutes
+        # P3D        -> 3 days = 72 hours
+        # --------------------------------------------------
+        if val_str.startswith("P"):
+            match = re.fullmatch(
+                r"P(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?",
+                val_str
+            )
             if match:
-                return timedelta(days=int(match.group(1)))
-                
-        # 2. Handle raw ints (2), string ints ("2"), and standard Django formats ("2 00:00:00")
-        days = int(val_str.split()[0])
-        return timedelta(days=days)
-        
+                days = int(match.group(1) or 0)
+                hours = int(match.group(2) or 0)
+                minutes = int(match.group(3) or 0)
+                seconds = int(match.group(4) or 0)
+                return timedelta(days=days, hours=hours, minutes=minutes, seconds=seconds)
+
+        # --------------------------------------------------
+        # 2. HH:MM
+        # --------------------------------------------------
+        if re.fullmatch(r"\d+:\d{2}", val_str):
+            hours, minutes = map(int, val_str.split(":"))
+            return timedelta(hours=hours, minutes=minutes)
+
+        # --------------------------------------------------
+        # 3. HH:MM:SS
+        # --------------------------------------------------
+        if re.fullmatch(r"\d+:\d{2}:\d{2}", val_str):
+            hours, minutes, seconds = map(int, val_str.split(":"))
+            return timedelta(hours=hours, minutes=minutes, seconds=seconds)
+
+        # --------------------------------------------------
+        # 4. Decimal hours
+        # --------------------------------------------------
+        hours = float(val_str)
+        return timedelta(hours=hours)
+
     except (ValueError, TypeError, IndexError):
         return None
+
 
 @csrf_exempt
 def task_master_api(request, id=None):
     if request.method == 'GET':
-        data = task_master.objects.all(id=id) if id else task_master.objects.all()
+        data = task_master.objects.all()
+        task_id = id or request.GET.get('id')
+        project_id = request.GET.get('project_id')
+        code_id = request.GET.get('code_id')
+        task_status = request.GET.get('task_status')
+
+        if task_id:
+            data = data.filter(id=task_id)
+        if project_id:
+            data = data.filter(project_id=project_id)
+        if code_id:
+            data = data.filter(code_id=code_id)
+        if task_status:
+            data = data.filter(task_status__iexact=task_status.strip())
 
         return JsonResponse(
             list(data.values(
                 'id',
                 'project_id',
-                'code_id',       # Matches frontend
+                'code_id',
                 'task_name',
                 'task_description',
                 'assing_date',
@@ -694,29 +773,29 @@ def task_master_api(request, id=None):
         try:
             body = json.loads(request.body)
 
-            # FIX: Look for 'code_id' exactly as React sends it
             proj_id = body.get('project_id')
-            user_id = body.get('code_id') 
+            user_id = body.get('code_id')
 
-            # Convert empty values to None
             if proj_id == "":
                 proj_id = None
             if user_id == "":
                 user_id = None
 
-            # Create task
+            parsed_duration = safe_parse_duration(body.get('task_duration'))
+
             obj = task_master.objects.create(
                 project_id=proj_id,
-                code_id=user_id,   
+                code_id=user_id,
                 task_name=body.get('task_name'),
                 assing_date=body.get('assing_date'),
                 task_priority=body.get('task_priority', 'Medium'),
-                task_status1 = body.get('task_status1', False),
-                # Convert the raw duration into a timedelta object
-                task_duration=safe_parse_duration(body.get('task_duration')),
+                task_status1=body.get('task_status1', False),
+                task_duration=parsed_duration,
                 task_description=body.get('task_description', ''),
                 task_status=body.get('task_status', 'Pending')
             )
+
+            print(f"DEBUG create: parsed_duration={parsed_duration!r}, saved={obj.task_duration!r}")
 
             return JsonResponse({
                 "status": True,
@@ -727,32 +806,26 @@ def task_master_api(request, id=None):
             })
 
         except Exception as e:
-            return JsonResponse({
-                "status": False,
-                "message": str(e)
-            }, status=400)
+            return JsonResponse({"status": False, "message": str(e)}, status=400)
 
     elif request.method in ['PUT', 'PATCH']:
         try:
             body = json.loads(request.body)
-            
-            # Prioritize the 'id' from the URL, fallback to the body payload
+
             task_id = id if id else body.get('id')
-            
             if not task_id:
                 return JsonResponse({"status": False, "message": "Task ID is required for update"}, status=400)
 
             obj = task_master.objects.get(id=task_id)
 
-            # For PUT/PATCH, safely update only the fields provided in the payload
             if 'project_id' in body:
                 proj_id = body.get('project_id')
                 obj.project_id = None if proj_id == "" else proj_id
-                
+
             if 'code_id' in body:
                 user_id = body.get('code_id')
                 obj.code_id = None if user_id == "" else user_id
-                
+
             if 'task_name' in body:
                 obj.task_name = body.get('task_name')
 
@@ -760,31 +833,32 @@ def task_master_api(request, id=None):
                 obj.task_priority = body.get('task_priority')
 
             if 'task_duration' in body:
-                obj.task_duration = safe_parse_duration(body.get('task_duration'))
-                
+                parsed_duration = safe_parse_duration(body.get('task_duration'))
+                obj.task_duration = parsed_duration
+                print(f"DEBUG update: raw={body.get('task_duration')!r}, parsed={parsed_duration!r}")
+
             if 'task_start_date' in body:
                 obj.task_start_date = body.get('task_start_date')
-                
+
             if 'task_end_date' in body:
                 obj.task_end_date = body.get('task_end_date')
-                
+
             if 'task_description' in body:
                 obj.task_description = body.get('task_description')
 
-            # 🛠️ ADD THIS MISSING BLOCK TO UPDATE TASK STATUS:
             if 'task_status' in body:
                 obj.task_status = body.get('task_status')
-                
-            # ADD THIS:
+
             if 'task_status1' in body:
                 val = body.get('task_status1')
-                # normalize in case it arrives as a string ("true"/"false") instead of a real bool
                 if isinstance(val, str):
                     obj.task_status1 = val.strip().lower() in ('true', '1', 'yes')
                 else:
                     obj.task_status1 = bool(val)
 
             obj.save()
+            obj.refresh_from_db()
+            print(f"DEBUG after save/refresh: task_duration={obj.task_duration!r}")
 
             return JsonResponse({
                 "status": True,
@@ -800,27 +874,21 @@ def task_master_api(request, id=None):
         try:
             body = json.loads(request.body)
             task_id = body.get('id')
-            
+
             if not task_id:
                 return JsonResponse({"status": False, "message": "Task ID is required for deletion"}, status=400)
 
             obj = task_master.objects.get(id=task_id)
             obj.delete()
 
-            return JsonResponse({
-                "status": True, 
-                "message": "Task deleted successfully"
-            })
-            
+            return JsonResponse({"status": True, "message": "Task deleted successfully"})
+
         except task_master.DoesNotExist:
             return JsonResponse({"status": False, "message": "Task not found"}, status=404)
         except Exception as e:
             return JsonResponse({"status": False, "message": str(e)}, status=400)
 
-    return JsonResponse({
-        "status": False,
-        "message": "Method not allowed"
-    }, status=405)
+    return JsonResponse({"status": False, "message": "Method not allowed"}, status=405)
 
 
 @csrf_exempt
@@ -831,10 +899,26 @@ def trs_workentry(request, id=None):
         if id:
             try:
                 data = Workentry.objects.get(id=id)
-                return JsonResponse(model_to_dict(data), safe=False)
+
+                response_data = model_to_dict(data)
+
+                # Photo URL
+                if data.image:
+                    filename = os.path.basename(data.image.name)
+                    response_data['image'] = (
+                        f"http://10.1.21.99:8200/workentry_images/{filename}"
+                    )
+                else:
+                    response_data['image'] = None
+
+                return JsonResponse(response_data, safe=False)
+
             except Workentry.DoesNotExist:
                 return JsonResponse(
-                    {"status": False, "message": "Record not found"},
+                    {
+                        "status": False,
+                        "message": "Record not found"
+                    },
                     status=404
                 )
 
@@ -855,40 +939,112 @@ def trs_workentry(request, id=None):
             if entry_date:
                 data = data.filter(entrydate=entry_date)
 
-            return JsonResponse(
-                list(data.values()),
-                safe=False
-            )
+            response_data = []
+
+            for rec in data:
+                record = model_to_dict(rec)
+
+                # Photo URL
+                if rec.image:
+                    filename = os.path.basename(rec.image.name)
+                    record['image'] = (
+                        f"http://10.1.21.99:8200/workentry_images/{filename}"
+                    )
+                else:
+                    record['image'] = None
+
+                response_data.append(record)
+
+        return JsonResponse(
+            response_data,
+            safe=False
+        )
 
     # INSERT
+    # INSERT OR UPDATE (Handles both JSON and FormData for Image Uploads)
     elif request.method == 'POST':
         try:
-            body = json.loads(request.body)
+            is_multipart = request.content_type.startswith('multipart/form-data')
+            body = request.POST if is_multipart else json.loads(request.body)
+            image_file = request.FILES.get('image') if is_multipart else None
 
-            obj = Workentry.objects.create(
-                username=body.get("username"),
-                entrydate=body.get("entrydate"),
-                project=body.get("project"),
-                category=body.get("category"),
-                subcat=body.get("subcat"),
-                status=body.get("status", False),  # default to False if not provided
-                startdatetime=body.get("startdatetime"),
-                task_id_id=body.get("task_id"),  # fixed
-                description=body.get("description"),
-                enddatetime=body.get("enddatetime"),
-                endstatus=body.get("endstatus"),
-                duration=body.get("duration"),
-                durationminutes=body.get("durationminutes"),
-                createddate=timezone.now(),
-                modifieddate=timezone.now(),
-            )
+            # Helpers to handle FormData string conversions
+            def parse_bool(val, default=False):
+                if isinstance(val, str):
+                    return val.lower() == 'true'
+                return val if val is not None else default
 
+            def parse_null(val):
+                return val if val not in ["", "null", "None"] else None
+
+            if id:
+                # UPDATE LOGIC
+                obj = Workentry.objects.get(id=id)
+                obj.username = body.get('username', obj.username)
+                obj.entrydate = body.get('entrydate', obj.entrydate)
+                obj.project = body.get('project', obj.project)
+                obj.category = body.get('category', obj.category)
+                obj.subcat = body.get('subcat', obj.subcat)
+                obj.startdatetime = body.get('startdatetime', obj.startdatetime)
+                
+                new_task = parse_null(body.get("task_id"))
+                if new_task:
+                    obj.task_id_id = new_task
+                    
+                obj.description = body.get('description', obj.description)
+                obj.enddatetime = body.get('enddatetime', obj.enddatetime)
+                obj.endstatus = body.get('endstatus', obj.endstatus)
+                obj.duration = body.get('duration', obj.duration)
+                
+                new_dur = parse_null(body.get('durationminutes'))
+                if new_dur:
+                    obj.durationminutes = new_dur
+                    
+                obj.status = parse_bool(body.get('status', obj.status))
+                obj.modifieddate = timezone.now()
+
+                if image_file:
+                    obj.image = image_file
+
+                obj.save()
+
+                return JsonResponse({
+                    "status": True,
+                    "message": "Record updated successfully"
+                })
+
+            else:
+                # INSERT LOGIC
+                obj = Workentry.objects.create(
+                    username=body.get("username"),
+                    entrydate=body.get("entrydate"),
+                    project=body.get("project"),
+                    category=body.get("category"),
+                    subcat=body.get("subcat"),
+                    status=parse_bool(body.get("status", False)),
+                    startdatetime=body.get("startdatetime"),
+                    task_id_id=parse_null(body.get("task_id")),
+                    description=body.get("description"),
+                    enddatetime=body.get("enddatetime"),
+                    endstatus=body.get("endstatus"),
+                    duration=body.get("duration"),
+                    durationminutes=parse_null(body.get("durationminutes")),
+                    createddate=timezone.now(),
+                    modifieddate=timezone.now(),
+                    image=image_file
+                )
+
+                return JsonResponse({
+                    "status": True,
+                    "message": "Record created successfully",
+                    "id": obj.id
+                })
+
+        except Workentry.DoesNotExist:
             return JsonResponse({
-                "status": True,
-                "message": "Record created successfully",
-                "id": obj.id
-            })
-
+                "status": False,
+                "message": "Record not found"
+            }, status=404)
         except Exception as e:
             return JsonResponse({
                 "status": False,
@@ -977,6 +1133,13 @@ def workentry_pause_api(request):
     if request.method == 'GET':
         try:
             pauses = workentry_pause.objects.select_related('workentry').all()
+            pause_id = request.GET.get('id')
+            workentry_id = request.GET.get('workentry_id')
+
+            if pause_id:
+                pauses = pauses.filter(id=pause_id)
+            if workentry_id:
+                pauses = pauses.filter(workentry_id=workentry_id)
 
             data = []
 
