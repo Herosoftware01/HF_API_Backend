@@ -503,13 +503,13 @@ class GetUnitDataAPIView(APIView):
         if selected_date:
             date_obj = datetime.strptime(selected_date, '%Y-%m-%d')
             # data = unit_input.objects.filter(unit=unit, line=line, entry_date__date=date_obj).order_by('-entry_date')
-            data = unit_input.objects.filter(unit=unit, job_no=job_no, entry_date__date=date_obj).order_by('-entry_date')
+            data = unit_input.objects.filter(unit=unit, job_no=job_no).order_by('-entry_date')
         else:
             # four_days_ago = datetime.now() - timedelta(days=1)
             today = date.today()
             print("Today's date:", today)
             # data = unit_input.objects.filter(unit=unit, line=line, entry_date__gte=today).order_by('-entry_date')
-            data = unit_input.objects.filter(unit=unit, job_no=job_no, entry_date__gte=today).order_by('-entry_date')
+            data = unit_input.objects.filter(unit=unit, job_no=job_no).order_by('-entry_date')
 
         if job_no is not None:
             job_no = job_no.strip()

@@ -646,36 +646,65 @@ def subcategory_master_api(request):
 
 
 def safe_parse_duration(duration_val):
-    if not duration_val:
+    if duration_val is None or duration_val == "":
         return None
-        
+
     val_str = str(duration_val).strip()
-    
+
     try:
-        # 1. Handle ISO-8601 format sent by React (e.g., "P3D")
-        if val_str.startswith('P') and 'D' in val_str:
-            # Extracts just the number between P and D
-            match = re.search(r'P(\d+)D', val_str)
+        # --------------------------------------------------
+        # 1. ISO-8601 duration
+        # PT2H       -> 2 hours
+        # PT2H30M    -> 2 hours 30 minutes
+        # PT45M      -> 45 minutes
+        # P3D        -> 3 days = 72 hours
+        # --------------------------------------------------
+        if val_str.startswith("P"):
+            match = re.fullmatch(
+                r"P(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?",
+                val_str
+            )
             if match:
-                return timedelta(days=int(match.group(1)))
-                
-        # 2. Handle raw ints (2), string ints ("2"), and standard Django formats ("2 00:00:00")
-        days = int(val_str.split()[0])
-        return timedelta(days=days)
-        
+                days = int(match.group(1) or 0)
+                hours = int(match.group(2) or 0)
+                minutes = int(match.group(3) or 0)
+                seconds = int(match.group(4) or 0)
+                return timedelta(days=days, hours=hours, minutes=minutes, seconds=seconds)
+
+        # --------------------------------------------------
+        # 2. HH:MM
+        # --------------------------------------------------
+        if re.fullmatch(r"\d+:\d{2}", val_str):
+            hours, minutes = map(int, val_str.split(":"))
+            return timedelta(hours=hours, minutes=minutes)
+
+        # --------------------------------------------------
+        # 3. HH:MM:SS
+        # --------------------------------------------------
+        if re.fullmatch(r"\d+:\d{2}:\d{2}", val_str):
+            hours, minutes, seconds = map(int, val_str.split(":"))
+            return timedelta(hours=hours, minutes=minutes, seconds=seconds)
+
+        # --------------------------------------------------
+        # 4. Decimal hours
+        # --------------------------------------------------
+        hours = float(val_str)
+        return timedelta(hours=hours)
+
     except (ValueError, TypeError, IndexError):
         return None
+
 
 @csrf_exempt
 def task_master_api(request, id=None):
     if request.method == 'GET':
-        data = task_master.objects.all(id=id) if id else task_master.objects.all()
+        data = task_master.objects.filter(id=id) if id else task_master.objects.all()
 
         return JsonResponse(
             list(data.values(
                 'id',
                 'project_id',
-                'code_id',       # Matches frontend
+                'code_id',
                 'task_name',
                 'task_description',
                 'assing_date',
@@ -694,29 +723,29 @@ def task_master_api(request, id=None):
         try:
             body = json.loads(request.body)
 
-            # FIX: Look for 'code_id' exactly as React sends it
             proj_id = body.get('project_id')
-            user_id = body.get('code_id') 
+            user_id = body.get('code_id')
 
-            # Convert empty values to None
             if proj_id == "":
                 proj_id = None
             if user_id == "":
                 user_id = None
 
-            # Create task
+            parsed_duration = safe_parse_duration(body.get('task_duration'))
+
             obj = task_master.objects.create(
                 project_id=proj_id,
-                code_id=user_id,   
+                code_id=user_id,
                 task_name=body.get('task_name'),
                 assing_date=body.get('assing_date'),
                 task_priority=body.get('task_priority', 'Medium'),
-                task_status1 = body.get('task_status1', False),
-                # Convert the raw duration into a timedelta object
-                task_duration=safe_parse_duration(body.get('task_duration')),
+                task_status1=body.get('task_status1', False),
+                task_duration=parsed_duration,
                 task_description=body.get('task_description', ''),
                 task_status=body.get('task_status', 'Pending')
             )
+
+            print(f"DEBUG create: parsed_duration={parsed_duration!r}, saved={obj.task_duration!r}")
 
             return JsonResponse({
                 "status": True,
@@ -727,32 +756,26 @@ def task_master_api(request, id=None):
             })
 
         except Exception as e:
-            return JsonResponse({
-                "status": False,
-                "message": str(e)
-            }, status=400)
+            return JsonResponse({"status": False, "message": str(e)}, status=400)
 
     elif request.method in ['PUT', 'PATCH']:
         try:
             body = json.loads(request.body)
-            
-            # Prioritize the 'id' from the URL, fallback to the body payload
+
             task_id = id if id else body.get('id')
-            
             if not task_id:
                 return JsonResponse({"status": False, "message": "Task ID is required for update"}, status=400)
 
             obj = task_master.objects.get(id=task_id)
 
-            # For PUT/PATCH, safely update only the fields provided in the payload
             if 'project_id' in body:
                 proj_id = body.get('project_id')
                 obj.project_id = None if proj_id == "" else proj_id
-                
+
             if 'code_id' in body:
                 user_id = body.get('code_id')
                 obj.code_id = None if user_id == "" else user_id
-                
+
             if 'task_name' in body:
                 obj.task_name = body.get('task_name')
 
@@ -760,31 +783,32 @@ def task_master_api(request, id=None):
                 obj.task_priority = body.get('task_priority')
 
             if 'task_duration' in body:
-                obj.task_duration = safe_parse_duration(body.get('task_duration'))
-                
+                parsed_duration = safe_parse_duration(body.get('task_duration'))
+                obj.task_duration = parsed_duration
+                print(f"DEBUG update: raw={body.get('task_duration')!r}, parsed={parsed_duration!r}")
+
             if 'task_start_date' in body:
                 obj.task_start_date = body.get('task_start_date')
-                
+
             if 'task_end_date' in body:
                 obj.task_end_date = body.get('task_end_date')
-                
+
             if 'task_description' in body:
                 obj.task_description = body.get('task_description')
 
-            # 🛠️ ADD THIS MISSING BLOCK TO UPDATE TASK STATUS:
             if 'task_status' in body:
                 obj.task_status = body.get('task_status')
-                
-            # ADD THIS:
+
             if 'task_status1' in body:
                 val = body.get('task_status1')
-                # normalize in case it arrives as a string ("true"/"false") instead of a real bool
                 if isinstance(val, str):
                     obj.task_status1 = val.strip().lower() in ('true', '1', 'yes')
                 else:
                     obj.task_status1 = bool(val)
 
             obj.save()
+            obj.refresh_from_db()
+            print(f"DEBUG after save/refresh: task_duration={obj.task_duration!r}")
 
             return JsonResponse({
                 "status": True,
@@ -800,27 +824,21 @@ def task_master_api(request, id=None):
         try:
             body = json.loads(request.body)
             task_id = body.get('id')
-            
+
             if not task_id:
                 return JsonResponse({"status": False, "message": "Task ID is required for deletion"}, status=400)
 
             obj = task_master.objects.get(id=task_id)
             obj.delete()
 
-            return JsonResponse({
-                "status": True, 
-                "message": "Task deleted successfully"
-            })
-            
+            return JsonResponse({"status": True, "message": "Task deleted successfully"})
+
         except task_master.DoesNotExist:
             return JsonResponse({"status": False, "message": "Task not found"}, status=404)
         except Exception as e:
             return JsonResponse({"status": False, "message": str(e)}, status=400)
 
-    return JsonResponse({
-        "status": False,
-        "message": "Method not allowed"
-    }, status=405)
+    return JsonResponse({"status": False, "message": "Method not allowed"}, status=405)
 
 
 @csrf_exempt
