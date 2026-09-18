@@ -543,29 +543,90 @@ class QcHourlyApproval(models.Model):
         managed = False
         db_table = 'qcapp_qc_hourly_approval'
         
+class MeasurementMas(models.Model):
+    jobno = models.CharField(max_length=50)
+    bundle_no = models.CharField(max_length=50)
+    tob_bottom = models.CharField(max_length=50)
+    pcs = models.IntegerField()
+    color = models.CharField(max_length=100)
+    size = models.CharField(max_length=50)
+    date = models.DateTimeField(auto_now_add=True)
 
-# class MeasurementMas(models.Model):
-#     jobno = models.CharField(max_length=50)
-#     bundle_no = models.CharField(max_length=50)
-#     tob_bottom = models.CharField(max_length=50)
-#     pcs = models.IntegerField()
-#     color = models.CharField(max_length=100)
-#     size = models.CharField(max_length=50)
-#     date = models.DateTimeField(auto_now_add=True)
-
-#     def __str__(self):
-#         return f"{self.jobno} - {self.bundle_no}"
+    def __str__(self):
+        return f"{self.jobno} - {self.bundle_no}"
 
 
-# class MeasurementData(models.Model):
-#     mes_id = models.IntegerField()
-#     mesurement_name = models.CharField(max_length=50)
-#     d_type = models.CharField(max_length=50)
-#     standard = models.CharField(max_length=50)
-#     tol = models.CharField(max_length=100)
-#     group = models.CharField(max_length=50)
-#     input_value = models.CharField(max_length=50)
+class MeasurementData(models.Model):
+    master = models.ForeignKey(
+        MeasurementMas,
+        on_delete=models.CASCADE,
+        related_name="measurements"
+    )
+    mes_id = models.IntegerField()
+    mesurement_name = models.CharField(max_length=50)
+    d_type = models.CharField(max_length=50)
+    standard = models.CharField(max_length=50)
+    tol = models.CharField(max_length=100)
+    group = models.CharField(max_length=50)
+    input_value = models.CharField(max_length=50)
 
-#     def __str__(self):
-#         return f"{self.mesurement_name} - {self.group}"
-    
+    def __str__(self):
+        return f"{self.mesurement_name} - {self.group}"
+
+
+
+class MmstAssign(models.Model):
+    ordno = models.CharField(max_length=50)
+    tbid = models.IntegerField()
+    measurdtls = models.CharField(max_length=80)
+    name = models.CharField(db_column='Name', max_length=35)  # Field name made lowercase.
+    meas = models.DecimalField(max_digits=18, decimal_places=2)
+    ty = models.CharField(max_length=50, blank=True, null=True)
+    tol = models.CharField(max_length=10, blank=True, null=True)
+    topbottom_des = models.CharField(db_column='TopBottom_des', max_length=50, blank=True, null=True)  # Field name made lowercase.
+
+    class Meta:
+        managed = False
+        db_table = 'mmst_assign'
+
+
+from django.db import models
+
+
+class MeasurementEntry(models.Model):
+    id = models.BigAutoField(primary_key=True)
+    order_no = models.CharField(
+        max_length=50
+    )
+    top_bottom = models.CharField(
+        max_length=100
+    )
+    measurement = models.CharField(
+        max_length=150
+    )
+    type = models.CharField(
+        max_length=50
+    )
+    group = models.CharField(
+        max_length=10
+    )
+    d_type = models.CharField(
+        max_length=10,
+        default="STD"
+    )
+    entry_no = models.CharField(
+        max_length=20
+    )
+    created_at = models.DateTimeField(
+        auto_now_add=True
+    )
+    updated_at = models.DateTimeField(
+        auto_now=True
+    )
+    def __str__(self):
+        return (
+            f"{self.order_no} - "
+            f"{self.measurement} - "
+            f"{self.group} - "
+            f"{self.d_type}"
+        )

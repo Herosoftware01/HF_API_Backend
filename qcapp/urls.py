@@ -51,10 +51,42 @@ urlpatterns = [
     path("role_qc/", views.role_qc, name='role_qc'),
     path("qc_hourly_approval_api/", views.qc_hourly_approval_api, name='qc_hourly_approval_api'),
     path(
-        "save_measurement/",
-        views.save_measurement,
-        name="save_measurement"
+        "save_measurementss/",
+        views.save_measurementss,
+        name="save_measurementss"
     ),
+    path(
+        "mmst/orders/",
+        views.get_mmst_orders
+    ),
+
+    path(
+        "mmst/topbottom/",
+        views.get_mmst_topbottom
+    ),
+
+    path(
+        "mmst/types/",
+        views.get_mmst_types
+    ),
+
+    path(
+        "mmst/measurements/",
+        views.get_mmst_measurements
+    ),
+    path(
+        "measuremententry_save/",
+        views.measuremententry_save
+    ),
+    path(
+        "measuremententry_load/",
+        views.measuremententry_load
+    ),
+    path(
+        "measuremententry_delete/",
+        views.measuremententry_delete
+    ),
+
 
 ]
 
