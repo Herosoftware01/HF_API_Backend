@@ -6,28 +6,25 @@ from rest_framework.views import APIView
 from zoneinfo import ZoneInfo
 from rest_framework.response import Response
 from rest_framework import status, permissions
-from .models import QcAdminMistake,cut_sample_data_final,Cont_employee,sequency_data,cut_sample_data,cut_sample_data_final,VueUser,Unit,Needle_change,Line,roving_qc_mistake,qc_piece_final, MachineAllocation, machine_details, emp_allocate, Empwisesal, VueProcessSequence,qc_hourly_approval,VueUloginRole,QcHourlyApproval 
+from .models import QcAdminMistake,MeasurementMas,MmstAssign,MeasurementData,MeasurementEntry,cut_sample_data_final,Cont_employee,sequency_data,cut_sample_data,cut_sample_data_final,VueUser,Unit,Needle_change,Line,roving_qc_mistake,qc_piece_final, MachineAllocation, machine_details, emp_allocate, Empwisesal, VueProcessSequence,qc_hourly_approval,VueUloginRole,QcHourlyApproval 
 from .serializers import QcAdminMistakeSerializer,UnitSerializer,MachineTrasnsferSerializer,MachineSerializer,LineSerializer, MachineAllocationSerializer, VueProcessSequenceSerializer
 from collections import defaultdict
-from django.shortcuts import get_object_or_404
-from datetime import date
 from django.utils.timezone import now
 from django.conf import settings
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_GET
 import json
-from django.utils import timezone
+from decimal import Decimal, InvalidOperation
 from django.utils.dateparse import parse_date
 from datetime import date, datetime, timedelta
 from django.db.models import Sum, Max
 from datetime import time
 from django.db import connection
-from datetime import datetime
 from django.utils import timezone
 from django.db.models import Case, When, Value, IntegerField,Sum
 from django.utils.timezone import localtime
 from production_live_scan.models import Assembly_data, dependency
-from django.conf import settings
 from datetime import time as time_cls, datetime as datetime_cls, timedelta
 from collections import defaultdict
 from herofashion.models import User
@@ -1528,31 +1525,6 @@ def get_existing_measurements(request):
 
 ########## cutting measurement start ############
 
-def get_cutting_measurements(request):
-    sl = request.GET.get('sl')
-    
-    with connections['demo'].cursor() as cursor:
-        cursor.execute(
-            """
-            EXEC sp_GetStickerDetails_BySL
-                @sl=%s    
-            """,
-            [sl]
-        )
-
-        columns = [col[0] for col in cursor.description]
-        rows = cursor.fetchall()
-
-    result = [
-        dict(zip(columns, row))
-        for row in rows
-    ]
-
-    return JsonResponse({
-        "status": "success",
-        "data": result
-    })
-
 def get_allocate_report(request):
 
     unit_id = request.GET.get("unit")
@@ -1588,160 +1560,6 @@ def get_allocate_report(request):
 
 
 
-# def get_allocate_live(request):
-
-#     unit_id = request.GET.get("unit")
-#     line_id = request.GET.get("line")
-#     selected_date = request.GET.get("date")
-
-#     # Date இல்லையென்றால் today
-#     if selected_date:
-#         try:
-#             report_day = datetime.strptime(selected_date, "%Y-%m-%d").date()
-#         except ValueError:
-#             report_day = date.today()
-#     else:
-#         report_day = date.today()
-
-#     selected_line = Line.objects.filter(id=line_id).only("line_number").first()
-#     assembly_line = selected_line.line_number if selected_line else line_id
-
-#     s_data = emp_allocate.objects.filter(
-#         unit=unit_id,
-#         line=line_id,
-#         date__date=report_day
-#     ).values(
-#         "emp_code",
-#         "machine__Identity",
-#         "date",
-#         "seq",
-#         "jobno",
-#         "top_bottom"
-#     )
-
-#     # report_day = date.today()
-#     day_start = datetime.combine(report_day, time.min)
-#     day_end = day_start + timedelta(days=1)
-
-#     scans = list(Assembly_data.objects.filter(
-#         unit=unit_id,
-#         line=assembly_line,
-#         entry_date__gte=day_start,
-#         entry_date__lt=day_end,
-#     ).values("machine", "job_no", "tb_name", "seq", "pc", "entry_date"))
-
-#     def normalized(value):
-#         return str(value or "").strip().casefold()
-
-#     def scan_key(machine, job_no, top_bottom, seq):
-#         return tuple(normalized(value) for value in (machine, job_no, top_bottom, seq))
-
-#     def operation_key(job_no, top_bottom, process_des):
-#         return tuple(normalized(value) for value in (job_no, top_bottom, process_des))
-
-#     def hourly_target(wsec):
-#         value = str(wsec or "").strip()
-#         if not value:
-#             return ""
-#         try:
-#             minutes_text, seconds_text = (value.split(".", 1) + [""])[:2]
-#             minutes = int(minutes_text or 0)
-#             seconds = int((seconds_text + "00")[:2]) if seconds_text else 0
-#             operation_seconds = (minutes * 60) + seconds
-#             return int(3600 / operation_seconds) if operation_seconds > 0 else ""
-#         except (TypeError, ValueError, ZeroDivisionError):
-#             return ""
-
-#     dependency_targets = {
-#         operation_key(row["job_no"], row["tb_name"], row["process_des"]): row["wsec"]
-#         for row in dependency.objects.filter(
-#             job_no__in=[row["jobno"] for row in s_data]
-#         ).values("job_no", "tb_name", "process_des", "wsec")
-#     }
-
-#     slot_ranges = (
-#         (time(8, 30), time(9, 30)),
-#         (time(9, 30), time(10, 30)),
-#         (time(10, 45), time(11, 45)),
-#         # Scan timestamps saved during the 1 PM production hour are recorded
-#         # as 12:xx in this database, so include 12:00-13:00 in slot 4.
-#         (time(11, 45), time(12, 45)),
-#         (time(13, 30), time(14, 30)),
-#         (time(2, 30), time(3, 30)),
-#         (time(3, 30), time(4, 30)),
-#         (time(4, 30), time(5, 30)),
-#         (time(5, 45), time(6, 45)),
-#         (time(6, 45), time(8, 00)),
-#     )
-#     hourly_totals = defaultdict(lambda: [0] * len(slot_ranges))
-
-#     for scan in scans:
-#         scan_datetime = scan["entry_date"]
-#         if timezone.is_aware(scan_datetime):
-#             scan_datetime = localtime(scan_datetime)
-#         scan_time = scan_datetime.time().replace(tzinfo=None)
-#         slot_index = next(
-#             (index for index, (start, end) in enumerate(slot_ranges) if start <= scan_time < end),
-#             None,
-#         )
-#         if slot_index is None:
-#             continue
-#         try:
-#             pieces = int(scan["pc"] or 0)
-#         except (TypeError, ValueError):
-#             try:
-#                 pieces = int(float(scan["pc"]))
-#             except (TypeError, ValueError):
-#                 pieces = 0
-#         key = scan_key(scan["machine"], scan["job_no"], scan["tb_name"], scan["seq"])
-#         hourly_totals[key][slot_index] += pieces
-
-#     data = []
-
-#     for row in s_data:
-#         emp = Empwisesal.objects.using('main').filter(
-#             code=row["emp_code"]
-#         ).first()
-
-#         allocation_key = scan_key(
-#             row["machine__Identity"],
-#             row["jobno"],
-#             row["top_bottom"],
-#             row["seq"],
-#         )
-#         employee_hours = hourly_totals[allocation_key]
-#         allocation_datetime = row["date"]
-#         if timezone.is_aware(allocation_datetime):
-#             allocation_datetime = localtime(allocation_datetime)
-#         allocation_time = allocation_datetime.time().replace(tzinfo=None)
-#         allocation_slot = next(
-#             (index + 1 for index, (start, end) in enumerate(slot_ranges)
-#              if start <= allocation_time < end),
-#             1,
-#         )
-#         allocation_time_display = allocation_datetime.strftime("%I:%M %p")
-
-
-
-
-#         data.append({
-#             "emp_code": row["emp_code"],
-#             "machine": row["machine__Identity"],
-#             "seq": row["seq"],
-#             "jobno": row["jobno"],
-#             "top_bottom": row["top_bottom"],
-#             "name": emp.name if emp else "",
-#             "allocation_slot": allocation_slot,
-#             "allocation_time": allocation_time_display,
-#             "target": hourly_target(dependency_targets.get(operation_key(
-#                 row["jobno"],
-#                 row["top_bottom"],
-#                 row["seq"],
-#             ), "")),
-#             "hours": employee_hours,
-#         })
-
-#     return JsonResponse(data, safe=False)
 
 def get_allocate_live(request):
 
@@ -2823,20 +2641,605 @@ def qc_hourly_approval_api(request):
     return JsonResponse(datas, safe=False)  
 
 
+############################################### MMST ASSIGN #####################################################
 
-@api_view(["POST"])
-def save_measurements(request):
+
+def get_cutting_measurements(request):
+    sl = request.GET.get('sl')
+
+    if not sl:
+        return JsonResponse({
+            "status": "error",
+            "message": "sl is required",
+            "data": []
+        }, status=400)
+
+    with connections['demo'].cursor() as cursor:
+        cursor.execute(
+            """
+            EXEC sp_GetStickerDetails_BySL
+                @sl=%s
+            """,
+            [sl]
+        )
+
+        columns = [col[0] for col in cursor.description]
+        rows = cursor.fetchall()
+
+    result = [
+        dict(zip(columns, row))
+        for row in rows
+    ]
+
+    jobno = None
+    top_bottom = None
+
+    for row in result:
+        if row.get("jobno"):
+            jobno = str(row.get("jobno")).strip()
+        if row.get("TopBottom_des"):
+            top_bottom = str(row.get("TopBottom_des")).strip()
+        if jobno and top_bottom:
+            break
+
+    def entry_number_key(entry_no):
+        try:
+            set_no, item_no = str(entry_no).split("-", 1)
+            return int(set_no), int(item_no)
+        except (TypeError, ValueError):
+            return float("inf"), float("inf")
+
+    saved_entry_map = {}
+    all_saved_entries = []
+
+    if jobno and top_bottom:
+        saved_entries = MeasurementEntry.objects.filter(
+            order_no=jobno,
+            top_bottom=top_bottom,
+        ).order_by("id")
+
+        for entry in saved_entries:
+            entry_data = {
+                "entry_no": entry.entry_no,
+                "group": entry.group,
+                "d_type": entry.d_type,
+            }
+            all_saved_entries.append(entry_data)
+            key = str(entry.measurement or "").strip().lower()
+            if not key:
+                continue
+            saved_entry_map.setdefault(key, []).append(entry_data)
+
+    all_saved_entries.sort(key=lambda item: entry_number_key(item["entry_no"]))
+    all_entry_numbers = [
+        item["entry_no"] for item in all_saved_entries
+    ]
+
+    for row in result:
+        measurdtls = str(row.get("measurdtls") or "").strip()
+        base_key = measurdtls.lower()
+
+        matched_entries = saved_entry_map.get(base_key, [])
+
+        if not matched_entries:
+            normalized = base_key.replace("-", " ").replace("_", " ")
+            for key, entries in saved_entry_map.items():
+                if normalized in key or key in normalized:
+                    matched_entries = entries
+                    break
+
+        matched_entries = sorted(
+            matched_entries,
+            key=lambda item: entry_number_key(item["entry_no"]),
+        )
+
+        row["saved_entry_numbers"] = matched_entries
+        row["entry_no_sequence"] = [
+            item["entry_no"] for item in matched_entries
+        ]
+        row["all_entry_no_sequence"] = all_entry_numbers
+        row["entry_no"] = (
+            matched_entries[0]["entry_no"]
+            if matched_entries else ""
+        )
+
+    return JsonResponse({
+        "status": "success",
+        "data": result
+    })
+
+
+
+# ============================================================
+# 1. ORDER LIST
+# ============================================================
+
+@require_GET
+def get_mmst_orders(request):
 
     try:
 
+        data = list(
+            MmstAssign.objects.using("demo")
+            .filter(
+                ordno__isnull=False
+            )
+            .values("ordno")
+            .distinct()
+            .order_by("ordno")
+        )
+
+        return JsonResponse({
+            "success": True,
+            "data": data
+        })
+
+    except Exception as e:
+
+        print("get_mmst_orders error:", e)
+
+        return JsonResponse({
+            "success": False,
+            "message": str(e),
+            "data": []
+        }, status=500)
+
+
+# ============================================================
+# 2. TOP / BOTTOM
+# ============================================================
+
+@require_GET
+def get_mmst_topbottom(request):
+
+    ordno = request.GET.get("ordno")
+    print("Received ordno:", ordno)  # Debugging line
+
+    if not ordno:
+        return JsonResponse({
+            "success": False,
+            "message": "ordno is required",
+            "data": []
+        }, status=400)
+
+    try:
+
+        data = list(
+            MmstAssign.objects.using("demo")
+            .filter(
+                ordno=ordno,
+                tbid__isnull=False
+            )
+            .values(
+                "tbid",
+                "topbottom_des"
+            )
+            .distinct()
+            .order_by("topbottom_des")
+        )
+
+        return JsonResponse({
+            "success": True,
+            "data": data
+        })
+
+    except Exception as e:
+
+        print("get_mmst_topbottom error:", e)
+
+        return JsonResponse({
+            "success": False,
+            "message": str(e),
+            "data": []
+        }, status=500)
+
+
+# ============================================================
+# 3. TYPE
+# ============================================================
+
+@require_GET
+def get_mmst_types(request):
+
+    ordno = request.GET.get("ordno")
+    tbid = request.GET.get("tbid")
+
+    if not ordno or not tbid:
+
+        return JsonResponse({
+            "success": False,
+            "message": "ordno and tbid are required",
+            "data": []
+        }, status=400)
+
+    try:
+
+        data = list(
+            MmstAssign.objects.using("demo")
+            .filter(
+                ordno=ordno,
+                tbid=tbid,
+                ty__isnull=False
+            )
+            .exclude(
+                ty=""
+            )
+            .values(
+                "ty"
+            )
+            .distinct()
+            .order_by("ty")
+        )
+
+        return JsonResponse({
+            "success": True,
+            "data": data
+        })
+
+    except Exception as e:
+
+        print("get_mmst_types error:", e)
+
+        return JsonResponse({
+            "success": False,
+            "message": str(e),
+            "data": []
+        }, status=500)
+
+
+# ============================================================
+# 4. MEASUREMENTS
+# ============================================================
+
+@require_GET
+def get_mmst_measurements(request):
+
+    ordno = request.GET.get("ordno")
+    tbid = request.GET.get("tbid")
+    ty = request.GET.get("ty")
+
+    if not ordno:
+        return JsonResponse({
+            "success": False,
+            "message": "ordno is required",
+            "data": []
+        }, status=400)
+
+    if not tbid:
+        return JsonResponse({
+            "success": False,
+            "message": "tbid is required",
+            "data": []
+        }, status=400)
+
+    if not ty:
+        return JsonResponse({
+            "success": False,
+            "message": "ty is required",
+            "data": []
+        }, status=400)
+
+    try:
+
+        data = list(
+            MmstAssign.objects.using("demo")
+            .using("demo")
+            .filter(
+                ordno=ordno,
+                tbid=tbid,
+                ty=ty
+            )
+            .values(
+                "measurdtls"
+            )
+            .distinct()
+            .order_by("measurdtls")
+        )
+
+        return JsonResponse({
+            "success": True,
+            "data": data
+        })
+
+    except Exception as e:
+
+        print(
+            "get_mmst_measurements error:",
+            e
+        )
+
+        return JsonResponse({
+            "success": False,
+            "message": str(e),
+            "data": []
+        }, status=500)
+
+
+
+@csrf_exempt
+def measuremententry_save(request):
+
+    if request.method != "POST":
+        return JsonResponse(
+            {
+                "success": False,
+                "message": "POST method required"
+            },
+            status=405
+        )
+
+    try:
+        data = json.loads(request.body)
+
+        if isinstance(data, dict) and isinstance(data.get("measurements"), list):
+            payloads = data["measurements"]
+        elif isinstance(data, list):
+            payloads = data
+        else:
+            payloads = [data]
+
+        if not payloads:
+            return JsonResponse({
+                "success": False,
+                "message": "No measurable entries found to save."
+            }, status=400)
+
+        created_entries = []
+        errors = []
+
+        for idx, payload in enumerate(payloads):
+            try:
+                mes_id = payload.get("mes_id")
+
+                order_no = str(payload.get("ordno", "")).strip()
+                top_bottom = str(payload.get("tob_bottom", "")).strip()
+                measurement = str(payload.get("mesurement_name", "")).strip()
+                measurement_type = str(payload.get("ty", "")).strip()
+                input_value = payload.get("input_value")
+
+                group = str(payload.get("group", "")).strip().upper()
+                d_type = str(payload.get("d_type", "STD")).strip().upper()
+                entry_no = str(payload.get("entry_no", "")).strip()
+                jobno = str(payload.get("jobno", "")).strip()
+                size = str(payload.get("size", "")).strip()
+                pcs = payload.get("pcs")
+                standard = payload.get("standard")
+                tolerance = payload.get("tol")
+
+                if not order_no:
+                    raise ValueError(f"Entry {idx + 1}: Order No is required")
+
+                if not top_bottom:
+                    raise ValueError(f"Entry {idx + 1}: Top / Bottom is required")
+
+                if not measurement:
+                    raise ValueError(f"Entry {idx + 1}: Measurement is required")
+
+                if not measurement_type:
+                    raise ValueError(f"Entry {idx + 1}: Type is required")
+
+                if input_value in [None, ""]:
+                    raise ValueError(f"Entry {idx + 1}: Input value is required")
+
+                if not group:
+                    raise ValueError(f"Entry {idx + 1}: Group is required")
+
+                if not entry_no:
+                    raise ValueError(f"Entry {idx + 1}: Entry No is required")
+
+                allowed_groups = ["F", "M", "L"]
+                if group not in allowed_groups:
+                    raise ValueError(f"Entry {idx + 1}: Invalid group. Use F, M or L.")
+
+                allowed_d_types = ["STD", "FR", "FL", "BR", "BL"]
+                if d_type not in allowed_d_types:
+                    raise ValueError(
+                        f"Entry {idx + 1}: Invalid d_type. Use STD, FR, FL, BR or BL."
+                    )
+
+                try:
+                    input_value = Decimal(str(input_value))
+                except (InvalidOperation, ValueError):
+                    raise ValueError(f"Entry {idx + 1}: Invalid input value")
+
+                if standard not in [None, ""]:
+                    try:
+                        standard = Decimal(str(standard))
+                    except (InvalidOperation, ValueError):
+                        standard = None
+                else:
+                    standard = None
+
+                if tolerance not in [None, ""]:
+                    try:
+                        tolerance = Decimal(str(tolerance))
+                    except (InvalidOperation, ValueError):
+                        tolerance = None
+                else:
+                    tolerance = None
+
+                if pcs in [None, ""]:
+                    pcs = None
+                else:
+                    try:
+                        pcs = int(pcs)
+                    except (ValueError, TypeError):
+                        pcs = None
+
+                try:
+                    set_no = int(entry_no.split("-")[0])
+                except (ValueError, IndexError):
+                    raise ValueError(f"Entry {idx + 1}: Invalid entry_no. Example: 1-1")
+
+                measurement_entry = MeasurementEntry.objects.create(
+                    order_no=order_no,
+                    top_bottom=top_bottom,
+                    measurement=measurement,
+                    type=measurement_type,
+                    group=group,
+                    d_type=d_type,
+                    entry_no=entry_no,
+                )
+
+                created_entries.append({
+                    "id": measurement_entry.id,
+                    "mes_id": mes_id,
+                    "order_no": measurement_entry.order_no,
+                    "top_bottom": measurement_entry.top_bottom,
+                    "measurement": measurement_entry.measurement,
+                    "type": measurement_entry.type,
+                    "group": measurement_entry.group,
+                    "d_type": measurement_entry.d_type,
+                    "entry_no": measurement_entry.entry_no,
+                    "created_at": measurement_entry.created_at.isoformat(),
+                })
+            except Exception as exc:
+                errors.append({
+                    "index": idx,
+                    "message": str(exc),
+                    "payload": payload,
+                })
+
+        if errors and not created_entries:
+            return JsonResponse({
+                "success": False,
+                "message": errors[0]["message"],
+                "errors": errors,
+            }, status=400)
+
+        if errors:
+            return JsonResponse({
+                "success": True,
+                "message": (
+                    f"Saved {len(created_entries)} measurement(s) successfully. "
+                    f"{len(errors)} failed."
+                ),
+                "data": {
+                    "saved_count": len(created_entries),
+                    "failed_count": len(errors),
+                    "entries": created_entries,
+                    "errors": errors,
+                },
+            }, status=200)
+
+        if len(payloads) == 1:
+            return JsonResponse({
+                "success": True,
+                "message": "Measurement saved successfully",
+                "data": created_entries[0],
+            })
+
+        return JsonResponse({
+            "success": True,
+            "message": f"{len(created_entries)} measurement(s) saved successfully",
+            "data": {
+                "saved_count": len(created_entries),
+                "entries": created_entries,
+            },
+        })
+
+        # ==========================================
+        # GET DATA
+        # ==========================================
+
+    except json.JSONDecodeError:
+
+        return JsonResponse({
+            "success": False,
+            "message": "Invalid JSON"
+        }, status=400)
+
+    except Exception as e:
+
+        print(
+            "Save Measurement Error:",
+            str(e)
+        )
+
+        return JsonResponse({
+            "success": False,
+            "message": "Unable to save measurement",
+            "error": str(e)
+        }, status=500)
+
+
+@require_GET
+def measuremententry_load(request):
+    order_no = str(request.GET.get("ordno", "")).strip()
+    top_bottom = str(request.GET.get("tob_bottom", "")).strip()
+    measurement_type = str(request.GET.get("ty", "")).strip()
+
+    if not order_no or not top_bottom or not measurement_type:
+        return JsonResponse({
+            "success": False,
+            "message": "ordno, tob_bottom and ty are required",
+            "data": [],
+        }, status=400)
+
+    entries = MeasurementEntry.objects.filter(
+        order_no=order_no,
+        top_bottom=top_bottom,
+        type=measurement_type,
+    ).order_by("entry_no", "id")
+
+    data = [
+        {
+            "id": entry.id,
+            "mes_id": entry.id,
+            "mesurement_name": entry.measurement,
+            "group": entry.group,
+            "d_type": entry.d_type,
+            "entry_no": entry.entry_no,
+            "input_value": "",
+        }
+        for entry in entries
+    ]
+
+    return JsonResponse({
+        "success": True,
+        "count": len(data),
+        "data": data,
+    })
+
+
+@csrf_exempt
+def measuremententry_delete(request):
+    if request.method != "DELETE":
+        return JsonResponse({
+            "success": False,
+            "message": "DELETE method required",
+        }, status=405)
+
+    order_no = str(request.GET.get("ordno", "")).strip()
+    top_bottom = str(request.GET.get("tob_bottom", "")).strip()
+    measurement_type = str(request.GET.get("ty", "")).strip()
+
+    if not order_no or not top_bottom or not measurement_type:
+        return JsonResponse({
+            "success": False,
+            "message": "ordno, tob_bottom and ty are required",
+        }, status=400)
+
+    deleted_count, _ = MeasurementEntry.objects.filter(
+        order_no=order_no,
+        top_bottom=top_bottom,
+        type=measurement_type,
+    ).delete()
+
+    return JsonResponse({
+        "success": True,
+        "deleted_count": deleted_count,
+        "message": "All saved measurements deleted successfully",
+    })
+
+
+@api_view(["POST"])
+def save_measurementss(request):
+    try:
         data = request.data
 
         print("SAVE REQUEST:")
         print(data)
-
-        # ==========================================
-        # MASTER DATA
-        # ==========================================
 
         jobno = data.get("jobno")
         bundle_no = data.get("bundle_no")
@@ -2844,10 +3247,6 @@ def save_measurements(request):
         pcs = data.get("pcs")
         color = data.get("color")
         size = data.get("size")
-
-        # ==========================================
-        # VALIDATION
-        # ==========================================
 
         if not jobno:
             return Response(
@@ -2867,39 +3266,13 @@ def save_measurements(request):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # ==========================================
-        # MEASUREMENT DATA
-        # ==========================================
-
         mes_id = data.get("mes_id")
-
-        mesurement_name = data.get(
-            "mesurement_name"
-        )
-
-        d_type = data.get(
-            "d_type"
-        )
-
-        standard = data.get(
-            "standard"
-        )
-
-        tol = data.get(
-            "tol"
-        )
-
-        group = data.get(
-            "group"
-        )
-
-        input_value = data.get(
-            "input_value"
-        )
-
-        # ==========================================
-        # INPUT VALIDATION
-        # ==========================================
+        mesurement_name = data.get("mesurement_name")
+        d_type = data.get("d_type")
+        standard = data.get("standard")
+        tol = data.get("tol")
+        group = data.get("group")
+        input_value = data.get("input_value")
 
         if input_value is None or input_value == "":
             return Response(
@@ -2910,20 +3283,12 @@ def save_measurements(request):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # ==========================================
-        # MASTER
-        # ==========================================
-        # Same Job + Bundle இருந்தால்
-        # புதிய master create செய்ய வேண்டாம்
-        # ==========================================
-
         master = MeasurementMas.objects.filter(
             jobno=jobno,
             bundle_no=bundle_no
         ).first()
 
         if not master:
-
             master = MeasurementMas.objects.create(
                 jobno=jobno,
                 bundle_no=bundle_no,
@@ -2933,85 +3298,42 @@ def save_measurements(request):
                 size=size or "",
             )
 
-        # ==========================================
-        # MEASUREMENT DATA
-        # ==========================================
 
         detail = MeasurementData.objects.filter(
-            jobno=jobno,
+            master=master,
             mes_id=mes_id or 0,
             group=group or "",
             d_type=d_type or ""
         ).first()
 
-        # ==========================================
-        # UPDATE EXISTING
-        # ==========================================
 
         if detail:
 
-            detail.mesurement_name = (
-                mesurement_name or ""
-            )
-
-            detail.standard = (
-                standard or ""
-            )
-
-            detail.tol = (
-                tol or ""
-            )
-
-            detail.input_value = str(
-                input_value
-            )
+            detail.mesurement_name = mesurement_name or ""
+            detail.standard = standard or ""
+            detail.tol = tol or ""
+            detail.input_value = str(input_value)
 
             detail.save()
 
             message = "Measurement updated successfully"
 
-        # ==========================================
-        # CREATE NEW
-        # ==========================================
+       
 
         else:
 
             detail = MeasurementData.objects.create(
-
-                jobno=jobno,
-
+                master=master,
                 mes_id=mes_id or 0,
-
-                mesurement_name=(
-                    mesurement_name or ""
-                ),
-
-                d_type=(
-                    d_type or ""
-                ),
-
-                standard=(
-                    standard or ""
-                ),
-
-                tol=(
-                    tol or ""
-                ),
-
-                group=(
-                    group or ""
-                ),
-
-                input_value=str(
-                    input_value
-                ),
+                mesurement_name=mesurement_name or "",
+                d_type=d_type or "",
+                standard=standard or "",
+                tol=tol or "",
+                group=group or "",
+                input_value=str(input_value),
             )
 
             message = "Measurement saved successfully"
-
-        # ==========================================
-        # RESPONSE
-        # ==========================================
 
         return Response(
             {
@@ -3023,8 +3345,8 @@ def save_measurements(request):
                 "measurement_id": detail.id,
 
                 "data": {
-                    "jobno": jobno,
-                    "bundle_no": bundle_no,
+                    "jobno": master.jobno,
+                    "bundle_no": master.bundle_no,
                     "mes_id": detail.mes_id,
                     "mesurement_name": detail.mesurement_name,
                     "group": detail.group,
