@@ -2964,6 +2964,9 @@ def Master_Repcut_Details(request):
                 slno=item["slno"]
             ).update(
                 weight=item["weight"],
+                parts=item["parts"],
+                size=item["size"],
+                topbottom=item["topbottom"],
                 average=item["average"],
                 percentage=item["percentage"],
                 grandtotal=item["grandtotal"],
@@ -2972,4 +2975,17 @@ def Master_Repcut_Details(request):
 
         return JsonResponse({
             "message": "Record updated"
+        })
+
+    elif request.method == "DELETE":
+
+        data = json.loads(request.body)
+
+        for item in data:
+            Master_Replace_Cutpend.objects.using('demo').filter(
+                slno=item["slno"]
+            ).delete()
+
+        return JsonResponse({
+            "message": "Records deleted successfully"
         })

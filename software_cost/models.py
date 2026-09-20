@@ -1,4 +1,10 @@
 from django.db import models
+from django.core.files.storage import FileSystemStorage
+
+network_storage = FileSystemStorage(
+    location=r'\\10.1.21.11\d\workentry_images',
+    base_url='/workentry_images_network/' # The URL path used if you need to display it on the frontend
+)
 
 class user_master(models.Model):
     id = models.AutoField(primary_key=True)
@@ -81,6 +87,7 @@ class Workentry(models.Model):
     modifieddate = models.DateTimeField(db_column='ModifiedDate', blank=True, null=True)  # Field name made lowercase.
     durationminutes = models.IntegerField(db_column='DurationMinutes', blank=True, null=True)  # Field name made lowercase.
     status = models.BooleanField(db_column='Status', default=False)  # Field name made lowercase.
+    image = models.ImageField(db_column='Image', storage=network_storage,upload_to='', blank=True, null=True)  # Field name made lowercase.
 
     def __str__(self):
         return f"{self.username} - {self.entrydate}"
