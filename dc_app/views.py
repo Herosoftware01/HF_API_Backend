@@ -1,14 +1,15 @@
 from django.http import JsonResponse
 from .models import ViewCuttingDelPrint, CuttingPrintembdel, ViewYarnProcessDelivery, ViewUnitPcdelivery, ViewCutsecFabricdelivery
-from .models import ViewCuttingDelPrint,ViewKnitDelivery,VueAccInhTransfer,VueAccProdDel,TrsGatemodule, CuttingPrintembdel, ViewYarnProcessDelivery,VueAccProcDel,ViewAccinwardVerification,ViewFabricDeliveryProcess,ViewMistakeqtyPrint,ViewUnitPcdelivery,VueRibDeliveryDetails,ViewGdwnFabricDeliveryPlan,TrsApidtls,ViewFabricDeliveryRepl,HerofashionUser,Holiday,RoleModulePermission
+from .models import ViewCuttingDelPrint,ViewKnitDelivery,VueAccInhTransfer,VueAccProdDel,TrsGatemodule, CuttingPrintembdel, ViewYarnProcessDelivery,VueAccProcDel,ViewAccinwardVerification,ViewFabricDeliveryProcess,ViewMistakeqtyPrint,ViewUnitPcdelivery,VueRibDeliveryDetails,ViewGdwnFabricDeliveryPlan,TrsApidtls,ViewFabricDeliveryRepl,HerofashionUser,Holiday,RoleModulePermission,Dc_Verify_Incharge
 import json
 from django.views.decorators.csrf import csrf_exempt
 from django.forms.models import model_to_dict
 from django.utils.dateparse import parse_datetime
 from django.utils import timezone
-from django.views.decorators.http import require_GET, require_POST
-from django.db import transaction
-from django.contrib.auth import get_user_model
+from django.views.decorators.http import require_http_methods
+from django.utils.dateparse import parse_datetime
+from django.core.exceptions import ValidationError
+from decimal import Decimal, InvalidOperation
 
 
 def cutting_del_print(request):
@@ -41,12 +42,12 @@ def yarn_process_delivery(request, dcno):
 
 
 def knitting_del_print(request):
-    dcno = request.GET.get("dcno")  # Example: ?id=101
-
+    dcno = request.GET.get("dcno")  
     queryset = ViewKnitDelivery.objects.using('test').all()
 
     if dcno:
-        queryset = queryset.filter(dc=dcno)
+        # FIX: Changed from dc=dcno to dcno=dcno
+        queryset = queryset.filter(dcno=dcno)
 
     data = list(queryset.values())
 
@@ -58,12 +59,13 @@ def knitting_del_print(request):
     })
 
 def acc_prod_del_print(request):
-    no = request.GET.get("no")  # Example: ?id=101
+    no = request.GET.get("no")  
 
     queryset = VueAccProdDel.objects.using('test').all()
 
     if no:
-        queryset = queryset.filter(n=no)
+        # FIX: Changed from n=no to no=no
+        queryset = queryset.filter(no=no)
 
     data = list(queryset.values())
 
@@ -179,12 +181,13 @@ def CuttingSecFabric(request, dcno):
 
 
 def rib_delivery_print(request):
-    dcno = request.GET.get("dc")  # Example: ?id=101
+    dcno = request.GET.get("dc")  
 
     queryset = VueRibDeliveryDetails.objects.using('demo').all()
 
     if dcno:
-        queryset = queryset.filter(dcno=dcno)
+        # FIX: Changed from dcno=dcno to dc=dcno
+        queryset = queryset.filter(dc=dcno)
 
     data = list(queryset.values())
 
@@ -239,31 +242,29 @@ def gate_module_api(request, pk=None):
     # ---------------- GET ----------------
     if request.method == "GET":
 
-        # Single Record
+        # 1. Single Record by Primary Key (if URL is like /api/1774/)
         if pk:
             try:
                 obj = TrsGatemodule.objects.using('demo').get(pk=pk)
                 data = model_to_dict(obj)
-
                 if obj.date:
                     data["date"] = obj.date.strftime("%Y-%m-%d %H:%M:%S")
-
-                return JsonResponse({
-                    "status": True,
-                    "data": data
-                })
-
+                return JsonResponse({"status": True, "data": data})
             except TrsGatemodule.DoesNotExist:
-                return JsonResponse({
-                    "status": False,
-                    "message": "Record not found"
-                }, status=404)
+                return JsonResponse({"status": False, "message": "Record not found"}, status=404)
 
-        # All Records
-        objs = TrsGatemodule.objects.using('demo').all().order_by("-date")
+        # 2. Filter by DC Number (if URL is like /api/?no=5107)
+        dc_no = request.GET.get("no")
+        queryset = TrsGatemodule.objects.using('demo').all().order_by("-date")
+
+        if dc_no:
+            queryset = queryset.filter(no=dc_no)
+        else:
+            # Optional: Limit to 50 records if no search is provided to prevent crashing
+            queryset = queryset[:50] 
+
         data = []
-
-        for obj in objs:
+        for obj in queryset:
             item = model_to_dict(obj)
             if obj.date:
                 item["date"] = obj.date.strftime("%Y-%m-%d %H:%M:%S")
@@ -530,3 +531,248 @@ def manage_role_permissions(request, role_param=None):
 
     else:
         return JsonResponse({"status": False, "message": "Method not allowed"}, status=405)
+
+
+
+def _validate_and_extract_payload(data, is_update=False):
+    """
+    Validates types, required fields, and converts data types.
+    Returns: (cleaned_dict, error_string)
+    """
+    cleaned = {}
+
+    # Required fields on creation
+    required_fields = ["slno", "date", "DCNo", "jobno", "trstype", "username"]
+    if not is_update:
+        missing = [f for f in required_fields if f not in data or data[f] is None or str(data[f]).strip() == ""]
+        if missing:
+            return None, f"Missing required fields: {', '.join(missing)}"
+
+    # slno (Primary Key)
+    if "slno" in data:
+        try:
+            cleaned["slno"] = int(data["slno"])
+        except (ValueError, TypeError):
+            return None, "'slno' must be an integer."
+
+    # DCNo
+    if "DCNo" in data:
+        try:
+            cleaned["DCNo"] = int(data["DCNo"])
+        except (ValueError, TypeError):
+            return None, "'DCNo' must be an integer."
+
+    # username
+    if "username" in data:
+        try:
+            cleaned["username"] = int(data["username"])
+        except (ValueError, TypeError):
+            return None, "'username' must be an integer."
+
+    # date (ISO 8601 format: YYYY-MM-DDTHH:MM:SS)
+    if "date" in data and data["date"]:
+        parsed_date = parse_datetime(str(data["date"]))
+        if not parsed_date:
+            return None, "'date' must be in ISO format (e.g., '2026-09-20T10:30:00')."
+        cleaned["date"] = parsed_date
+
+    # jobno & trstype (CharFields with max_length=50)
+    for char_field in ["jobno", "trstype"]:
+        if char_field in data:
+            val = str(data[char_field]).strip()
+            if len(val) > 50:
+                return None, f"'{char_field}' cannot exceed 50 characters."
+            cleaned[char_field] = val
+
+    # wgt (DecimalField max_digits=18, decimal_places=3)
+    if "wgt" in data:
+        if data["wgt"] is not None and str(data["wgt"]).strip() != "":
+            try:
+                cleaned["wgt"] = Decimal(str(data["wgt"]))
+            except InvalidOperation:
+                return None, "'wgt' must be a valid decimal number."
+        else:
+            cleaned["wgt"] = None
+
+    # mtr (DecimalField max_digits=18, decimal_places=2)
+    if "mtr" in data:
+        if data["mtr"] is not None and str(data["mtr"]).strip() != "":
+            try:
+                cleaned["mtr"] = Decimal(str(data["mtr"]))
+            except InvalidOperation:
+                return None, "'mtr' must be a valid decimal number."
+        else:
+            cleaned["mtr"] = None
+
+    # rolls (IntegerField, optional)
+    if "rolls" in data:
+        if data["rolls"] is not None and str(data["rolls"]).strip() != "":
+            try:
+                cleaned["rolls"] = int(data["rolls"])
+            except (ValueError, TypeError):
+                return None, "'rolls' must be an integer."
+        else:
+            cleaned["rolls"] = None
+
+    # bags (CharField, optional, max_length=50)
+    if "bags" in data:
+        if data["bags"] is not None:
+            val = str(data["bags"]).strip()
+            if len(val) > 50:
+                return None, "'bags' cannot exceed 50 characters."
+            cleaned["bags"] = val
+        else:
+            cleaned["bags"] = None
+
+    return cleaned, None
+
+
+@csrf_exempt
+def dc_verify_incharge_crud(request):
+    """
+    All-in-one CRUD API endpoint using standard Django JsonResponse:
+      - GET:    Filter by ?slno=... or ?dcno=... or fetch all.
+      - POST:   Create a new record (JSON body).
+      - PUT:    Update an existing record via ?slno=... (JSON body).
+      - DELETE: Delete record via ?slno=...
+    """
+    method = request.method
+
+    # ----------------------------------------------------
+    # READ (GET)
+    # ----------------------------------------------------
+    if method == "GET":
+        slno = request.GET.get("slno")
+        dcno = request.GET.get("dcno") or request.GET.get("DCNo")
+
+        queryset = Dc_Verify_Incharge.objects.all()
+
+        if slno:
+            queryset = queryset.filter(slno=slno)
+        if dcno:
+            queryset = queryset.filter(DCNo=dcno)
+
+        data = list(queryset.values())
+        return JsonResponse({
+            "status": True,
+            "message": "Records fetched successfully.",
+            "count": len(data),
+            "data": data
+        }, status=200)
+
+    # Parse JSON body for mutation requests
+    if method in ["POST", "PUT"]:
+        try:
+            body = json.loads(request.body.decode("utf-8")) if request.body else {}
+        except json.JSONDecodeError:
+            return JsonResponse({
+                "status": False,
+                "message": "Invalid JSON payload."
+            }, status=400)
+
+    # ----------------------------------------------------
+    # CREATE (POST)
+    # ----------------------------------------------------
+    if method == "POST":
+        cleaned_data, error = _validate_and_extract_payload(body, is_update=False)
+        if error:
+            return JsonResponse({"status": False, "message": error}, status=400)
+
+        # Check primary key collision since 'slno' is user-supplied
+        if Dc_Verify_Incharge.objects.filter(slno=cleaned_data["slno"]).exists():
+            return JsonResponse({
+                "status": False,
+                "message": f"Record with slno '{cleaned_data['slno']}' already exists."
+            }, status=409)
+
+        try:
+            instance = Dc_Verify_Incharge.objects.create(**cleaned_data)
+            return JsonResponse({
+                "status": True,
+                "message": "Record created successfully.",
+                "data": list(Dc_Verify_Incharge.objects.filter(slno=instance.slno).values())[0]
+            }, status=201)
+        except ValidationError as e:
+            return JsonResponse({"status": False, "message": str(e)}, status=400)
+        except Exception as e:
+            return JsonResponse({"status": False, "message": f"Database error: {str(e)}"}, status=500)
+
+    # ----------------------------------------------------
+    # UPDATE (PUT)
+    # ----------------------------------------------------
+    elif method == "PUT":
+        slno = request.GET.get("slno") or body.get("slno")
+        if not slno:
+            return JsonResponse({
+                "status": False,
+                "message": "'slno' parameter is required for update (in query params or body)."
+            }, status=400)
+
+        try:
+            instance = Dc_Verify_Incharge.objects.get(slno=slno)
+        except Dc_Verify_Incharge.DoesNotExist:
+            return JsonResponse({
+                "status": False,
+                "message": f"Record with slno '{slno}' not found."
+            }, status=404)
+
+        cleaned_data, error = _validate_and_extract_payload(body, is_update=True)
+        if error:
+            return JsonResponse({"status": False, "message": error}, status=400)
+
+        # Apply updates
+        for field, value in cleaned_data.items():
+            if field != "slno":  # Avoid mutating primary key
+                setattr(instance, field, value)
+
+        try:
+            instance.save()
+            return JsonResponse({
+                "status": True,
+                "message": "Record updated successfully.",
+                "data": list(Dc_Verify_Incharge.objects.filter(slno=instance.slno).values())[0]
+            }, status=200)
+        except ValidationError as e:
+            return JsonResponse({"status": False, "message": str(e)}, status=400)
+        except Exception as e:
+            return JsonResponse({"status": False, "message": f"Database error: {str(e)}"}, status=500)
+
+    # ----------------------------------------------------
+    # DELETE (DELETE)
+    # ----------------------------------------------------
+    elif method == "DELETE":
+        slno = request.GET.get("slno")
+        if not slno:
+            # Fallback check inside JSON body
+            try:
+                body = json.loads(request.body.decode("utf-8")) if request.body else {}
+                slno = body.get("slno")
+            except json.JSONDecodeError:
+                pass
+
+        if not slno:
+            return JsonResponse({
+                "status": False,
+                "message": "'slno' parameter is required for deletion."
+            }, status=400)
+
+        try:
+            instance = Dc_Verify_Incharge.objects.get(slno=slno)
+            instance.delete()
+            return JsonResponse({
+                "status": True,
+                "message": f"Record with slno '{slno}' deleted successfully."
+            }, status=200)
+        except Dc_Verify_Incharge.DoesNotExist:
+            return JsonResponse({
+                "status": False,
+                "message": f"Record with slno '{slno}' not found."
+            }, status=404)
+        except Exception as e:
+            return JsonResponse({"status": False, "message": f"Database error: {str(e)}"}, status=500)
+
+    # Unsupported HTTP Methods
+    return JsonResponse({
+        "status": False,
+        "message": f"Method {method} not allowed."
+    }, status=405)
