@@ -135,12 +135,12 @@ def request_advance(request):
 # ==============================
 # 🔥 BACKGROUND EMAIL SENDER
 # ==============================
-def send_mail_async(email):
-    try:
-        email.send()
-        print("✅ Email sent in background")
-    except Exception as e:
-        print("❌ Email failed:", str(e))
+# def send_mail_async(email):
+#     try:
+#         email.send()
+#         print("✅ Email sent in background")
+#     except Exception as e:
+#         print("❌ Email failed:", str(e))
 
 
 # ==============================
