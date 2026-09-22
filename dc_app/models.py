@@ -1,4 +1,6 @@
 from django.db import models
+from django.contrib.contenttypes.models import ContentType
+from django.contrib.contenttypes.fields import GenericForeignKey
 
 class ViewCuttingDelPrint(models.Model):
     rowno = models.BigIntegerField(db_column='RowNo', primary_key=True)  # Field name made lowercase.
@@ -528,5 +530,47 @@ class RoleModulePermission(models.Model):
 
     def __str__(self):
         return f"{self.role} - {self.module_name} ({'ON' if self.is_enabled else 'OFF'})"
+
+
+
+class Dc_Verify_Incharge(models.Model):
+    id = models.AutoField(db_column='id', primary_key=True)
+    date = models.DateTimeField(db_column='Date')  # Field name made lowercase.
+    DCNo = models.IntegerField(db_column='DCNo')  # Field name made lowercase.
+    jobno = models.CharField(db_column='JobNo', max_length=50)  # Field name made lowercase. # Field name made lowercase.
+    trstype = models.CharField(db_column='TrsType', max_length=50)  # Field name made lowercase.
+    wgt = models.DecimalField(db_column='Wgt', max_digits=18, decimal_places=3,blank=True, null=True)  # Field name made lowercase.
+    mtr = models.DecimalField(db_column='Mtr', max_digits=18, decimal_places=2,blank=True, null=True)  # Field name made lowercase.
+    rolls = models.IntegerField(db_column='Rolls',blank=True, null=True)  # Field name made lowercase.
+    bags = models.CharField(db_column='Bags', max_length=50,blank=True, null=True)  # Field name made lowercase.
+    username = models.IntegerField(db_column='Username')  # Field name made lowercase.
+
+    class Meta:
+        db_table = 'dc_verify_incharge'
+
+    def __str__(self):
+        return f"DCNo: {self.DCNo}, JobNo: {self.jobno}, Date: {self.date}, TrsType: {self.trstype}"
     
-  
+
+class Dc_Reciver_Verify(models.Model):
+    id = models.AutoField(db_column='id', primary_key=True)
+    date = models.DateTimeField(db_column='Date')
+    DCNo = models.IntegerField(db_column='DCNo')
+    jobno = models.CharField(db_column='JobNo', max_length=50)
+    trstype = models.CharField(db_column='TrsType', max_length=50)
+    wgt = models.DecimalField(db_column='Wgt',max_digits=18, decimal_places=3,blank=True, null=True)
+    mtr = models.DecimalField(db_column='Mtr',max_digits=18,decimal_places=2,blank=True,null=True)
+    rolls = models.IntegerField(db_column='Rolls',blank=True,null=True)
+    bags = models.CharField(db_column='Bags',max_length=50, blank=True,null=True)
+    username = models.IntegerField(db_column='Username')
+    latitude = models.DecimalField(db_column='Latitude',max_digits=10,decimal_places=7, blank=True,null=True)
+    longitude = models.DecimalField(db_column='Longitude',max_digits=10,decimal_places=7,blank=True,null=True)
+    location = models.CharField(db_column='Location',max_length=500,blank=True,null=True)
+    receiver_image = models.ImageField(db_column='ReceiverImage',upload_to='dc_receiver/',blank=True,null=True)
+    received_at = models.DateTimeField(db_column='ReceivedAt', auto_now_add=True)
+
+    class Meta:
+        db_table = 'dc_receiver_verify'
+
+    def __str__(self):
+        return (f"DCNo: {self.DCNo},"f"JobNo: {self.jobno},"f"Date: {self.date},"f"TrsType: {self.trstype}")
