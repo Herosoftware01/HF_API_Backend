@@ -2767,6 +2767,7 @@ def dyeing_order_details(request):
 
 def GetCuttingDetails(request):
     jobno = request.GET.get("jobno")
+    TopBottomDes = request.GET.get("TopBottomDes")
 
     if not jobno:
         return JsonResponse(
@@ -2776,8 +2777,8 @@ def GetCuttingDetails(request):
 
     with connections["demo"].cursor() as cursor:
         cursor.execute(
-            "EXEC sp_GetCuttingDetails @jobno=%s",
-            [jobno]
+            "EXEC sp_GetCuttingDetails @jobno=%s, @TopBottomDes=%s",
+            [jobno, TopBottomDes]
         )
 
         columns = [col[0] for col in cursor.description]
