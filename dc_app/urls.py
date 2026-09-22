@@ -39,4 +39,6 @@ urlpatterns = [
     # For GET by role name (e.g., /dcapp/dc_permissions/Admin/)
     path('dc_permissions/<str:role_param>/', views.manage_role_permissions, name='get_role_permissions'),
     path('dc_verify_in/', views.dc_verify_incharge_crud, name='dc_verify_crud'),
+    path('dc_receiver/', views.dc_receiver_crud_api, name='dc_receiver_list_create'),
+    path('dc_receiver/<int:record_id>/', views.dc_receiver_crud_api, name='dc_receiver_detail'),
 ]
