@@ -2948,7 +2948,8 @@ def Master_Repcut_Details(request):
                     average=item["average"],
                     percentage=item["percentage"],
                     grandtotal=item["grandtotal"],
-                    totalavg=item["totalavg"]
+                    totalavg=item["totalavg"],
+                    partavg=item["partavg"]
                 )
 
         return JsonResponse({
@@ -2971,7 +2972,8 @@ def Master_Repcut_Details(request):
                 average=item["average"],
                 percentage=item["percentage"],
                 grandtotal=item["grandtotal"],
-                totalavg=item["totalavg"]
+                totalavg=item["totalavg"],
+                partavg=item["partavg"]
             )
 
         return JsonResponse({
