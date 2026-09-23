@@ -50,10 +50,16 @@ urlpatterns = [
     path("allocate-live/", views.get_allocate_live, name='get_allocate_live'),
     path("role_qc/", views.role_qc, name='role_qc'),
     path("qc_hourly_approval_api/", views.qc_hourly_approval_api, name='qc_hourly_approval_api'),
+    path("qcroving_qcwise/",views.qcroving_qcwise, name='qcroving_qcwise'),
     path(
         "save_measurementss/",
         views.save_measurementss,
         name="save_measurementss"
+    ),
+    path(
+        "finalize_measurementss/",
+        views.finalize_measurementss,
+        name="finalize_measurementss"
     ),
     path(
         "mmst/orders/",

@@ -1,3 +1,5 @@
+from itertools import count
+
 from django.shortcuts import render,get_object_or_404
 from django.db import connections
 from rest_framework.decorators import api_view
@@ -12,15 +14,16 @@ from collections import defaultdict
 from django.utils.timezone import now
 from django.conf import settings
 from django.http import JsonResponse
+from django.core.files.base import ContentFile
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET
 import json
+import base64
 from decimal import Decimal, InvalidOperation
 from django.utils.dateparse import parse_date
 from datetime import date, datetime, timedelta
 from django.db.models import Sum, Max
 from datetime import time
-from django.db import connection
 from django.utils import timezone
 from django.db.models import Case, When, Value, IntegerField,Sum
 from django.utils.timezone import localtime
@@ -28,10 +31,8 @@ from production_live_scan.models import Assembly_data, dependency
 from datetime import time as time_cls, datetime as datetime_cls, timedelta
 from collections import defaultdict
 from herofashion.models import User
+from datetime import date
 
-from rest_framework import viewsets, filters
-
-from .serializers import CutSampleSerializer
 
 from django.contrib.auth import get_user_model
 User = get_user_model()
@@ -2673,13 +2674,20 @@ def get_cutting_measurements(request):
 
     jobno = None
     top_bottom = None
+    plan_no = None
 
     for row in result:
         if row.get("jobno"):
             jobno = str(row.get("jobno")).strip()
         if row.get("TopBottom_des"):
             top_bottom = str(row.get("TopBottom_des")).strip()
-        if jobno and top_bottom:
+        for plan_key in (
+            "plan_no", "planNo", "Planno", "PlanNo", "planno", "PLAN_NO", "plan"
+        ):
+            if row.get(plan_key):
+                plan_no = str(row.get(plan_key)).strip()
+                break
+        if jobno and top_bottom and plan_no:
             break
 
     def entry_number_key(entry_no):
@@ -2691,8 +2699,30 @@ def get_cutting_measurements(request):
 
     saved_entry_map = {}
     all_saved_entries = []
+    saved_measurements = []
+    master_status = False
 
     if jobno and top_bottom:
+        master = MeasurementMas.objects.filter(
+            jobno=jobno,
+            bundle_no=str(sl).strip(),
+            plan_no=plan_no or "",
+        ).first()
+
+        if master:
+            master_status = bool(master.status)
+            saved_measurements = list(
+                master.measurements.values(
+                    "mes_id",
+                    "mesurement_name",
+                    "d_type",
+                    "standard",
+                    "tol",
+                    "group",
+                    "input_value",
+                )
+            )
+
         saved_entries = MeasurementEntry.objects.filter(
             order_no=jobno,
             top_bottom=top_bottom,
@@ -2745,6 +2775,9 @@ def get_cutting_measurements(request):
 
     return JsonResponse({
         "status": "success",
+        "plan_no": plan_no or "",
+        "master_status": master_status,
+        "saved_measurements": saved_measurements,
         "data": result
     })
 
@@ -3243,6 +3276,7 @@ def save_measurementss(request):
 
         jobno = data.get("jobno")
         bundle_no = data.get("bundle_no")
+        plan_no = str(data.get("plan_no") or "").strip()
         tob_bottom = data.get("tob_bottom")
         pcs = data.get("pcs")
         color = data.get("color")
@@ -3266,13 +3300,43 @@ def save_measurementss(request):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
+        if not plan_no:
+            return Response(
+                {
+                    "success": False,
+                    "message": "Plan No is required"
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        master = MeasurementMas.objects.filter(
+            jobno=jobno,
+            bundle_no=bundle_no,
+            plan_no=plan_no,
+        ).first()
+
+        if master and master.status:
+            return Response(
+                {
+                    "success": False,
+                    "message": "This bundle is already finalized and cannot be edited"
+                },
+                status=status.HTTP_409_CONFLICT
+            )
+
         mes_id = data.get("mes_id")
         mesurement_name = data.get("mesurement_name")
-        d_type = data.get("d_type")
+        d_type = str(data.get("d_type") or "").strip().upper()
         standard = data.get("standard")
         tol = data.get("tol")
-        group = data.get("group")
+        group = str(data.get("group") or "").strip().upper()
         input_value = data.get("input_value")
+
+        # Keep the database columns separate even when an older client sends
+        # a combined value such as F_BL.
+        combined_type = d_type if "_" in d_type else group
+        if "_" in combined_type:
+            group, d_type = combined_type.split("_", 1)
 
         if input_value is None or input_value == "":
             return Response(
@@ -3283,15 +3347,11 @@ def save_measurementss(request):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        master = MeasurementMas.objects.filter(
-            jobno=jobno,
-            bundle_no=bundle_no
-        ).first()
-
         if not master:
             master = MeasurementMas.objects.create(
                 jobno=jobno,
                 bundle_no=bundle_no,
+                plan_no=plan_no,
                 tob_bottom=tob_bottom or "",
                 pcs=int(pcs or 0),
                 color=color or "",
@@ -3302,6 +3362,7 @@ def save_measurementss(request):
         detail = MeasurementData.objects.filter(
             master=master,
             mes_id=mes_id or 0,
+            mesurement_name=mesurement_name or "",
             group=group or "",
             d_type=d_type or ""
         ).first()
@@ -3371,3 +3432,141 @@ def save_measurementss(request):
             },
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
+
+
+@api_view(["POST"])
+def finalize_measurementss(request):
+    jobno = str(request.data.get("jobno") or "").strip()
+    bundle_no = str(request.data.get("bundle_no") or "").strip()
+    plan_no = str(request.data.get("plan_no") or "").strip()
+
+    if not jobno or not bundle_no or not plan_no:
+        return Response(
+            {
+                "success": False,
+                "message": "Job No, Bundle No and Plan No are required"
+            },
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    master = MeasurementMas.objects.filter(
+        jobno=jobno,
+        bundle_no=bundle_no,
+        plan_no=plan_no,
+    ).first()
+
+    if not master:
+        return Response(
+            {
+                "success": False,
+                "message": "No saved measurements found for this bundle"
+            },
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+    master.status = True
+    master.save(update_fields=["status"])
+
+    return Response({
+        "success": True,
+        "master_id": master.id,
+        "status": 1,
+        "message": "All measurements finalized successfully",
+    })
+def qcroving_qcwise(request):
+    if request.method == 'GET':
+        try:
+            # 1. Query parameters
+            username = request.GET.get('username')
+            from_date = request.GET.get('from_date')
+            to_date = request.GET.get('to_date')
+
+            # 2. Base QuerySet
+            qc_final = qc_piece_final.objects.all()
+
+            # 3. Date filtering
+            if from_date and to_date:
+                qc_final = qc_final.filter(date__date__range=[from_date, to_date])
+            elif from_date:
+                qc_final = qc_final.filter(date__date__gte=from_date)
+            elif to_date:
+                qc_final = qc_final.filter(date__date__lte=to_date)
+            else:
+                today = date.today()
+                qc_final = qc_final.filter(date__date=today)
+
+            # 4. Username filtering
+            if username:
+                matching_user_ids = User.objects.filter(
+                    username__iexact=username
+                ).values_list('id', flat=True)
+                qc_final = qc_final.filter(user_id__in=matching_user_ids)
+
+            # 5. Bulk fetch users
+            user_ids = qc_final.values_list('user_id', flat=True).distinct()
+            user_map = {
+                u.id: u for u in User.objects.filter(id__in=user_ids)
+            }
+
+            # 6. Group by (username, first_name, jobno, product)
+            grouped_data = {}
+
+            for item in qc_final:
+                user = user_map.get(item.user_id)
+                u_name = user.username if user else None
+                f_name = user.first_name if user else None
+
+                # Composite grouping key
+                group_key = (u_name, f_name, item.jobno, item.product)
+
+                if group_key not in grouped_data:
+                    grouped_data[group_key] = {
+                        "date": item.date,
+                        "jobno": item.jobno,
+                        "bundle" : [],
+                        "product": item.product,
+                        "username": u_name,
+                        "first_name": f_name,
+                        "machine": [],
+                        "_unique_bundles": set() #  Hidden set to track unique bundles
+                    }
+
+                # Add machine to list (avoid duplicates while keeping order)
+                if item.machine_id and item.machine_id not in grouped_data[group_key]["machine"]:
+                    grouped_data[group_key]["machine"].append(item.machine_id)
+
+                if item.bundle_no and item.bundle_no not in grouped_data[group_key]["bundle"]:
+                                    grouped_data[group_key]["bundle"].append(item.bundle_no)
+                
+                # Add bundle to set to track unique bundle count
+                if item.bundle_no:
+                    grouped_data[group_key]["_unique_bundles"].add(item.bundle_no)
+
+            # 7. Finalize result format
+            result = []
+            for item_data in grouped_data.values():
+                # Get the count of unique bundles
+                item_data["bundle_count"] = len(item_data["_unique_bundles"])
+                # Remove the temporary set before sending JSON
+                del item_data["_unique_bundles"]
+                
+                result.append(item_data)
+
+            return JsonResponse({
+                "status": True,
+                "message": "QC data fetched successfully",
+                "count": len(result),
+                "data": result
+            })
+
+        except Exception as e:
+            return JsonResponse({
+                "status": False,
+                "message": "Something went wrong",
+                "error": str(e)
+            }, status=500)
+
+    return JsonResponse({
+        "status": False,
+        "message": "Only GET method is allowed"
+    }, status=405)
