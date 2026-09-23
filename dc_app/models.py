@@ -533,8 +533,8 @@ class RoleModulePermission(models.Model):
 
 
 
-class Dc_Verify_Incharge(models.Model):
-    id = models.AutoField(db_column='id', primary_key=True)
+class Dc_Incharge_Verify(models.Model):
+    id = models.AutoField(primary_key=True)
     date = models.DateTimeField(db_column='Date')  # Field name made lowercase.
     DCNo = models.IntegerField(db_column='DCNo')  # Field name made lowercase.
     jobno = models.CharField(db_column='JobNo', max_length=50)  # Field name made lowercase. # Field name made lowercase.
@@ -546,7 +546,7 @@ class Dc_Verify_Incharge(models.Model):
     username = models.IntegerField(db_column='Username')  # Field name made lowercase.
 
     class Meta:
-        db_table = 'dc_verify_incharge'
+        db_table = 'dc_incharge_verify'
 
     def __str__(self):
         return f"DCNo: {self.DCNo}, JobNo: {self.jobno}, Date: {self.date}, TrsType: {self.trstype}"

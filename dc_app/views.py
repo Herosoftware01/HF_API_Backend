@@ -1,5 +1,5 @@
 from django.http import JsonResponse
-from .models import ViewCuttingDelPrint,ViewKnitDelivery,ViewCutsecFabricdelivery,VueAccInhTransfer,VueAccProdDel,TrsGatemodule, CuttingPrintembdel, ViewYarnProcessDelivery,VueAccProcDel,ViewAccinwardVerification,ViewFabricDeliveryProcess,ViewMistakeqtyPrint,ViewUnitPcdelivery,VueRibDeliveryDetails,ViewGdwnFabricDeliveryPlan,TrsApidtls,ViewFabricDeliveryRepl,HerofashionUser,Holiday,RoleModulePermission,Dc_Verify_Incharge,Dc_Reciver_Verify
+from .models import ViewCuttingDelPrint,ViewKnitDelivery,ViewCutsecFabricdelivery,VueAccInhTransfer,VueAccProdDel,TrsGatemodule, CuttingPrintembdel, ViewYarnProcessDelivery,VueAccProcDel,ViewAccinwardVerification,ViewFabricDeliveryProcess,ViewMistakeqtyPrint,ViewUnitPcdelivery,VueRibDeliveryDetails,ViewGdwnFabricDeliveryPlan,TrsApidtls,ViewFabricDeliveryRepl,HerofashionUser,Holiday,RoleModulePermission,Dc_Incharge_Verify,Dc_Reciver_Verify
 import json
 from django.views.decorators.csrf import csrf_exempt
 from django.forms.models import model_to_dict
@@ -541,7 +541,8 @@ def _validate_and_extract_payload(data, is_update=False):
     cleaned = {}
 
     # Required fields on creation
-    required_fields = ["id", "date", "DCNo", "jobno", "trstype", "username"]
+    # The database generates the AutoField primary key on create.
+    required_fields = ["date", "DCNo", "jobno", "trstype", "username"]
     if not is_update:
         missing = [f for f in required_fields if f not in data or data[f] is None or str(data[f]).strip() == ""]
         if missing:
@@ -641,13 +642,13 @@ def dc_verify_incharge_crud(request):
     # READ (GET)
     # ----------------------------------------------------
     if method == "GET":
-        slno = request.GET.get("id")
+        record_id = request.GET.get("id") or request.GET.get("slno")
         dcno = request.GET.get("dcno") or request.GET.get("DCNo")
 
-        queryset = Dc_Verify_Incharge.objects.all()
+        queryset = Dc_Incharge_Verify.objects.all()
 
-        if id:
-            queryset = queryset.filter(id=id)
+        if record_id:
+            queryset = queryset.filter(id=record_id)
         if dcno:
             queryset = queryset.filter(DCNo=dcno)
 
@@ -677,19 +678,12 @@ def dc_verify_incharge_crud(request):
         if error:
             return JsonResponse({"status": False, "message": error}, status=400)
 
-        # Check primary key collision since 'slno' is user-supplied
-        if Dc_Verify_Incharge.objects.filter(id=cleaned_data["id"]).exists():
-            return JsonResponse({
-                "status": False,
-                "message": f"Record with id '{cleaned_data['id']}' already exists."
-            }, status=409)
-
         try:
-            instance = Dc_Verify_Incharge.objects.create(**cleaned_data)
+            instance = Dc_Incharge_Verify.objects.create(**cleaned_data)
             return JsonResponse({
                 "status": True,
                 "message": "Record created successfully.",
-                "data": list(Dc_Verify_Incharge.objects.filter(slno=instance.slno).values())[0]
+                "data": list(Dc_Incharge_Verify.objects.filter(id=instance.id).values())[0]
             }, status=201)
         except ValidationError as e:
             return JsonResponse({"status": False, "message": str(e)}, status=400)
@@ -700,19 +694,19 @@ def dc_verify_incharge_crud(request):
     # UPDATE (PUT)
     # ----------------------------------------------------
     elif method == "PUT":
-        slno = request.GET.get("id") or body.get("id")
-        if not slno:
+        record_id = request.GET.get("id") or request.GET.get("slno") or body.get("id") or body.get("slno")
+        if not record_id:
             return JsonResponse({
                 "status": False,
                 "message": "'slno' parameter is required for update (in query params or body)."
             }, status=400)
 
         try:
-            instance = Dc_Verify_Incharge.objects.get(slno=slno)
-        except Dc_Verify_Incharge.DoesNotExist:
+            instance = Dc_Incharge_Verify.objects.get(id=record_id)
+        except Dc_Incharge_Verify.DoesNotExist:
             return JsonResponse({
                 "status": False,
-                "message": f"Record with slno '{id}' not found."
+                "message": f"Record with slno '{record_id}' not found."
             }, status=404)
 
         cleaned_data, error = _validate_and_extract_payload(body, is_update=True)
@@ -729,7 +723,7 @@ def dc_verify_incharge_crud(request):
             return JsonResponse({
                 "status": True,
                 "message": "Record updated successfully.",
-                "data": list(Dc_Verify_Incharge.objects.filter(id=instance.id).values())[0]
+                "data": list(Dc_Incharge_Verify.objects.filter(id=instance.id).values())[0]
             }, status=200)
         except ValidationError as e:
             return JsonResponse({"status": False, "message": str(e)}, status=400)
@@ -756,13 +750,13 @@ def dc_verify_incharge_crud(request):
             }, status=400)
 
         try:
-            instance = Dc_Verify_Incharge.objects.get(slno=id)
+            instance = Dc_Incharge_Verify.objects.get(id=id)
             instance.delete()
             return JsonResponse({
                 "status": True,
                 "message": f"Record with slno '{id}' deleted successfully."
             }, status=200)
-        except Dc_Verify_Incharge.DoesNotExist:
+        except Dc_Incharge_Verify.DoesNotExist:
             return JsonResponse({
                 "status": False,
                 "message": f"Record with slno '{id}' not found."

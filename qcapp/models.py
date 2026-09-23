@@ -630,3 +630,5 @@ class MeasurementEntry(models.Model):
             f"{self.group} - "
             f"{self.d_type}"
         )
+
+
