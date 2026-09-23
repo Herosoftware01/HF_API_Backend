@@ -546,11 +546,13 @@ class QcHourlyApproval(models.Model):
 class MeasurementMas(models.Model):
     jobno = models.CharField(max_length=50)
     bundle_no = models.CharField(max_length=50)
+    plan_no = models.CharField(max_length=50)
     tob_bottom = models.CharField(max_length=50)
     pcs = models.IntegerField()
     color = models.CharField(max_length=100)
     size = models.CharField(max_length=50)
     date = models.DateTimeField(auto_now_add=True)
+    status = models.BooleanField(default=False)
 
     def __str__(self):
         return f"{self.jobno} - {self.bundle_no}"
