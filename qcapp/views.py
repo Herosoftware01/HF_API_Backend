@@ -2698,6 +2698,8 @@ def get_cutting_measurements(request):
             return float("inf"), float("inf")
 
     saved_entry_map = {}
+    skipped_entry_map = {}
+    measurement_order_map = {}
     all_saved_entries = []
     saved_measurements = []
     master_status = False
@@ -2729,13 +2731,31 @@ def get_cutting_measurements(request):
         ).order_by("id")
 
         for entry in saved_entries:
+            key = str(entry.measurement or "").strip().lower()
+            field_key = (
+                f"{str(entry.group).strip().lower()}_"
+                f"{str(entry.d_type).strip().lower()}"
+                if str(entry.d_type).strip().upper() != "STD"
+                else str(entry.group).strip().lower()
+            )
+
+            if entry.mes_order:
+                measurement_order_map[key] = min(
+                    measurement_order_map.get(key, entry.mes_order),
+                    entry.mes_order,
+                )
+
+            if entry.skip_mes or str(entry.entry_no).strip() == "0":
+                skipped_entry_map.setdefault(key, set()).add(field_key)
+                continue
+
             entry_data = {
                 "entry_no": entry.entry_no,
                 "group": entry.group,
                 "d_type": entry.d_type,
+                "mes_order": entry.mes_order,
             }
             all_saved_entries.append(entry_data)
-            key = str(entry.measurement or "").strip().lower()
             if not key:
                 continue
             saved_entry_map.setdefault(key, []).append(entry_data)
@@ -2764,6 +2784,10 @@ def get_cutting_measurements(request):
         )
 
         row["saved_entry_numbers"] = matched_entries
+        row["skip_fields"] = sorted(
+            skipped_entry_map.get(base_key, set())
+        )
+        row["mes_order"] = measurement_order_map.get(base_key, 0)
         row["entry_no_sequence"] = [
             item["entry_no"] for item in matched_entries
         ]
@@ -2772,6 +2796,13 @@ def get_cutting_measurements(request):
             matched_entries[0]["entry_no"]
             if matched_entries else ""
         )
+
+    result.sort(
+        key=lambda row: (
+            row.get("mes_order") or float("inf"),
+            str(row.get("measurdtls") or "").lower(),
+        )
+    )
 
     return JsonResponse({
         "status": "success",
@@ -2904,6 +2935,26 @@ def get_mmst_types(request):
             .order_by("ty")
         )
 
+        top_bottoms = dict(
+            MmstAssign.objects.using("demo")
+            .filter(
+                ordno=ordno,
+                tbid=tbid,
+                ty__isnull=False,
+            )
+            .exclude(ty="")
+            .values_list("ty", "topbottom_des")
+            .distinct()
+        )
+
+        for item in data:
+            top_bottom = top_bottoms.get(item["ty"], "")
+            item["entry_exists"] = MeasurementEntry.objects.filter(
+                order_no=ordno,
+                top_bottom=top_bottom,
+                type=item["ty"],
+            ).exists()
+
         return JsonResponse({
             "success": True,
             "data": data
@@ -3029,6 +3080,19 @@ def measuremententry_save(request):
                 measurement = str(payload.get("mesurement_name", "")).strip()
                 measurement_type = str(payload.get("ty", "")).strip()
                 input_value = payload.get("input_value")
+                mes_order = payload.get("mes_order", 0)
+                skip_mes = payload.get("skip_mes", False)
+                if isinstance(skip_mes, str):
+                    skip_mes = skip_mes.strip().lower() in {
+                        "1", "true", "yes", "on"
+                    }
+                else:
+                    skip_mes = bool(skip_mes)
+
+                try:
+                    mes_order = int(mes_order or 0)
+                except (TypeError, ValueError):
+                    mes_order = 0
 
                 group = str(payload.get("group", "")).strip().upper()
                 d_type = str(payload.get("d_type", "STD")).strip().upper()
@@ -3051,7 +3115,7 @@ def measuremententry_save(request):
                 if not measurement_type:
                     raise ValueError(f"Entry {idx + 1}: Type is required")
 
-                if input_value in [None, ""]:
+                if not skip_mes and input_value in [None, ""]:
                     raise ValueError(f"Entry {idx + 1}: Input value is required")
 
                 if not group:
@@ -3070,10 +3134,11 @@ def measuremententry_save(request):
                         f"Entry {idx + 1}: Invalid d_type. Use STD, FR, FL, BR or BL."
                     )
 
-                try:
-                    input_value = Decimal(str(input_value))
-                except (InvalidOperation, ValueError):
-                    raise ValueError(f"Entry {idx + 1}: Invalid input value")
+                if not skip_mes:
+                    try:
+                        input_value = Decimal(str(input_value))
+                    except (InvalidOperation, ValueError):
+                        raise ValueError(f"Entry {idx + 1}: Invalid input value")
 
                 if standard not in [None, ""]:
                     try:
@@ -3112,6 +3177,8 @@ def measuremententry_save(request):
                     group=group,
                     d_type=d_type,
                     entry_no=entry_no,
+                    mes_order=mes_order,
+                    skip_mes=skip_mes,
                 )
 
                 created_entries.append({
@@ -3124,6 +3191,8 @@ def measuremententry_save(request):
                     "group": measurement_entry.group,
                     "d_type": measurement_entry.d_type,
                     "entry_no": measurement_entry.entry_no,
+                    "mes_order": measurement_entry.mes_order,
+                    "skip_mes": measurement_entry.skip_mes,
                     "created_at": measurement_entry.created_at.isoformat(),
                 })
             except Exception as exc:
@@ -3223,7 +3292,9 @@ def measuremententry_load(request):
             "group": entry.group,
             "d_type": entry.d_type,
             "entry_no": entry.entry_no,
+            "mes_order": entry.mes_order,
             "input_value": "",
+            "skip_mes": entry.skip_mes,
         }
         for entry in entries
     ]
