@@ -1,4 +1,4 @@
-from .models import ViewRepcutPend, Repcutpending, View_Master_RepcutPend, Master_Replace_Cutpend, VueHoldwage, Empwisesal, Employeeworking, Holdwagepaid,ResignDtls,Empjoin,AttStaff,StaffAbsent,StaffAtt,ContractSec, VueRepCutPend, VueDyeingRatenew, Txorderdetstyles
+from .models import ViewAbsentList, ViewRepcutPend, Repcutpending, View_Master_RepcutPend, Master_Replace_Cutpend, VueHoldwage, Empwisesal, Employeeworking, Holdwagepaid,ResignDtls,Empjoin,AttStaff,StaffAbsent,StaffAtt,ContractSec, VueRepCutPend, VueDyeingRatenew, Txorderdetstyles
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 import os
@@ -2775,6 +2775,12 @@ def GetCuttingDetails(request):
             status=400
         )
 
+    if not TopBottomDes:
+        return JsonResponse(
+            {"error": "TopBottomDes parameter is required"},
+            status=400
+        )
+
     with connections["demo"].cursor() as cursor:
         cursor.execute(
             "EXEC sp_GetCuttingDetails @jobno=%s, @TopBottomDes=%s",
@@ -2996,3 +3002,25 @@ def Master_Repcut_Details(request):
         return JsonResponse({
             "message": "Records deleted successfully"
         })
+
+def Absent_list(request):
+
+    unitname = request.GET.get('unitname')
+    name = request.GET.get('name')
+    month = request.GET.get('month')
+
+    queryset = ViewAbsentList.objects.using('main').all()
+
+    if unitname:
+        units = unitname.split(',')
+        queryset = queryset.filter(unitname__in=units)
+
+    if name:
+        queryset = queryset.filter(name=name)
+
+    if month:
+        months = month.split(',')
+        queryset = queryset.filter(month__in=months)
+
+    data = list(queryset.values())
+    return JsonResponse(data, safe=False)
