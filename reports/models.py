@@ -1009,6 +1009,7 @@ class Master_Replace_Cutpend(models.Model):
     percentage = models.DecimalField(db_column='Percentage', max_digits=10, decimal_places=2, blank=True, null=True) 
     grandtotal = models.DecimalField(db_column='GrandTotal', max_digits=10, decimal_places=2, blank=True, null=True) 
     totalavg = models.DecimalField(db_column='GrandTotalAvg', max_digits=10, decimal_places=2, blank=True, null=True) 
+    partavg = models.DecimalField(db_column='PartAvg', max_digits=10, decimal_places=2, blank=True, null=True) 
 
     class Meta:
         managed = False
