@@ -1016,3 +1016,18 @@ class Master_Replace_Cutpend(models.Model):
     class Meta:
         managed = False
         db_table = 'Master_Repcutpend'
+
+class ViewAbsentList(models.Model):
+    id = models.IntegerField(primary_key=True)
+    unitname = models.CharField(max_length=50)
+    month = models.CharField(max_length=3, blank=True, null=True,db_column='m')
+    year = models.IntegerField(blank=True, null=True, db_column='y')
+    workingdays = models.IntegerField(blank=True, null=True, db_column='days')
+    leave_days = models.IntegerField(blank=True, null=True, db_column='leavdays')
+    informed = models.IntegerField(blank=True, null=True, db_column='inl')
+    shiftdays = models.IntegerField(blank=True, null=True, db_column='actshiftdays')
+    name = models.CharField(max_length=100, blank=True, null=True)
+
+    class Meta:
+        managed = False
+        db_table = 'view_absent_list'

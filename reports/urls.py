@@ -54,4 +54,7 @@ urlpatterns = [
     path('cutting_replace_pending/', views.Cutting_Replace_Pending, name='Cutting_Replace_Pending'),
     path('master_repcut/', views.Master_Repcut, name='Master_Repcut'),
     path('master_repcut_details/', views.Master_Repcut_Details, name='Master_Repcut_Details'),
-    ] 
+
+    # Absent List Report
+    path('absent_list/', views.Absent_list, name='Absent_list'),
+] 
