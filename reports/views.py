@@ -1860,7 +1860,7 @@ def _fill_days(counts_by_day, days):
 
 def _to_js_ts(d):
     if isinstance(d, (datetime, date)):
-        dt = datetime(d.year, d.month, getattr(d, "day", 1), tzinfo=dt_timezone.utc)
+        dt = datetime(d.year, d.month, getattr(d, "day", 1), tzinfo=timezone.utc)
         return int(dt.timestamp() * 1000)
 
     if isinstance(d, str):
@@ -1873,7 +1873,7 @@ def _to_js_ts(d):
                 d = datetime.strptime(d.split(" ")[0], "%Y-%m-%d").date()
             except Exception:
                 return None
-        dt = datetime(d.year, d.month, d.day, tzinfo=dt_timezone.utc)
+        dt = datetime(d.year, d.month, d.day, tzinfo=timezone.utc)
         return int(dt.timestamp() * 1000)
 
     return None

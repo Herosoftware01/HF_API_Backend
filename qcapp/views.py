@@ -1,3 +1,5 @@
+from itertools import count
+
 from django.shortcuts import render,get_object_or_404
 from django.db import connections
 from rest_framework.decorators import api_view
@@ -20,7 +22,6 @@ from django.utils.dateparse import parse_date
 from datetime import date, datetime, timedelta
 from django.db.models import Sum, Max
 from datetime import time
-from django.db import connection
 from django.utils import timezone
 from django.db.models import Case, When, Value, IntegerField,Sum
 from django.utils.timezone import localtime
@@ -28,10 +29,8 @@ from production_live_scan.models import Assembly_data, dependency
 from datetime import time as time_cls, datetime as datetime_cls, timedelta
 from collections import defaultdict
 from herofashion.models import User
+from datetime import date
 
-from rest_framework import viewsets, filters
-
-from .serializers import CutSampleSerializer
 
 from django.contrib.auth import get_user_model
 User = get_user_model()
@@ -3371,3 +3370,101 @@ def save_measurementss(request):
             },
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
+
+def qcroving_qcwise(request):
+    if request.method == 'GET':
+        try:
+            # 1. Query parameters
+            username = request.GET.get('username')
+            from_date = request.GET.get('from_date')
+            to_date = request.GET.get('to_date')
+
+            # 2. Base QuerySet
+            qc_final = qc_piece_final.objects.all()
+
+            # 3. Date filtering
+            if from_date and to_date:
+                qc_final = qc_final.filter(date__date__range=[from_date, to_date])
+            elif from_date:
+                qc_final = qc_final.filter(date__date__gte=from_date)
+            elif to_date:
+                qc_final = qc_final.filter(date__date__lte=to_date)
+            else:
+                today = date.today()
+                qc_final = qc_final.filter(date__date=today)
+
+            # 4. Username filtering
+            if username:
+                matching_user_ids = User.objects.filter(
+                    username__iexact=username
+                ).values_list('id', flat=True)
+                qc_final = qc_final.filter(user_id__in=matching_user_ids)
+
+            # 5. Bulk fetch users
+            user_ids = qc_final.values_list('user_id', flat=True).distinct()
+            user_map = {
+                u.id: u for u in User.objects.filter(id__in=user_ids)
+            }
+
+            # 6. Group by (username, first_name, jobno, product)
+            grouped_data = {}
+
+            for item in qc_final:
+                user = user_map.get(item.user_id)
+                u_name = user.username if user else None
+                f_name = user.first_name if user else None
+
+                # Composite grouping key
+                group_key = (u_name, f_name, item.jobno, item.product)
+
+                if group_key not in grouped_data:
+                    grouped_data[group_key] = {
+                        "date": item.date,
+                        "jobno": item.jobno,
+                        "bundle" : [],
+                        "product": item.product,
+                        "username": u_name,
+                        "first_name": f_name,
+                        "machine": [],
+                        "_unique_bundles": set() #  Hidden set to track unique bundles
+                    }
+
+                # Add machine to list (avoid duplicates while keeping order)
+                if item.machine_id and item.machine_id not in grouped_data[group_key]["machine"]:
+                    grouped_data[group_key]["machine"].append(item.machine_id)
+
+                if item.bundle_no and item.bundle_no not in grouped_data[group_key]["bundle"]:
+                                    grouped_data[group_key]["bundle"].append(item.bundle_no)
+                
+                # Add bundle to set to track unique bundle count
+                if item.bundle_no:
+                    grouped_data[group_key]["_unique_bundles"].add(item.bundle_no)
+
+            # 7. Finalize result format
+            result = []
+            for item_data in grouped_data.values():
+                # Get the count of unique bundles
+                item_data["bundle_count"] = len(item_data["_unique_bundles"])
+                # Remove the temporary set before sending JSON
+                del item_data["_unique_bundles"]
+                
+                result.append(item_data)
+
+            return JsonResponse({
+                "status": True,
+                "message": "QC data fetched successfully",
+                "count": len(result),
+                "data": result
+            })
+
+        except Exception as e:
+            return JsonResponse({
+                "status": False,
+                "message": "Something went wrong",
+                "error": str(e)
+            }, status=500)
+
+    return JsonResponse({
+        "status": False,
+        "message": "Only GET method is allowed"
+    }, status=405)
