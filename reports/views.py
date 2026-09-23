@@ -2949,7 +2949,9 @@ def Master_Repcut_Details(request):
                     percentage=item["percentage"],
                     grandtotal=item["grandtotal"],
                     totalavg=item["totalavg"],
-                    partavg=item["partavg"]
+                    partavg=item["partavg"],
+                    omspcs=item["omspcs"],
+                    omsexcess=item["omsexcess"]
                 )
 
         return JsonResponse({
@@ -2973,7 +2975,9 @@ def Master_Repcut_Details(request):
                 percentage=item["percentage"],
                 grandtotal=item["grandtotal"],
                 totalavg=item["totalavg"],
-                partavg=item["partavg"]
+                partavg=item["partavg"],
+                omspcs=item["omspcs"],
+                omsexcess=item["omsexcess"]
             )
 
         return JsonResponse({
