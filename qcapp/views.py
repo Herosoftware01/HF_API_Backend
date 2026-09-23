@@ -14,9 +14,11 @@ from collections import defaultdict
 from django.utils.timezone import now
 from django.conf import settings
 from django.http import JsonResponse
+from django.core.files.base import ContentFile
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET
 import json
+import base64
 from decimal import Decimal, InvalidOperation
 from django.utils.dateparse import parse_date
 from datetime import date, datetime, timedelta
