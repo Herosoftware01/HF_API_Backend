@@ -2674,13 +2674,20 @@ def get_cutting_measurements(request):
 
     jobno = None
     top_bottom = None
+    plan_no = None
 
     for row in result:
         if row.get("jobno"):
             jobno = str(row.get("jobno")).strip()
         if row.get("TopBottom_des"):
             top_bottom = str(row.get("TopBottom_des")).strip()
-        if jobno and top_bottom:
+        for plan_key in (
+            "plan_no", "planNo", "Planno", "PlanNo", "planno", "PLAN_NO", "plan"
+        ):
+            if row.get(plan_key):
+                plan_no = str(row.get(plan_key)).strip()
+                break
+        if jobno and top_bottom and plan_no:
             break
 
     def entry_number_key(entry_no):
@@ -2691,22 +2698,64 @@ def get_cutting_measurements(request):
             return float("inf"), float("inf")
 
     saved_entry_map = {}
+    skipped_entry_map = {}
+    measurement_order_map = {}
     all_saved_entries = []
+    saved_measurements = []
+    master_status = False
 
     if jobno and top_bottom:
+        master = MeasurementMas.objects.filter(
+            jobno=jobno,
+            bundle_no=str(sl).strip(),
+            plan_no=plan_no or "",
+        ).first()
+
+        if master:
+            master_status = bool(master.status)
+            saved_measurements = list(
+                master.measurements.values(
+                    "mes_id",
+                    "mesurement_name",
+                    "d_type",
+                    "standard",
+                    "tol",
+                    "group",
+                    "input_value",
+                )
+            )
+
         saved_entries = MeasurementEntry.objects.filter(
             order_no=jobno,
             top_bottom=top_bottom,
         ).order_by("id")
 
         for entry in saved_entries:
+            key = str(entry.measurement or "").strip().lower()
+            field_key = (
+                f"{str(entry.group).strip().lower()}_"
+                f"{str(entry.d_type).strip().lower()}"
+                if str(entry.d_type).strip().upper() != "STD"
+                else str(entry.group).strip().lower()
+            )
+
+            if entry.mes_order:
+                measurement_order_map[key] = min(
+                    measurement_order_map.get(key, entry.mes_order),
+                    entry.mes_order,
+                )
+
+            if entry.skip_mes or str(entry.entry_no).strip() == "0":
+                skipped_entry_map.setdefault(key, set()).add(field_key)
+                continue
+
             entry_data = {
                 "entry_no": entry.entry_no,
                 "group": entry.group,
                 "d_type": entry.d_type,
+                "mes_order": entry.mes_order,
             }
             all_saved_entries.append(entry_data)
-            key = str(entry.measurement or "").strip().lower()
             if not key:
                 continue
             saved_entry_map.setdefault(key, []).append(entry_data)
@@ -2735,6 +2784,10 @@ def get_cutting_measurements(request):
         )
 
         row["saved_entry_numbers"] = matched_entries
+        row["skip_fields"] = sorted(
+            skipped_entry_map.get(base_key, set())
+        )
+        row["mes_order"] = measurement_order_map.get(base_key, 0)
         row["entry_no_sequence"] = [
             item["entry_no"] for item in matched_entries
         ]
@@ -2744,8 +2797,18 @@ def get_cutting_measurements(request):
             if matched_entries else ""
         )
 
+    result.sort(
+        key=lambda row: (
+            row.get("mes_order") or float("inf"),
+            str(row.get("measurdtls") or "").lower(),
+        )
+    )
+
     return JsonResponse({
         "status": "success",
+        "plan_no": plan_no or "",
+        "master_status": master_status,
+        "saved_measurements": saved_measurements,
         "data": result
     })
 
@@ -2872,6 +2935,26 @@ def get_mmst_types(request):
             .order_by("ty")
         )
 
+        top_bottoms = dict(
+            MmstAssign.objects.using("demo")
+            .filter(
+                ordno=ordno,
+                tbid=tbid,
+                ty__isnull=False,
+            )
+            .exclude(ty="")
+            .values_list("ty", "topbottom_des")
+            .distinct()
+        )
+
+        for item in data:
+            top_bottom = top_bottoms.get(item["ty"], "")
+            item["entry_exists"] = MeasurementEntry.objects.filter(
+                order_no=ordno,
+                top_bottom=top_bottom,
+                type=item["ty"],
+            ).exists()
+
         return JsonResponse({
             "success": True,
             "data": data
@@ -2997,6 +3080,19 @@ def measuremententry_save(request):
                 measurement = str(payload.get("mesurement_name", "")).strip()
                 measurement_type = str(payload.get("ty", "")).strip()
                 input_value = payload.get("input_value")
+                mes_order = payload.get("mes_order", 0)
+                skip_mes = payload.get("skip_mes", False)
+                if isinstance(skip_mes, str):
+                    skip_mes = skip_mes.strip().lower() in {
+                        "1", "true", "yes", "on"
+                    }
+                else:
+                    skip_mes = bool(skip_mes)
+
+                try:
+                    mes_order = int(mes_order or 0)
+                except (TypeError, ValueError):
+                    mes_order = 0
 
                 group = str(payload.get("group", "")).strip().upper()
                 d_type = str(payload.get("d_type", "STD")).strip().upper()
@@ -3019,7 +3115,7 @@ def measuremententry_save(request):
                 if not measurement_type:
                     raise ValueError(f"Entry {idx + 1}: Type is required")
 
-                if input_value in [None, ""]:
+                if not skip_mes and input_value in [None, ""]:
                     raise ValueError(f"Entry {idx + 1}: Input value is required")
 
                 if not group:
@@ -3038,10 +3134,11 @@ def measuremententry_save(request):
                         f"Entry {idx + 1}: Invalid d_type. Use STD, FR, FL, BR or BL."
                     )
 
-                try:
-                    input_value = Decimal(str(input_value))
-                except (InvalidOperation, ValueError):
-                    raise ValueError(f"Entry {idx + 1}: Invalid input value")
+                if not skip_mes:
+                    try:
+                        input_value = Decimal(str(input_value))
+                    except (InvalidOperation, ValueError):
+                        raise ValueError(f"Entry {idx + 1}: Invalid input value")
 
                 if standard not in [None, ""]:
                     try:
@@ -3080,6 +3177,8 @@ def measuremententry_save(request):
                     group=group,
                     d_type=d_type,
                     entry_no=entry_no,
+                    mes_order=mes_order,
+                    skip_mes=skip_mes,
                 )
 
                 created_entries.append({
@@ -3092,6 +3191,8 @@ def measuremententry_save(request):
                     "group": measurement_entry.group,
                     "d_type": measurement_entry.d_type,
                     "entry_no": measurement_entry.entry_no,
+                    "mes_order": measurement_entry.mes_order,
+                    "skip_mes": measurement_entry.skip_mes,
                     "created_at": measurement_entry.created_at.isoformat(),
                 })
             except Exception as exc:
@@ -3191,7 +3292,9 @@ def measuremententry_load(request):
             "group": entry.group,
             "d_type": entry.d_type,
             "entry_no": entry.entry_no,
+            "mes_order": entry.mes_order,
             "input_value": "",
+            "skip_mes": entry.skip_mes,
         }
         for entry in entries
     ]
@@ -3244,6 +3347,7 @@ def save_measurementss(request):
 
         jobno = data.get("jobno")
         bundle_no = data.get("bundle_no")
+        plan_no = str(data.get("plan_no") or "").strip()
         tob_bottom = data.get("tob_bottom")
         pcs = data.get("pcs")
         color = data.get("color")
@@ -3267,13 +3371,43 @@ def save_measurementss(request):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
+        if not plan_no:
+            return Response(
+                {
+                    "success": False,
+                    "message": "Plan No is required"
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        master = MeasurementMas.objects.filter(
+            jobno=jobno,
+            bundle_no=bundle_no,
+            plan_no=plan_no,
+        ).first()
+
+        if master and master.status:
+            return Response(
+                {
+                    "success": False,
+                    "message": "This bundle is already finalized and cannot be edited"
+                },
+                status=status.HTTP_409_CONFLICT
+            )
+
         mes_id = data.get("mes_id")
         mesurement_name = data.get("mesurement_name")
-        d_type = data.get("d_type")
+        d_type = str(data.get("d_type") or "").strip().upper()
         standard = data.get("standard")
         tol = data.get("tol")
-        group = data.get("group")
+        group = str(data.get("group") or "").strip().upper()
         input_value = data.get("input_value")
+
+        # Keep the database columns separate even when an older client sends
+        # a combined value such as F_BL.
+        combined_type = d_type if "_" in d_type else group
+        if "_" in combined_type:
+            group, d_type = combined_type.split("_", 1)
 
         if input_value is None or input_value == "":
             return Response(
@@ -3284,15 +3418,11 @@ def save_measurementss(request):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        master = MeasurementMas.objects.filter(
-            jobno=jobno,
-            bundle_no=bundle_no
-        ).first()
-
         if not master:
             master = MeasurementMas.objects.create(
                 jobno=jobno,
                 bundle_no=bundle_no,
+                plan_no=plan_no,
                 tob_bottom=tob_bottom or "",
                 pcs=int(pcs or 0),
                 color=color or "",
@@ -3303,6 +3433,7 @@ def save_measurementss(request):
         detail = MeasurementData.objects.filter(
             master=master,
             mes_id=mes_id or 0,
+            mesurement_name=mesurement_name or "",
             group=group or "",
             d_type=d_type or ""
         ).first()
@@ -3373,6 +3504,46 @@ def save_measurementss(request):
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
+
+@api_view(["POST"])
+def finalize_measurementss(request):
+    jobno = str(request.data.get("jobno") or "").strip()
+    bundle_no = str(request.data.get("bundle_no") or "").strip()
+    plan_no = str(request.data.get("plan_no") or "").strip()
+
+    if not jobno or not bundle_no or not plan_no:
+        return Response(
+            {
+                "success": False,
+                "message": "Job No, Bundle No and Plan No are required"
+            },
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    master = MeasurementMas.objects.filter(
+        jobno=jobno,
+        bundle_no=bundle_no,
+        plan_no=plan_no,
+    ).first()
+
+    if not master:
+        return Response(
+            {
+                "success": False,
+                "message": "No saved measurements found for this bundle"
+            },
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+    master.status = True
+    master.save(update_fields=["status"])
+
+    return Response({
+        "success": True,
+        "master_id": master.id,
+        "status": 1,
+        "message": "All measurements finalized successfully",
+    })
 def qcroving_qcwise(request):
     if request.method == 'GET':
         try:
