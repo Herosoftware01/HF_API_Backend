@@ -1860,7 +1860,7 @@ def _fill_days(counts_by_day, days):
 
 def _to_js_ts(d):
     if isinstance(d, (datetime, date)):
-        dt = datetime(d.year, d.month, getattr(d, "day", 1), tzinfo=dt_timezone.utc)
+        dt = datetime(d.year, d.month, getattr(d, "day", 1), tzinfo=timezone.utc)
         return int(dt.timestamp() * 1000)
 
     if isinstance(d, str):
@@ -1873,7 +1873,7 @@ def _to_js_ts(d):
                 d = datetime.strptime(d.split(" ")[0], "%Y-%m-%d").date()
             except Exception:
                 return None
-        dt = datetime(d.year, d.month, d.day, tzinfo=dt_timezone.utc)
+        dt = datetime(d.year, d.month, d.day, tzinfo=timezone.utc)
         return int(dt.timestamp() * 1000)
 
     return None
@@ -2767,6 +2767,7 @@ def dyeing_order_details(request):
 
 def GetCuttingDetails(request):
     jobno = request.GET.get("jobno")
+    TopBottomDes = request.GET.get("TopBottomDes")
 
     if not jobno:
         return JsonResponse(
@@ -2776,8 +2777,8 @@ def GetCuttingDetails(request):
 
     with connections["demo"].cursor() as cursor:
         cursor.execute(
-            "EXEC sp_GetCuttingDetails @jobno=%s",
-            [jobno]
+            "EXEC sp_GetCuttingDetails @jobno=%s, @TopBottomDes=%s",
+            [jobno, TopBottomDes]
         )
 
         columns = [col[0] for col in cursor.description]
@@ -2947,7 +2948,8 @@ def Master_Repcut_Details(request):
                     average=item["average"],
                     percentage=item["percentage"],
                     grandtotal=item["grandtotal"],
-                    totalavg=item["totalavg"]
+                    totalavg=item["totalavg"],
+                    partavg=item["partavg"]
                 )
 
         return JsonResponse({
@@ -2970,7 +2972,8 @@ def Master_Repcut_Details(request):
                 average=item["average"],
                 percentage=item["percentage"],
                 grandtotal=item["grandtotal"],
-                totalavg=item["totalavg"]
+                totalavg=item["totalavg"],
+                partavg=item["partavg"]
             )
 
         return JsonResponse({

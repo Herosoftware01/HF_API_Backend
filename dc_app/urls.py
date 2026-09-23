@@ -14,13 +14,13 @@ urlpatterns = [
     path('cutting_bit_print/<int:id>/', views.cutting_bit_print, name='CuttingBitPrint'),
     path('yarn_process_del/<int:dcno>/', views.yarn_process_delivery, name='YarnProcessDelivery'),
     path('knitting_del_print/', views.knitting_del_print, name='knitting_del_print'),
-    path('knitting_del_print/<int:id>/', views.knitting_del_print, name='knitting_del_print'),
+    path('knitting_del_print/<int:dcno>/', views.knitting_del_print, name='knitting_del_print'),
     path('acc_prod_del_print/', views.acc_prod_del_print, name='acc_prod_del_print'),
     path('acc_prod_del_print/<int:no>/', views.acc_prod_del_print, name='acc_prod_del_print'),
     path('acc_proc_del_print/', views.acc_proc_del_print, name='acc_proc_del_print'),
-    path('acc_proc_del_print/<int:id>/', views.acc_proc_del_print, name='acc_proc_del_print'),
+    path('acc_proc_del_print/<int:no>/', views.acc_proc_del_print, name='acc_proc_del_print'),
     path('acc_inhouse_transfer/', views.acc_inhouse_transfer, name='acc_inhouse_transfer'),
-    path('acc_inhouse_transfer/<int:id>/', views.acc_inhouse_transfer, name='acc_inhouse_transfer'),
+    path('acc_inhouse_transfer/<int:no>/', views.acc_inhouse_transfer, name='acc_inhouse_transfer'),
     path('acc_inward_verification/', views.acc_inward_verification, name='acc_inward_verification'),
     path('fabric_process_delivery/', views.fabric_process_delivery, name='FabricProcessDelivery'),
     path('fabric_process_delivery/<int:dcno>/', views.fabric_process_delivery, name='FabricProcessDelivery'),
@@ -38,4 +38,7 @@ urlpatterns = [
     
     # For GET by role name (e.g., /dcapp/dc_permissions/Admin/)
     path('dc_permissions/<str:role_param>/', views.manage_role_permissions, name='get_role_permissions'),
+    path('dc_verify_in/', views.dc_verify_incharge_crud, name='dc_verify_crud'),
+    path('dc_receiver/', views.dc_receiver_crud_api, name='dc_receiver_list_create'),
+    path('dc_receiver/<int:record_id>/', views.dc_receiver_crud_api, name='dc_receiver_detail'),
 ]

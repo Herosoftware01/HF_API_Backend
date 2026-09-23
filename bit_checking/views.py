@@ -1,4 +1,3 @@
-from django.shortcuts import render
 from django.http import JsonResponse
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
@@ -9,9 +8,7 @@ from django.views.decorators.csrf import csrf_exempt
 import json
 from django.utils.dateparse import parse_datetime
 from django.utils import timezone
-from datetime import timedelta
 from django.db import connections
-from django.db import connections, DatabaseError
 from django.contrib.auth import get_user_model
 from datetime import datetime, time, timedelta
 
@@ -52,23 +49,6 @@ def get_shift_date():
     return current_time.date()
 # ---------------------------------------
 
-
-from django.shortcuts import render
-from django.http import JsonResponse
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
-from rest_framework.response import Response
-from rest_framework import status
-from .models import  Stickemp,VueMistakePartDetails,TrsCutstickerprodNew1, bit_checking_updates, BitcheckingPlyDetails, TrsCutstickerprodNew, bit_start_end_time,ViewAccinwardVerification,Accessory_Verification,user_accessory_verification
-from django.views.decorators.csrf import csrf_exempt
-import json
-from django.utils.dateparse import parse_datetime
-from django.utils import timezone
-from datetime import timedelta
-from django.db import connections
-from django.db import connections, DatabaseError
-from django.contrib.auth import get_user_model
-from datetime import datetime, time, timedelta
 
 
 def get_previous_entry_mode(qrid):
