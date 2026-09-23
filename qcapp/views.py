@@ -2673,13 +2673,20 @@ def get_cutting_measurements(request):
 
     jobno = None
     top_bottom = None
+    plan_no = None
 
     for row in result:
         if row.get("jobno"):
             jobno = str(row.get("jobno")).strip()
         if row.get("TopBottom_des"):
             top_bottom = str(row.get("TopBottom_des")).strip()
-        if jobno and top_bottom:
+        for plan_key in (
+            "plan_no", "planNo", "Planno", "PlanNo", "planno", "PLAN_NO", "plan"
+        ):
+            if row.get(plan_key):
+                plan_no = str(row.get(plan_key)).strip()
+                break
+        if jobno and top_bottom and plan_no:
             break
 
     def entry_number_key(entry_no):
@@ -2691,8 +2698,30 @@ def get_cutting_measurements(request):
 
     saved_entry_map = {}
     all_saved_entries = []
+    saved_measurements = []
+    master_status = False
 
     if jobno and top_bottom:
+        master = MeasurementMas.objects.filter(
+            jobno=jobno,
+            bundle_no=str(sl).strip(),
+            plan_no=plan_no or "",
+        ).first()
+
+        if master:
+            master_status = bool(master.status)
+            saved_measurements = list(
+                master.measurements.values(
+                    "mes_id",
+                    "mesurement_name",
+                    "d_type",
+                    "standard",
+                    "tol",
+                    "group",
+                    "input_value",
+                )
+            )
+
         saved_entries = MeasurementEntry.objects.filter(
             order_no=jobno,
             top_bottom=top_bottom,
@@ -2745,6 +2774,9 @@ def get_cutting_measurements(request):
 
     return JsonResponse({
         "status": "success",
+        "plan_no": plan_no or "",
+        "master_status": master_status,
+        "saved_measurements": saved_measurements,
         "data": result
     })
 
@@ -3243,6 +3275,7 @@ def save_measurementss(request):
 
         jobno = data.get("jobno")
         bundle_no = data.get("bundle_no")
+        plan_no = str(data.get("plan_no") or "").strip()
         tob_bottom = data.get("tob_bottom")
         pcs = data.get("pcs")
         color = data.get("color")
@@ -3266,13 +3299,43 @@ def save_measurementss(request):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
+        if not plan_no:
+            return Response(
+                {
+                    "success": False,
+                    "message": "Plan No is required"
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        master = MeasurementMas.objects.filter(
+            jobno=jobno,
+            bundle_no=bundle_no,
+            plan_no=plan_no,
+        ).first()
+
+        if master and master.status:
+            return Response(
+                {
+                    "success": False,
+                    "message": "This bundle is already finalized and cannot be edited"
+                },
+                status=status.HTTP_409_CONFLICT
+            )
+
         mes_id = data.get("mes_id")
         mesurement_name = data.get("mesurement_name")
-        d_type = data.get("d_type")
+        d_type = str(data.get("d_type") or "").strip().upper()
         standard = data.get("standard")
         tol = data.get("tol")
-        group = data.get("group")
+        group = str(data.get("group") or "").strip().upper()
         input_value = data.get("input_value")
+
+        # Keep the database columns separate even when an older client sends
+        # a combined value such as F_BL.
+        combined_type = d_type if "_" in d_type else group
+        if "_" in combined_type:
+            group, d_type = combined_type.split("_", 1)
 
         if input_value is None or input_value == "":
             return Response(
@@ -3283,15 +3346,11 @@ def save_measurementss(request):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        master = MeasurementMas.objects.filter(
-            jobno=jobno,
-            bundle_no=bundle_no
-        ).first()
-
         if not master:
             master = MeasurementMas.objects.create(
                 jobno=jobno,
                 bundle_no=bundle_no,
+                plan_no=plan_no,
                 tob_bottom=tob_bottom or "",
                 pcs=int(pcs or 0),
                 color=color or "",
@@ -3302,6 +3361,7 @@ def save_measurementss(request):
         detail = MeasurementData.objects.filter(
             master=master,
             mes_id=mes_id or 0,
+            mesurement_name=mesurement_name or "",
             group=group or "",
             d_type=d_type or ""
         ).first()
@@ -3371,3 +3431,44 @@ def save_measurementss(request):
             },
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
+
+
+@api_view(["POST"])
+def finalize_measurementss(request):
+    jobno = str(request.data.get("jobno") or "").strip()
+    bundle_no = str(request.data.get("bundle_no") or "").strip()
+    plan_no = str(request.data.get("plan_no") or "").strip()
+
+    if not jobno or not bundle_no or not plan_no:
+        return Response(
+            {
+                "success": False,
+                "message": "Job No, Bundle No and Plan No are required"
+            },
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    master = MeasurementMas.objects.filter(
+        jobno=jobno,
+        bundle_no=bundle_no,
+        plan_no=plan_no,
+    ).first()
+
+    if not master:
+        return Response(
+            {
+                "success": False,
+                "message": "No saved measurements found for this bundle"
+            },
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+    master.status = True
+    master.save(update_fields=["status"])
+
+    return Response({
+        "success": True,
+        "master_id": master.id,
+        "status": 1,
+        "message": "All measurements finalized successfully",
+    })

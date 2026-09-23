@@ -56,6 +56,11 @@ urlpatterns = [
         name="save_measurementss"
     ),
     path(
+        "finalize_measurementss/",
+        views.finalize_measurementss,
+        name="finalize_measurementss"
+    ),
+    path(
         "mmst/orders/",
         views.get_mmst_orders
     ),
