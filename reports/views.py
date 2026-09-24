@@ -3008,6 +3008,8 @@ def Absent_list(request):
     unitname = request.GET.get('unitname')
     name = request.GET.get('name')
     month = request.GET.get('month')
+    status = request.GET.get('status')
+    category = request.GET.get('category')
 
     queryset = ViewAbsentList.objects.using('main').all()
 
@@ -3022,5 +3024,18 @@ def Absent_list(request):
         months = month.split(',')
         queryset = queryset.filter(month__in=months)
 
-    data = list(queryset.values())
+    if status:
+        statuses = status.split(',')
+        queryset = queryset.filter(status__in=statuses)
+
+    if category:
+        categories = category.split(',')
+        queryset = queryset.filter(category__in=categories)
+
+    queryset = queryset.order_by('stat', 'mon_order')
+
+    data = list(queryset.values(
+        'id', 'unitname', 'month', 'year', 'workingdays', 'leave_days', 'informed',
+        'shiftdays', 'name', 'photo', 'category', 'status'
+    ))
     return JsonResponse(data, safe=False)
