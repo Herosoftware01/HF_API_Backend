@@ -975,7 +975,7 @@ class ViewRepcutPend(models.Model):
 class Repcutpending(models.Model):
     slno = models.AutoField(db_column='SlNo', primary_key=True) 
     jobno = models.CharField(db_column='JobNo', max_length=20) 
-    styleid = models.CharField(db_column='StyleID', max_length=20)
+    styleid = models.CharField(db_column='StyleID', max_length=100)
     size = models.CharField(db_column='Size', max_length=20) 
     topbottom = models.CharField(db_column='TopBottom', max_length=50, blank=True, null=True) 
     parts = models.CharField(db_column='Parts', max_length=50, blank=True, null=True) 
@@ -1000,7 +1000,7 @@ class View_Master_RepcutPend(models.Model):
 
 class Master_Replace_Cutpend(models.Model):
     slno = models.AutoField(db_column='SlNo', primary_key=True)
-    styleid = models.CharField(max_length=20, db_column='StyleID')
+    styleid = models.CharField(max_length=100, db_column='StyleID')
     size = models.CharField(db_column='Size', max_length=20, blank=True, null=True)
     topbottom = models.CharField(db_column='TopBottom', max_length=50, blank=True, null=True)
     parts = models.CharField(db_column='Parts', max_length=50, blank=True, null=True)
@@ -1016,3 +1016,23 @@ class Master_Replace_Cutpend(models.Model):
     class Meta:
         managed = False
         db_table = 'Master_Repcutpend'
+
+class ViewAbsentList(models.Model):
+    id = models.IntegerField(primary_key=True)
+    unitname = models.CharField(max_length=50)
+    month = models.CharField(max_length=3, blank=True, null=True,db_column='m')
+    year = models.IntegerField(blank=True, null=True, db_column='y')
+    workingdays = models.IntegerField(blank=True, null=True, db_column='days')
+    leave_days = models.IntegerField(blank=True, null=True, db_column='leavdays')
+    informed = models.IntegerField(blank=True, null=True, db_column='inl')
+    shiftdays = models.IntegerField(blank=True, null=True, db_column='actshiftdays')
+    name = models.CharField(max_length=100, blank=True, null=True)
+    photo = models.CharField(max_length=443, blank=True, null=True)
+    category = models.CharField(db_column='Category', max_length=50, blank=True, null=True)
+    status = models.CharField(max_length=25, blank=True, null=True)
+    stat = models.IntegerField(db_column='Stat')
+    mon_order = models.IntegerField()
+
+    class Meta:
+        managed = False
+        db_table = 'view_absent_list'
