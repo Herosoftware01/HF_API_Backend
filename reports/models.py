@@ -975,7 +975,7 @@ class ViewRepcutPend(models.Model):
 class Repcutpending(models.Model):
     slno = models.AutoField(db_column='SlNo', primary_key=True) 
     jobno = models.CharField(db_column='JobNo', max_length=20) 
-    styleid = models.CharField(db_column='StyleID', max_length=20)
+    styleid = models.CharField(db_column='StyleID', max_length=100)
     size = models.CharField(db_column='Size', max_length=20) 
     topbottom = models.CharField(db_column='TopBottom', max_length=50, blank=True, null=True) 
     parts = models.CharField(db_column='Parts', max_length=50, blank=True, null=True) 
@@ -1000,7 +1000,7 @@ class View_Master_RepcutPend(models.Model):
 
 class Master_Replace_Cutpend(models.Model):
     slno = models.AutoField(db_column='SlNo', primary_key=True)
-    styleid = models.CharField(max_length=20, db_column='StyleID')
+    styleid = models.CharField(max_length=100, db_column='StyleID')
     size = models.CharField(db_column='Size', max_length=20, blank=True, null=True)
     topbottom = models.CharField(db_column='TopBottom', max_length=50, blank=True, null=True)
     parts = models.CharField(db_column='Parts', max_length=50, blank=True, null=True)
