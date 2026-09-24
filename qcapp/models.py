@@ -633,6 +633,10 @@ class MeasurementEntry(models.Model):
     updated_at = models.DateTimeField(
         auto_now=True
     )
+    
+    class Meta:
+        db_table = 'qcapp_measuremententry'
+
     def __str__(self):
         return (
             f"{self.order_no} - "
@@ -640,5 +644,21 @@ class MeasurementEntry(models.Model):
             f"{self.group} - "
             f"{self.d_type}"
         )
+    
+class ViewCuttingMeasurmentpending(models.Model):
+    row_num = models.BigIntegerField(primary_key=True)
+    planno = models.IntegerField()
+    jobno = models.CharField(db_column='JobNo', max_length=50)  # Field name made lowercase.
+    topbottom_des = models.CharField(db_column='TopBottom_des', max_length=50, blank=True, null=True)  # Field name made lowercase.
+    clrcombo = models.CharField(db_column='Clrcombo', max_length=80)  # Field name made lowercase.
+    lotno = models.CharField(db_column='LotNo', max_length=50)  # Field name made lowercase.
+    name = models.CharField(db_column='Name', max_length=35)  # Field name made lowercase.
+    pc = models.IntegerField(blank=True, null=True)
+    markerclassification = models.CharField(db_column='MarKerClassification', max_length=50, blank=True, null=True)  # Field name made lowercase.
+    done = models.IntegerField()
+    done_dt = models.DateTimeField(db_column='DONE_DT', blank=True, null=True)  # Field name made lowercase.
 
+    class Meta:
+        managed = False
+        db_table = 'view_cutting_measurmentpending'
 

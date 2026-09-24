@@ -3,12 +3,13 @@ from itertools import count
 from django.shortcuts import render,get_object_or_404
 from django.db import connections
 from rest_framework.decorators import api_view
+from django.db.models import Exists, OuterRef
 # import pandas as pd
 from rest_framework.views import APIView
 from zoneinfo import ZoneInfo
 from rest_framework.response import Response
 from rest_framework import status, permissions
-from .models import QcAdminMistake,MeasurementMas,MmstAssign,MeasurementData,MeasurementEntry,cut_sample_data_final,Cont_employee,sequency_data,cut_sample_data,cut_sample_data_final,VueUser,Unit,Needle_change,Line,roving_qc_mistake,qc_piece_final, MachineAllocation, machine_details, emp_allocate, Empwisesal, VueProcessSequence,qc_hourly_approval,VueUloginRole,QcHourlyApproval 
+from .models import QcAdminMistake,MeasurementMas,ViewCuttingMeasurmentpending,MmstAssign,MeasurementData,MeasurementEntry,cut_sample_data_final,Cont_employee,sequency_data,cut_sample_data,cut_sample_data_final,VueUser,Unit,Needle_change,Line,roving_qc_mistake,qc_piece_final, MachineAllocation, machine_details, emp_allocate, Empwisesal, VueProcessSequence,qc_hourly_approval,VueUloginRole,QcHourlyApproval 
 from .serializers import QcAdminMistakeSerializer,UnitSerializer,MachineTrasnsferSerializer,MachineSerializer,LineSerializer, MachineAllocationSerializer, VueProcessSequenceSerializer
 from collections import defaultdict
 from django.utils.timezone import now
@@ -3641,3 +3642,420 @@ def qcroving_qcwise(request):
         "status": False,
         "message": "Only GET method is allowed"
     }, status=405)
+
+
+def format_work_minutes(total_minutes):
+    total_minutes = int(total_minutes or 0)
+
+    days = total_minutes // 1440
+    remaining = total_minutes % 1440
+
+    hours = remaining // 60
+    minutes = remaining % 60
+
+    parts = []
+
+    # Days
+    if days:
+        parts.append(
+            f"{days} day"
+            if days == 1
+            else f"{days} days"
+        )
+
+    # Hours
+    if hours:
+        parts.append(
+            f"{hours} hour"
+            if hours == 1
+            else f"{hours} hours"
+        )
+
+    # Minutes
+    if minutes:
+        parts.append(
+            f"{minutes} min"
+            if minutes == 1
+            else f"{minutes} mins"
+        )
+
+    if not parts:
+        return "0 mins"
+
+    return ", ".join(parts)
+
+
+# ============================================================
+# CUTTING MEASUREMENT PENDING API
+# ============================================================
+
+class CuttingMeasurementPendingAPIView(APIView):
+
+    def get(self, request):
+
+        today = date.today()
+
+        # ====================================================
+        # GET ALL DATA
+        # ====================================================
+
+        qs = (
+            ViewCuttingMeasurmentpending.objects
+            .using("demo")
+            .all()
+        )
+
+        # ====================================================
+        # TODAY COMPLETED DATA
+        # ====================================================
+
+        today_completed_data = qs.filter(
+            done=1,
+            done_dt__date=today
+        ).count()
+
+        # Each completed size = 5 minutes
+        today_work_minutes = (
+            today_completed_data * 5
+        )
+
+        # ====================================================
+        # JOB -> PLAN STRUCTURE
+        # ====================================================
+
+        jobs = {}
+
+        # ====================================================
+        # PROCESS ALL ROWS
+        # ====================================================
+
+        for row in qs.order_by(
+            "jobno",
+            "planno",
+            "row_num"
+        ):
+
+            # ------------------------------------------------
+            # JOB NO
+            # ------------------------------------------------
+
+            jobno = (row.jobno or "").strip().upper()
+
+            # ------------------------------------------------
+            # PLAN NO
+            # ------------------------------------------------
+
+            planno = row.planno
+
+            # ------------------------------------------------
+            # CREATE JOB
+            # ------------------------------------------------
+
+            if jobno not in jobs:
+
+                jobs[jobno] = {}
+
+            # ------------------------------------------------
+            # CREATE PLAN
+            # ------------------------------------------------
+
+            if planno not in jobs[jobno]:
+
+                jobs[jobno][planno] = {
+
+                    "planno": planno,
+
+                    "topbottom_des": (
+                        row.topbottom_des or ""
+                    ),
+
+                    # All sizes
+                    "total_sizes": [],
+
+                    # Completed sizes
+                    "completed_sizes": [],
+
+                    # Pending sizes
+                    "pending_sizes": [],
+
+                    # Pending work minutes
+                    "pending_work_mins": 0,
+                }
+
+            plan = jobs[jobno][planno]
+
+            # =================================================
+            # SIZE
+            # =================================================
+
+            size = ""
+
+            if row.name:
+
+                size = str(row.name).strip()
+
+            # =================================================
+            # TOTAL SIZE
+            # =================================================
+
+            if size:
+
+                plan["total_sizes"].append(
+                    size
+                )
+
+            # =================================================
+            # COMPLETED
+            # =================================================
+
+            if row.done == 1:
+
+                if size:
+
+                    plan["completed_sizes"].append(
+                        size
+                    )
+
+            # =================================================
+            # PENDING
+            # =================================================
+
+            else:
+
+                if size:
+
+                    plan["pending_sizes"].append(
+                        size
+                    )
+
+                # Each pending size = 5 minutes
+                plan["pending_work_mins"] += 5
+
+        # ====================================================
+        # BUILD RESPONSE
+        # ====================================================
+
+        result = []
+
+        # Overall pending work minutes
+        total_pending_work_minutes = 0
+
+        # Pending plans count
+        total_plans = 0
+
+        # ====================================================
+        # JOB LOOP
+        # ====================================================
+
+        for jobno, plans in jobs.items():
+
+            child_data = []
+
+            # =================================================
+            # PLAN LOOP
+            # =================================================
+
+            for planno, plan in plans.items():
+
+                # ------------------------------------------------
+                # UNIQUE TOTAL SIZES
+                # ------------------------------------------------
+
+                unique_total_sizes = list(
+                    dict.fromkeys(
+                        plan["total_sizes"]
+                    )
+                )
+
+                total_size_count = len(
+                    unique_total_sizes
+                )
+
+                # ------------------------------------------------
+                # COMPLETED
+                # ------------------------------------------------
+
+                completed_sizes = list(
+                    dict.fromkeys(
+                        plan["completed_sizes"]
+                    )
+                )
+
+                completed_count = len(
+                    completed_sizes
+                )
+
+                # ------------------------------------------------
+                # PENDING
+                # ------------------------------------------------
+
+                pending_sizes = list(
+                    dict.fromkeys(
+                        plan["pending_sizes"]
+                    )
+                )
+
+                pending_count = len(
+                    pending_sizes
+                )
+
+                # =================================================
+                # IMPORTANT
+                # =================================================
+                # If ALL sizes are completed,
+                # don't show this plan.
+                # =================================================
+
+                if pending_count == 0:
+
+                    continue
+
+                # ------------------------------------------------
+                # PENDING WORK MINUTES
+                # ------------------------------------------------
+
+                pending_work_minutes = (
+                    plan["pending_work_mins"]
+                )
+
+                # Add to overall total
+                total_pending_work_minutes += (
+                    pending_work_minutes
+                )
+
+                # Count only pending plans
+                total_plans += 1
+
+                # =================================================
+                # CHILD DATA
+                # =================================================
+
+                child_data.append({
+
+                    # -------------------------------
+                    # PLAN
+                    # -------------------------------
+
+                    "planno": plan["planno"],
+
+                    # -------------------------------
+                    # DESCRIPTION
+                    # -------------------------------
+
+                    "topbottom_des": (
+                        plan["topbottom_des"]
+                    ),
+
+                    # -------------------------------
+                    # TOTAL SIZE
+                    # -------------------------------
+
+                    "total_size": ",".join(
+                        unique_total_sizes
+                    ),
+
+                    "total_size_count": (
+                        total_size_count
+                    ),
+
+                    # -------------------------------
+                    # COMPLETED
+                    # -------------------------------
+
+                    "completed": (
+                        completed_count
+                    ),
+
+                    "completed_size": ",".join(
+                        completed_sizes
+                    ),
+
+                    # -------------------------------
+                    # PENDING
+                    # -------------------------------
+
+                    "Pending": (
+                        pending_count
+                    ),
+
+                    "Pending_size": ",".join(
+                        pending_sizes
+                    ),
+
+                    # -------------------------------
+                    # WORK TIME
+                    # -------------------------------
+
+                    "work_mins": format_work_minutes(
+                        pending_work_minutes
+                    ),
+                })
+
+            # =================================================
+            # IMPORTANT
+            # =================================================
+            # If this job has no pending plans,
+            # don't show the job.
+            # =================================================
+
+            if not child_data:
+
+                continue
+
+            # =================================================
+            # JOB DATA
+            # =================================================
+
+            result.append({
+
+                "jobno": jobno,
+
+                "data": child_data,
+            })
+
+        # ====================================================
+        # FINAL RESPONSE
+        # ====================================================
+
+        return Response({
+
+            # ------------------------------------------------
+            # TODAY COMPLETED COUNT
+            # ------------------------------------------------
+
+            "today_completed_data": (
+                today_completed_data
+            ),
+
+            # ------------------------------------------------
+            # TODAY WORK TIME
+            # ------------------------------------------------
+
+            "today_work_mins": (
+                format_work_minutes(
+                    today_work_minutes
+                )
+            ),
+
+            # ------------------------------------------------
+            # TOTAL PENDING WORK TIME
+            # ------------------------------------------------
+
+            "total_pending_work_mins": (
+                format_work_minutes(
+                    total_pending_work_minutes
+                )
+            ),
+
+            # ------------------------------------------------
+            # TOTAL PENDING PLANS
+            # ------------------------------------------------
+
+            "total_plans": total_plans,
+
+            # ------------------------------------------------
+            # JOB -> PLAN DATA
+            # ------------------------------------------------
+
+            "data": result,
+        })
