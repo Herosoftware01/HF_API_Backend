@@ -1027,6 +1027,11 @@ class ViewAbsentList(models.Model):
     informed = models.IntegerField(blank=True, null=True, db_column='inl')
     shiftdays = models.IntegerField(blank=True, null=True, db_column='actshiftdays')
     name = models.CharField(max_length=100, blank=True, null=True)
+    photo = models.CharField(max_length=443, blank=True, null=True)
+    category = models.CharField(db_column='Category', max_length=50, blank=True, null=True)
+    status = models.CharField(max_length=25, blank=True, null=True)
+    stat = models.IntegerField(db_column='Stat')
+    mon_order = models.IntegerField()
 
     class Meta:
         managed = False
