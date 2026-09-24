@@ -619,6 +619,14 @@ class MeasurementEntry(models.Model):
     entry_no = models.CharField(
         max_length=20
     )
+
+    skip_mes = models.BooleanField(
+        default=False
+    )
+    mes_order = models.IntegerField(
+        default=0
+    )
+
     created_at = models.DateTimeField(
         auto_now_add=True
     )
