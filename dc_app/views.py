@@ -8,6 +8,7 @@ from django.utils import timezone
 from django.core.exceptions import ValidationError
 from decimal import Decimal, InvalidOperation
 from django.db import transaction
+from django.http.multipartparser import MultiPartParser, MultiPartParserError
 
 
 
@@ -786,10 +787,12 @@ def _serialize_record(obj, request=None):
         'wgt': str(obj.wgt) if obj.wgt is not None else None,
         'mtr': str(obj.mtr) if obj.mtr is not None else None,
         'rolls': obj.rolls,
+        'qty'  : obj.qty,
         'bags': obj.bags,
         'username': obj.username,
         'latitude': str(obj.latitude) if obj.latitude is not None else None,
         'longitude': str(obj.longitude) if obj.longitude is not None else None,
+        'concat_location' : str(obj.concat_location) if obj.concat_location is not None else None,
         'location': obj.location,
         'receiver_image': image_url,
         'received_at': obj.received_at.isoformat() if obj.received_at else None,
@@ -891,6 +894,16 @@ def _extract_and_validate(data, files, is_update=False):
             except (ValueError, TypeError):
                 errors['rolls'] = 'Must be a valid integer.'
 
+    if 'qty' in data:
+            val = data['qty']
+            if val in [None, '']:
+                cleaned['qty'] = None
+            else:
+                try:
+                    cleaned['qty'] = float(val)
+                except (ValueError, TypeError):
+                    errors['qty'] = 'Must be a valid Float.'
+
     # 9. bags (Optional, max_length=50)
     if 'bags' in data:
         val = str(data['bags']).strip() if data['bags'] is not None else None
@@ -900,7 +913,7 @@ def _extract_and_validate(data, files, is_update=False):
             cleaned['bags'] = val if val else None
 
     # 10. latitude & longitude (Optional Decimals)
-    for coord, max_d, dec_p in [('latitude', 10, 7), ('longitude', 10, 7)]:
+    for coord in ['latitude', 'longitude']:
         if coord in data:
             val = data[coord]
             if val in [None, '']:
@@ -912,13 +925,14 @@ def _extract_and_validate(data, files, is_update=False):
                 except (InvalidOperation, TypeError):
                     errors[coord] = f'Must be a valid decimal for {coord}.'
 
-    # 11. location (Optional, max_length=500)
-    if 'location' in data:
-        val = str(data['location']).strip() if data['location'] is not None else None
-        if val and len(val) > 500:
-            errors['location'] = 'Maximum length is 500 characters.'
-        else:
-            cleaned['location'] = val if val else None
+    # 11. Concatenated location and location text (Optional)
+    for field, max_length in [('concat_location', 100), ('location', 500)]:
+        if field in data:
+            val = str(data[field]).strip() if data[field] is not None else None
+            if val and len(val) > max_length:
+                errors[field] = f'Maximum length is {max_length} characters.'
+            else:
+                cleaned[field] = val if val else None
 
     # 12. File upload: receiver_image
     if 'receiver_image' in files:
@@ -932,6 +946,29 @@ def _extract_and_validate(data, files, is_update=False):
             cleaned['receiver_image'] = uploaded_file
 
     return cleaned, errors
+
+
+def _get_request_data_and_files(request):
+    """Return form data and uploaded files for POST, PUT, and PATCH requests."""
+    if request.content_type and 'application/json' in request.content_type:
+        try:
+            return json.loads(request.body), {}
+        except json.JSONDecodeError:
+            raise ValueError('Invalid JSON body.')
+
+    if request.method in ['PUT', 'PATCH'] and request.content_type and request.content_type.startswith('multipart/'):
+        try:
+            data, files = MultiPartParser(
+                request.META,
+                request,
+                request.upload_handlers,
+                request.encoding,
+            ).parse()
+            return data.dict(), files
+        except MultiPartParserError as exc:
+            raise ValueError(f'Invalid multipart body: {exc}')
+
+    return request.POST.dict(), request.FILES
 
 
 @csrf_exempt
@@ -972,19 +1009,25 @@ def dc_receiver_crud_api(request, record_id=None):
     # 2. CREATE (POST)
     # -------------------------------------------------------------
     elif request.method == 'POST' and not record_id:
-        if request.content_type and 'application/json' in request.content_type:
-            try:
-                payload = json.loads(request.body)
-            except json.JSONDecodeError:
-                return JsonResponse({'status': 'error', 'message': 'Invalid JSON body.'}, status=400)
-            files = {}
-        else:
-            payload = request.POST.dict()
-            files = request.FILES
+        try:
+            payload, files = _get_request_data_and_files(request)
+        except ValueError as exc:
+            return JsonResponse({'status': 'error', 'message': str(exc)}, status=400)
 
         cleaned_data, errors = _extract_and_validate(payload, files, is_update=False)
         if errors:
             return JsonResponse({'status': 'error', 'errors': errors}, status=400)
+
+        # A DC number may be reused for a different module/type, but not for
+        # another receiver record in the same module/type.
+        if Dc_Reciver_Verify.objects.filter(
+            DCNo=cleaned_data['DCNo'],
+            trstype=cleaned_data['trstype'],
+        ).exists():
+            return JsonResponse({
+                'status': 'error',
+                'errors': {'DCNo': 'This DC number already exists for this module.'},
+            }, status=400)
 
         try:
             with transaction.atomic():
@@ -1014,19 +1057,24 @@ def dc_receiver_crud_api(request, record_id=None):
         except Dc_Reciver_Verify.DoesNotExist:
             return JsonResponse({'status': 'error', 'message': 'Record not found.'}, status=404)
 
-        if request.content_type and 'application/json' in request.content_type:
-            try:
-                payload = json.loads(request.body)
-            except json.JSONDecodeError:
-                return JsonResponse({'status': 'error', 'message': 'Invalid JSON body.'}, status=400)
-            files = {}
-        else:
-            payload = request.POST.dict()
-            files = request.FILES
+        try:
+            payload, files = _get_request_data_and_files(request)
+        except ValueError as exc:
+            return JsonResponse({'status': 'error', 'message': str(exc)}, status=400)
 
         cleaned_data, errors = _extract_and_validate(payload, files, is_update=True)
         if errors:
             return JsonResponse({'status': 'error', 'errors': errors}, status=400)
+
+        duplicate_query = Dc_Reciver_Verify.objects.filter(
+            DCNo=cleaned_data.get('DCNo', record.DCNo),
+            trstype=cleaned_data.get('trstype', record.trstype),
+        ).exclude(pk=record.pk)
+        if duplicate_query.exists():
+            return JsonResponse({
+                'status': 'error',
+                'errors': {'DCNo': 'This DC number already exists for this module.'},
+            }, status=400)
 
         try:
             with transaction.atomic():

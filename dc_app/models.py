@@ -1,6 +1,5 @@
 from django.db import models
-from django.contrib.contenttypes.models import ContentType
-from django.contrib.contenttypes.fields import GenericForeignKey
+
 
 class ViewCuttingDelPrint(models.Model):
     rowno = models.BigIntegerField(db_column='RowNo', primary_key=True)  # Field name made lowercase.
@@ -544,6 +543,7 @@ class Dc_Incharge_Verify(models.Model):
     rolls = models.IntegerField(db_column='Rolls',blank=True, null=True)  # Field name made lowercase.
     bags = models.CharField(db_column='Bags', max_length=50,blank=True, null=True)  # Field name made lowercase.
     username = models.IntegerField(db_column='Username')  # Field name made lowercase.
+    status = models.BooleanField(db_column='Status' ,default=False)
 
     class Meta:
         db_table = 'dc_incharge_verify'
@@ -556,18 +556,21 @@ class Dc_Reciver_Verify(models.Model):
     id = models.AutoField(db_column='id', primary_key=True)
     date = models.DateTimeField(db_column='Date')
     DCNo = models.IntegerField(db_column='DCNo')
-    jobno = models.CharField(db_column='JobNo', max_length=50)
+    jobno = models.CharField(db_column='JobNo', max_length=50,blank=True, null=True)
     trstype = models.CharField(db_column='TrsType', max_length=50)
     wgt = models.DecimalField(db_column='Wgt',max_digits=18, decimal_places=3,blank=True, null=True)
     mtr = models.DecimalField(db_column='Mtr',max_digits=18,decimal_places=2,blank=True,null=True)
+    qty = models.DecimalField(db_column='Qty',max_digits=10,decimal_places=2,blank=True,null=True)
     rolls = models.IntegerField(db_column='Rolls',blank=True,null=True)
     bags = models.CharField(db_column='Bags',max_length=50, blank=True,null=True)
     username = models.IntegerField(db_column='Username')
     latitude = models.DecimalField(db_column='Latitude',max_digits=10,decimal_places=7, blank=True,null=True)
     longitude = models.DecimalField(db_column='Longitude',max_digits=10,decimal_places=7,blank=True,null=True)
     location = models.CharField(db_column='Location',max_length=500,blank=True,null=True)
+    concat_location = models.CharField(db_column='Concate_Location', max_length=100, blank=True, null=True)
     receiver_image = models.ImageField(db_column='ReceiverImage',upload_to='dc_receiver/',blank=True,null=True)
     received_at = models.DateTimeField(db_column='ReceivedAt', auto_now_add=True)
+
 
     class Meta:
         db_table = 'dc_receiver_verify'
