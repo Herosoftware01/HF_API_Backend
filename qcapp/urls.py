@@ -96,6 +96,15 @@ urlpatterns = [
         "MeasurementPendingView/",
         views.CuttingMeasurementPendingAPIView.as_view()
     ),
+    path(
+        "plan-data-copy/",
+        views.plan_data_copy
+    ),
+    path(
+        "measurement-details/",
+        views.get_measurement_details
+    ),
+
 
 
 ]
