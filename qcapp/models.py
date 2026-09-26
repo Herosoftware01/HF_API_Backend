@@ -549,6 +549,7 @@ class MeasurementMas(models.Model):
     plan_no = models.CharField(max_length=50)
     tob_bottom = models.CharField(max_length=50)
     pcs = models.IntegerField()
+    ratio = models.IntegerField()
     color = models.CharField(max_length=100)
     size = models.CharField(max_length=50)
     date = models.DateTimeField(auto_now_add=True)
@@ -662,3 +663,15 @@ class ViewCuttingMeasurmentpending(models.Model):
         managed = False
         db_table = 'view_cutting_measurmentpending'
 
+
+
+class ViewPlandetailsWithratio(models.Model):
+    rowno = models.BigIntegerField(primary_key=True)  # Field name made lowercase.
+    planno = models.IntegerField(db_column='Planno')  # Field name made lowercase.
+    jobno = models.CharField(db_column='Jobno', max_length=50)  # Field name made lowercase.
+    topbottom = models.CharField(max_length=50, blank=True, null=True)
+    ratio = models.CharField(max_length=8000, blank=True, null=True)
+
+    class Meta:
+        managed = False
+        db_table = 'view_plandetails_withratio'
