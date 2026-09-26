@@ -92,6 +92,10 @@ urlpatterns = [
         "measuremententry_delete/",
         views.measuremententry_delete
     ),
+    path(
+        "MeasurementPendingView/",
+        views.CuttingMeasurementPendingAPIView.as_view()
+    ),
 
 
 ]
