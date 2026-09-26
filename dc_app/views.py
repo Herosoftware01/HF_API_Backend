@@ -534,108 +534,14 @@ def manage_role_permissions(request, role_param=None):
 
 
 
-def _validate_and_extract_payload(data, is_update=False):
-    """
-    Validates types, required fields, and converts data types.
-    Returns: (cleaned_dict, error_string)
-    """
-    cleaned = {}
-
-    # Required fields on creation
-    # The database generates the AutoField primary key on create.
-    required_fields = ["date", "DCNo", "jobno", "trstype", "username"]
-    if not is_update:
-        missing = [f for f in required_fields if f not in data or data[f] is None or str(data[f]).strip() == ""]
-        if missing:
-            return None, f"Missing required fields: {', '.join(missing)}"
-
-    # slno (Primary Key)
-    if "id" in data:
-        try:
-            cleaned["id"] = int(data["id"])
-        except (ValueError, TypeError):
-            return None, "'slno' must be an integer."
-
-    # DCNo
-    if "DCNo" in data:
-        try:
-            cleaned["DCNo"] = int(data["DCNo"])
-        except (ValueError, TypeError):
-            return None, "'DCNo' must be an integer."
-
-    # username
-    if "username" in data:
-        try:
-            cleaned["username"] = int(data["username"])
-        except (ValueError, TypeError):
-            return None, "'username' must be an integer."
-
-    # date (ISO 8601 format: YYYY-MM-DDTHH:MM:SS)
-    if "date" in data and data["date"]:
-        parsed_date = parse_datetime(str(data["date"]))
-        if not parsed_date:
-            return None, "'date' must be in ISO format (e.g., '2026-09-20T10:30:00')."
-        cleaned["date"] = parsed_date
-
-    # jobno & trstype (CharFields with max_length=50)
-    for char_field in ["jobno", "trstype"]:
-        if char_field in data:
-            val = str(data[char_field]).strip()
-            if len(val) > 50:
-                return None, f"'{char_field}' cannot exceed 50 characters."
-            cleaned[char_field] = val
-
-    # wgt (DecimalField max_digits=18, decimal_places=3)
-    if "wgt" in data:
-        if data["wgt"] is not None and str(data["wgt"]).strip() != "":
-            try:
-                cleaned["wgt"] = Decimal(str(data["wgt"]))
-            except InvalidOperation:
-                return None, "'wgt' must be a valid decimal number."
-        else:
-            cleaned["wgt"] = None
-
-    # mtr (DecimalField max_digits=18, decimal_places=2)
-    if "mtr" in data:
-        if data["mtr"] is not None and str(data["mtr"]).strip() != "":
-            try:
-                cleaned["mtr"] = Decimal(str(data["mtr"]))
-            except InvalidOperation:
-                return None, "'mtr' must be a valid decimal number."
-        else:
-            cleaned["mtr"] = None
-
-    # rolls (IntegerField, optional)
-    if "rolls" in data:
-        if data["rolls"] is not None and str(data["rolls"]).strip() != "":
-            try:
-                cleaned["rolls"] = int(data["rolls"])
-            except (ValueError, TypeError):
-                return None, "'rolls' must be an integer."
-        else:
-            cleaned["rolls"] = None
-
-    # bags (CharField, optional, max_length=50)
-    if "bags" in data:
-        if data["bags"] is not None:
-            val = str(data["bags"]).strip()
-            if len(val) > 50:
-                return None, "'bags' cannot exceed 50 characters."
-            cleaned["bags"] = val
-        else:
-            cleaned["bags"] = None
-
-    return cleaned, None
-
-
 @csrf_exempt
 def dc_verify_incharge_crud(request):
     """
     All-in-one CRUD API endpoint using standard Django JsonResponse:
-      - GET:    Filter by ?slno=... or ?dcno=... or fetch all.
+      - GET:    Filter by ?id=... or ?dcno=... or fetch all.
       - POST:   Create a new record (JSON body).
-      - PUT:    Update an existing record via ?slno=... (JSON body).
-      - DELETE: Delete record via ?slno=...
+      - PUT:    Update an existing record via ?id=... or JSON body id.
+      - DELETE: Delete record via ?id=... or JSON body id.
     """
     method = request.method
 
@@ -661,23 +567,46 @@ def dc_verify_incharge_crud(request):
             "data": data
         }, status=200)
 
-    # Parse JSON body for mutation requests
-    if method in ["POST", "PUT"]:
-        try:
-            body = json.loads(request.body.decode("utf-8")) if request.body else {}
-        except json.JSONDecodeError:
-            return JsonResponse({
-                "status": False,
-                "message": "Invalid JSON payload."
-            }, status=400)
+    # ----------------------------------------------------
+    # Parse JSON body for mutation requests (POST, PUT, DELETE)
+    # ----------------------------------------------------
+    body = {}
+    if method in ["POST", "PUT", "DELETE"]:
+        if request.body:
+            try:
+                body = json.loads(request.body.decode("utf-8"))
+            except json.JSONDecodeError:
+                return JsonResponse({"status": False, "message": "Invalid JSON payload."}, status=400)
+
+    # Helper to extract valid model fields from payload
+    def get_cleaned_data(payload):
+        valid_fields = ['date', 'DCNo', 'jobno', 'trstype', 'wgt', 'mtr', 'rolls', 'bags', 'username', 'status']
+        return {k: v for k, v in payload.items() if k in valid_fields}
 
     # ----------------------------------------------------
     # CREATE (POST)
     # ----------------------------------------------------
     if method == "POST":
-        cleaned_data, error = _validate_and_extract_payload(body, is_update=False)
-        if error:
-            return JsonResponse({"status": False, "message": error}, status=400)
+        cleaned_data = get_cleaned_data(body)
+        if not cleaned_data:
+            return JsonResponse({"status": False, "message": "No valid fields provided."}, status=400)
+
+        # Default to verified unless explicitly stated otherwise
+        cleaned_data.setdefault("status", True)
+
+        # Block re-verifying a DC that already has a verified row for this trstype
+        existing = Dc_Incharge_Verify.objects.filter(
+            DCNo=cleaned_data.get("DCNo"),
+            trstype=cleaned_data.get("trstype"),
+            status=True,
+        ).first()
+
+        if existing:
+            return JsonResponse({
+                "status": False,
+                "message": "This DC has already been verified for this transaction type!",
+                "data": list(Dc_Incharge_Verify.objects.filter(id=existing.id).values())[0],
+            }, status=409)
 
         try:
             instance = Dc_Incharge_Verify.objects.create(**cleaned_data)
@@ -695,37 +624,28 @@ def dc_verify_incharge_crud(request):
     # UPDATE (PUT)
     # ----------------------------------------------------
     elif method == "PUT":
-        record_id = request.GET.get("id") or request.GET.get("slno") or body.get("id") or body.get("slno")
+        record_id = request.GET.get("id") or request.GET.get("slno") or body.get("id")
+        
         if not record_id:
-            return JsonResponse({
-                "status": False,
-                "message": "'slno' parameter is required for update (in query params or body)."
-            }, status=400)
+            return JsonResponse({"status": False, "message": "'id' parameter is required for updating."}, status=400)
+
+        cleaned_data = get_cleaned_data(body)
+        if not cleaned_data:
+            return JsonResponse({"status": False, "message": "No valid fields provided to update."}, status=400)
 
         try:
             instance = Dc_Incharge_Verify.objects.get(id=record_id)
-        except Dc_Incharge_Verify.DoesNotExist:
-            return JsonResponse({
-                "status": False,
-                "message": f"Record with slno '{record_id}' not found."
-            }, status=404)
-
-        cleaned_data, error = _validate_and_extract_payload(body, is_update=True)
-        if error:
-            return JsonResponse({"status": False, "message": error}, status=400)
-
-        # Apply updates
-        for field, value in cleaned_data.items():
-            if field != "id":  # Avoid mutating primary key
-                setattr(instance, field, value)
-
-        try:
+            for key, value in cleaned_data.items():
+                setattr(instance, key, value)
             instance.save()
+
             return JsonResponse({
                 "status": True,
                 "message": "Record updated successfully.",
                 "data": list(Dc_Incharge_Verify.objects.filter(id=instance.id).values())[0]
             }, status=200)
+        except Dc_Incharge_Verify.DoesNotExist:
+            return JsonResponse({"status": False, "message": f"Record with id '{record_id}' not found."}, status=404)
         except ValidationError as e:
             return JsonResponse({"status": False, "message": str(e)}, status=400)
         except Exception as e:
@@ -735,41 +655,27 @@ def dc_verify_incharge_crud(request):
     # DELETE (DELETE)
     # ----------------------------------------------------
     elif method == "DELETE":
-        id = request.GET.get("id")
-        if not id:
-            # Fallback check inside JSON body
-            try:
-                body = json.loads(request.body.decode("utf-8")) if request.body else {}
-                id = body.get("id")
-            except json.JSONDecodeError:
-                pass
+        record_id = request.GET.get("id") or request.GET.get("slno") or body.get("id")
 
-        if not id:
-            return JsonResponse({
-                "status": False,
-                "message": "'id' parameter is required for deletion."
-            }, status=400)
+        if not record_id:
+            return JsonResponse({"status": False, "message": "'id' parameter is required for deletion."}, status=400)
 
         try:
-            instance = Dc_Incharge_Verify.objects.get(id=id)
+            instance = Dc_Incharge_Verify.objects.get(id=record_id)
             instance.delete()
             return JsonResponse({
                 "status": True,
-                "message": f"Record with slno '{id}' deleted successfully."
+                "message": f"Record with id '{record_id}' deleted successfully."
             }, status=200)
         except Dc_Incharge_Verify.DoesNotExist:
-            return JsonResponse({
-                "status": False,
-                "message": f"Record with slno '{id}' not found."
-            }, status=404)
+            return JsonResponse({"status": False, "message": f"Record with id '{record_id}' not found."}, status=404)
         except Exception as e:
             return JsonResponse({"status": False, "message": f"Database error: {str(e)}"}, status=500)
 
+    # ----------------------------------------------------
     # Unsupported HTTP Methods
-    return JsonResponse({
-        "status": False,
-        "message": f"Method {method} not allowed."
-    }, status=405)
+    # ----------------------------------------------------
+    return JsonResponse({"status": False, "message": f"Method {method} not allowed."}, status=405)
 
 
 def _serialize_record(obj, request=None):
