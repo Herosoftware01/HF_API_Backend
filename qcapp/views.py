@@ -2731,6 +2731,13 @@ def get_cutting_measurements(request):
             top_bottom=top_bottom,
         ).order_by("id")
 
+        if not saved_entries.exists():
+            return JsonResponse({
+                "status": "error",
+                "message": "Please create your Measurement Flow Assign",
+                "data": []
+            }, status=400)
+
         for entry in saved_entries:
             key = str(entry.measurement or "").strip().lower()
             field_key = (
