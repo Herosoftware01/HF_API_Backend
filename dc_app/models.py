@@ -383,6 +383,46 @@ class VueRibDeliveryDetails(models.Model):
 
 
 
+class ViewMistakeqtyPrint(models.Model):
+    frm = models.CharField(max_length=750, blank=True, null=True)
+    toad = models.CharField(max_length=750, blank=True, null=True)
+    dcno = models.IntegerField(primary_key=True)
+    dt = models.DateTimeField()
+    jobno = models.CharField(db_column='Jobno', max_length=50)  # Field name made lowercase.
+    topbottom_des = models.CharField(db_column='TopBottom_des', max_length=50, blank=True, null=True)  # Field name made lowercase.
+    mistake_des = models.CharField(db_column='Mistake_des', max_length=50, blank=True, null=True)  # Field name made lowercase.
+    color = models.CharField(db_column='Color', max_length=50)  # Field name made lowercase.
+    lotno = models.CharField(db_column='Lotno', max_length=50)  # Field name made lowercase.
+    qty = models.IntegerField(db_column='Qty')  # Field name made lowercase.
+    trstype = models.CharField(db_column='Trstype', max_length=50)  # Field name made lowercase.
+    username = models.CharField(db_column='Username', max_length=50, blank=True, null=True)  # Field name made lowercase.
+
+    class Meta:
+        managed = False
+        db_table = 'view_mistakeqty_print'
+
+class ViewFabricDeliveryRepl(models.Model):
+    slno = models.BigIntegerField(db_column='SlNo', primary_key=True)  # Field name made lowercase.
+    frm = models.CharField(max_length=11)
+    todept = models.CharField(max_length=20, blank=True, null=True)
+    dcno = models.IntegerField()
+    dt = models.DateTimeField(db_column='Dt')  # Field name made lowercase.
+    jobno = models.CharField(db_column='JobNo', max_length=50)  # Field name made lowercase.
+    markerno = models.IntegerField(db_column='MarkerNo', blank=True, null=True)  # Field name made lowercase.
+    lotno = models.CharField(max_length=50, blank=True, null=True)
+    colour = models.CharField(db_column='Colour', max_length=50, blank=True, null=True)  # Field name made lowercase.
+    dia = models.CharField(db_column='Dia', max_length=35)  # Field name made lowercase.
+    rls = models.IntegerField(blank=True, null=True)
+    kg = models.DecimalField(max_digits=38, decimal_places=3, blank=True, null=True)
+    mtr = models.DecimalField(max_digits=38, decimal_places=2, blank=True, null=True)
+    rlno = models.CharField(max_length=8000, blank=True, null=True)
+
+    class Meta:
+        managed = False
+        db_table = 'view_fabric_delivery_repl'
+
+
+
 class TrsGatemodule(models.Model):
     module = models.CharField(db_column='Module', max_length=50, db_collation='SQL_Latin1_General_CP1_CI_AS')  # Field name made lowercase.
     qr_code_dtls = models.CharField(db_column='Qr_Code_Dtls', max_length=500, db_collation='SQL_Latin1_General_CP1_CI_AS')  # Field name made lowercase.
@@ -427,47 +467,6 @@ class ViewAccinwardVerification(models.Model):
     class Meta:
         managed = False
         db_table = 'view_accinward_verification'
-
-
-
-
-class ViewMistakeqtyPrint(models.Model):
-    frm = models.CharField(max_length=750, blank=True, null=True)
-    toad = models.CharField(max_length=750, blank=True, null=True)
-    dcno = models.IntegerField(primary_key=True)
-    dt = models.DateTimeField()
-    jobno = models.CharField(db_column='Jobno', max_length=50)  # Field name made lowercase.
-    topbottom_des = models.CharField(db_column='TopBottom_des', max_length=50, blank=True, null=True)  # Field name made lowercase.
-    mistake_des = models.CharField(db_column='Mistake_des', max_length=50, blank=True, null=True)  # Field name made lowercase.
-    color = models.CharField(db_column='Color', max_length=50)  # Field name made lowercase.
-    lotno = models.CharField(db_column='Lotno', max_length=50)  # Field name made lowercase.
-    qty = models.IntegerField(db_column='Qty')  # Field name made lowercase.
-    trstype = models.CharField(db_column='Trstype', max_length=50)  # Field name made lowercase.
-    username = models.CharField(db_column='Username', max_length=50, blank=True, null=True)  # Field name made lowercase.
-
-    class Meta:
-        managed = False
-        db_table = 'view_mistakeqty_print'
-
-class ViewFabricDeliveryRepl(models.Model):
-    slno = models.BigIntegerField(db_column='SlNo', primary_key=True)  # Field name made lowercase.
-    frm = models.CharField(max_length=11)
-    todept = models.CharField(max_length=20, blank=True, null=True)
-    dcno = models.IntegerField()
-    dt = models.DateTimeField(db_column='Dt')  # Field name made lowercase.
-    jobno = models.CharField(db_column='JobNo', max_length=50)  # Field name made lowercase.
-    markerno = models.IntegerField(db_column='MarkerNo', blank=True, null=True)  # Field name made lowercase.
-    lotno = models.CharField(max_length=50, blank=True, null=True)
-    colour = models.CharField(db_column='Colour', max_length=50, blank=True, null=True)  # Field name made lowercase.
-    dia = models.CharField(db_column='Dia', max_length=35)  # Field name made lowercase.
-    rls = models.IntegerField(blank=True, null=True)
-    kg = models.DecimalField(max_digits=38, decimal_places=3, blank=True, null=True)
-    mtr = models.DecimalField(max_digits=38, decimal_places=2, blank=True, null=True)
-    rlno = models.CharField(max_length=8000, blank=True, null=True)
-
-    class Meta:
-        managed = False
-        db_table = 'view_fabric_delivery_repl'
 
 
 
