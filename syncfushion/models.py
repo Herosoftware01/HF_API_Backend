@@ -275,6 +275,7 @@ class ViewAccpopending(models.Model):
     ordersizeid = models.IntegerField(db_column='OrderSizeID')
     grp = models.CharField(db_column='Grp', max_length=35)
     des = models.CharField(db_column='Des', max_length=35)
+    merch = models.CharField(db_column='merch', max_length=35)
     clr = models.CharField(db_column='Clr', max_length=50)
     itemsiz = models.CharField(db_column='ItemSiz', max_length=50)
     ordsiz = models.CharField(db_column='OrdSiz', max_length=35)
