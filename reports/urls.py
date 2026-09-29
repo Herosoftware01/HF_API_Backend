@@ -18,6 +18,7 @@ urlpatterns = [
 
     # HR Reports
     path('attendance/', views.attendance, name='attendance'),
+    path('emp_overall/', views.emp_overall, name="emp_overall"),
     path('absent_details/', views.abs_details, name='absent_details'),
     path('present_details/', views.present_details, name='present_details'),
     path('resign_report/', views.resign_report, name='resign_report'),

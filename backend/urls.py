@@ -40,6 +40,8 @@ urlpatterns = [
     path('dcapp/', include('dc_app.urls')),
     path('accessory/', include('bit_checking.urls')) ,
     path('software_cost/', include('software_cost.urls')) ,
+    path('skill_app/', include('Salary_Confirmation.urls')) ,
+
 ] 
 
 
