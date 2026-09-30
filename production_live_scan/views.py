@@ -1059,6 +1059,13 @@ def save_process_dependency(request):
     if request.method == "POST":
         try:
             data = json.loads(request.body)
+            edit_confirmed = False
+            changed_processes = []
+
+            if isinstance(data, dict):
+                edit_confirmed = data.get("edit_confirmed") is True
+                changed_processes = data.get("changed_processes") or []
+                data = data.get("dependencies") or []
 
             def safe_integer(value, default=0):
                 try:
@@ -1069,6 +1076,9 @@ def save_process_dependency(request):
             if not isinstance(data, list):
                 data = [data]
             saved_count = 0
+            affected_bundle_ids = []
+            deleted_assembly_count = 0
+            affected_process_names = []
             with transaction.atomic():
                 first_row = data[0] if data else {}
                 existing_group = dependency.objects.select_for_update().filter(
@@ -1076,10 +1086,80 @@ def save_process_dependency(request):
                     tb_id=first_row.get('tb_id'),
                 )
                 if existing_group.filter(verify=True).exists():
-                    return JsonResponse(
-                        {"error": "Verified dependency cannot be changed"},
-                        status=409
+                    if not edit_confirmed or not changed_processes:
+                        return JsonResponse(
+                            {"error": "Verified dependency requires confirmed edit"},
+                            status=409
+                        )
+
+                    changed_process_keys = {
+                        str(process_name or '').strip().casefold()
+                        for process_name in changed_processes
+                        if str(process_name or '').strip()
+                    }
+                    dependents_by_prerequisite = {}
+                    process_names_by_key = {}
+
+                    for saved_dependency in existing_group.prefetch_related('data_entries'):
+                        process_name = str(saved_dependency.process_des or '').strip()
+                        process_key = process_name.casefold()
+                        if not process_key:
+                            continue
+                        process_names_by_key[process_key] = process_name
+
+                        for entry in saved_dependency.data_entries.all():
+                            prerequisite_key = str(entry.descriptions or '').strip().casefold()
+                            if prerequisite_key:
+                                dependents_by_prerequisite.setdefault(
+                                    prerequisite_key, set()
+                                ).add(process_key)
+
+                    impacted_process_keys = set(changed_process_keys)
+                    pending_process_keys = list(changed_process_keys)
+                    while pending_process_keys:
+                        prerequisite_key = pending_process_keys.pop()
+                        for dependent_key in dependents_by_prerequisite.get(prerequisite_key, set()):
+                            if dependent_key not in impacted_process_keys:
+                                impacted_process_keys.add(dependent_key)
+                                pending_process_keys.append(dependent_key)
+
+                    affected_process_names = [
+                        process_names_by_key.get(process_key, process_key)
+                        for process_key in impacted_process_keys
+                    ]
+
+                    changed_assembly_filter = Q()
+                    for process_name in changed_processes:
+                        changed_assembly_filter |= Q(seq__iexact=str(process_name).strip())
+
+                    changed_assembly = Assembly_data.objects.filter(
+                        job_no__iexact=first_row.get('job_no'),
+                        tb_id=first_row.get('tb_id'),
+                    ).filter(changed_assembly_filter)
+                    affected_bundle_ids = list(
+                        changed_assembly.values_list('bundle_id', flat=True).distinct()
                     )
+
+                    if affected_bundle_ids and affected_process_names:
+                        impacted_assembly_filter = Q()
+                        for process_name in affected_process_names:
+                            impacted_assembly_filter |= Q(seq__iexact=process_name)
+
+                        impacted_assembly = Assembly_data.objects.filter(
+                            job_no__iexact=first_row.get('job_no'),
+                            tb_id=first_row.get('tb_id'),
+                            bundle_id__in=affected_bundle_ids,
+                        ).filter(impacted_assembly_filter)
+                        deleted_assembly_count, _ = impacted_assembly.delete()
+
+                    if affected_bundle_ids:
+                        unit_input.objects.filter(
+                            job_no__iexact=first_row.get('job_no'),
+                            tb_id=first_row.get('tb_id'),
+                            bundle_id__in=affected_bundle_ids,
+                        ).update(scan=False)
+
+                    existing_group.update(verify=False)
                 group_already_exists = existing_group.exists()
 
                 for row in data:
@@ -1140,7 +1220,11 @@ def save_process_dependency(request):
                     "message":
                     "Data saved successfully",
                     "count":
-                    saved_count
+                    saved_count,
+                    "edited": edit_confirmed,
+                    "deleted_assembly_rows": deleted_assembly_count,
+                    "affected_processes": affected_process_names,
+                    "affected_bundle_count": len(affected_bundle_ids),
                 },
                 status=201
             )
