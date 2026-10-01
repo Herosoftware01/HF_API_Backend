@@ -68,6 +68,7 @@ class dependency(models.Model):
     process_id = models.IntegerField()
     and_or = models.BooleanField(default=False)
     verify = models.BooleanField(default=False)
+    or_only = models.BooleanField(default=False)
     # assemply_scan = models.BooleanField(default=False)
 
 
@@ -79,6 +80,8 @@ class dependency_data(models.Model):
     process_id = models.IntegerField()
     desc_ord_no = models.IntegerField()
     descriptions = models.CharField(max_length=50)
+    or_data = models.BooleanField(default=False)
+    and_data = models.BooleanField(default=False)
     dep_id = models.ForeignKey(dependency, on_delete=models.CASCADE, related_name='data_entries')
 
     
