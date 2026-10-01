@@ -103,6 +103,7 @@ INSTALLED_APPS = [
     'production_live_scan',
     'fashionr',
     'software_cost',
+    'Salary_Confirmation',
     
 ]
 

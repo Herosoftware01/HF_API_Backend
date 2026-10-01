@@ -3528,6 +3528,60 @@ def save_measurementss(request):
         )
 
 
+@api_view(["DELETE"])
+def delete_measurementss(request):
+    data = request.data
+    jobno = str(data.get("jobno") or "").strip()
+    bundle_no = str(data.get("bundle_no") or "").strip()
+    plan_no = str(data.get("plan_no") or "").strip()
+    mesurement_name = str(data.get("mesurement_name") or "").strip()
+    group = str(data.get("group") or "").strip().upper()
+    d_type = str(data.get("d_type") or "").strip().upper()
+
+    if not all((jobno, bundle_no, plan_no)):
+        return Response(
+            {"success": False, "message": "Job No, Bundle No and Plan No are required"},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    field_filters = (mesurement_name, group, d_type)
+    if any(field_filters) and not all(field_filters):
+        return Response(
+            {"success": False, "message": "All measurement field details are required"},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    master = MeasurementMas.objects.filter(
+        jobno=jobno,
+        bundle_no=bundle_no,
+        plan_no=plan_no,
+    ).first()
+
+    if not master:
+        return Response(
+            {"success": False, "message": "Saved measurement not found"},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    details = MeasurementData.objects.filter(master=master)
+    if all(field_filters):
+        details = details.filter(
+            mesurement_name=mesurement_name,
+            group=group,
+            d_type=d_type,
+        )
+
+    if not details.exists():
+        return Response(
+            {"success": False, "message": "Saved measurement not found"},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    master.delete()
+
+    return Response({"success": True, "message": "Measurements and bundle record deleted successfully"})
+
+
 @api_view(["POST"])
 def finalize_measurementss(request):
     jobno = str(request.data.get("jobno") or "").strip()
@@ -3715,10 +3769,11 @@ class CuttingMeasurementPendingAPIView(APIView):
             .using("demo")
             .all()
         )
-        today_completed_data = qs.filter(
+        today_completed_rows = qs.filter(
             done=1,
             done_dt__date=today
-        ).count()
+        ).order_by("-done_dt", "jobno", "planno", "row_num")
+        today_completed_data = today_completed_rows.count()
         today_work_minutes = (
             today_completed_data * 5
         )
@@ -3846,6 +3901,18 @@ class CuttingMeasurementPendingAPIView(APIView):
         return Response({
             "today_completed_data": (
                 today_completed_data
+            ),
+            "today_completed_rows": list(
+                today_completed_rows.values(
+                    "jobno",
+                    "planno",
+                    "topbottom_des",
+                    "clrcombo",
+                    "lotno",
+                    "name",
+                    "pc",
+                    "done_dt",
+                )
             ),
             "today_work_mins": (
                 format_work_minutes(

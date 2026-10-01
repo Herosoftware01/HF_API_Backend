@@ -57,6 +57,11 @@ urlpatterns = [
         name="save_measurementss"
     ),
     path(
+        "delete_measurementss/",
+        views.delete_measurementss,
+        name="delete_measurementss"
+    ),
+    path(
         "finalize_measurementss/",
         views.finalize_measurementss,
         name="finalize_measurementss"

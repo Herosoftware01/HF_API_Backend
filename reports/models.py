@@ -442,6 +442,17 @@ class Empjoin(models.Model):
         db_table = 'vue_empjoin'
 
 
+class TrsOverAllemb(models.Model):
+    id = models.AutoField(db_column='ID', primary_key=True)  # Field name made lowercase.
+    dt = models.DateTimeField(db_column='Dt')  # Field name made lowercase.
+    dept = models.CharField(db_column='Dept', max_length=50, db_collation='SQL_Latin1_General_CP1_CI_AS')  # Field name made lowercase.
+    code = models.IntegerField()
+
+    class Meta:
+        managed = False
+        db_table = 'Trs_Over_AllEmb'
+
+
 class AttStaff(models.Model):
     rowno = models.BigIntegerField(db_column='RowNo', blank=True, null=True)  # Field name made lowercase.
     dt = models.DateTimeField(db_column='Dt', blank=True, null=True)  # Field name made lowercase.

@@ -17,6 +17,7 @@ from .models import (
     VueRepCutPend,
     VueDyeingRatenew,
     Txorderdetstyles,
+    TrsOverAllemb,
 )
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
@@ -714,6 +715,109 @@ def attendance(request):
     except Exception as e:
         return JsonResponse({"status": "error", "message": str(e)}, status=500)
 
+def emp_overall(request):
+    try:
+        # Get date parameter from the frontend request (e.g., ?dt=2026-09-29)
+        # Get parameters from the frontend request
+        target_date = request.GET.get('date') or request.GET.get('dt')
+        unit = request.GET.get('unit')
+
+        # 1. Get data from Tally2sql (demo DB)
+        overall_qs = TrsOverAllemb.objects.using("demo")
+        
+        # Apply filters
+        if target_date:
+            overall_qs = overall_qs.filter(dt=target_date)
+        if unit:
+            overall_qs = overall_qs.filter(unit=unit) # Adjust 'unit' to your actual DB column name
+        # ---------------------------------------
+        # 1. Get data from Tally2sql (demo DB)
+        # ---------------------------------------
+        overall_qs = TrsOverAllemb.objects.using("demo")
+        
+        # Apply date filter if the frontend sends a date
+        if target_date:
+            overall_qs = overall_qs.filter(dt=target_date)
+
+        overall_data = overall_qs.values("dt", "code", "dept")
+
+        # ---------------------------------------
+        # 2. Get employee details from Garmentrk
+        # ---------------------------------------
+        emp_data = (
+            Empwisesal.objects
+            .using("main")
+            .values("code", "name", "photo")
+        )
+
+        # Convert employee data into dictionary
+        emp_map = {
+            emp["code"]: emp
+            for emp in emp_data
+        }
+
+        # ---------------------------------------
+        # 3. Get employee working/category
+        # ---------------------------------------
+        working_data = (
+            Employeeworking.objects
+            .using("main")
+            .values("code", "category")
+        )
+
+        # Convert working data into dictionary
+        working_map = {
+            emp["code"]: emp
+            for emp in working_data
+        }
+
+        # ---------------------------------------
+        # 4. LEFT JOIN + INNER JOIN equivalent
+        # ---------------------------------------
+        result = []
+
+        for row in overall_data:
+            code = row["code"]
+            
+            # INNER JOIN EmployeeWorking
+            # SQL INNER JOIN means skip if no matching employee
+            working = working_map.get(code)
+            if not working:
+                continue
+
+            emp = emp_map.get(code)
+
+            # LEFT JOIN Empwisesal
+            name = emp["name"] if emp else None
+            
+            # Generate Photo URL
+            photo_url = None
+            if emp and emp.get("photo"):  # Ensure your DB field matches "photo" or "emppic"
+                filename = os.path.basename(str(emp["photo"]))
+                photo_url = f"https://hfapi.herofashion.com/staff_images/{filename}"
+
+            result.append({
+                "dt": row["dt"],
+                "code": code,
+                "name": name,
+                "photo": photo_url,
+                "dept": row["dept"],
+                "category": working["category"],
+            })
+
+        return JsonResponse({
+            "status": True,
+            "message": "Employee overall data fetched successfully",
+            "count": len(result),
+            "data": result
+        })
+
+    except Exception as e:
+        return JsonResponse({
+            "status": False,
+            "message": "Failed to fetch employee overall data",
+            "error": str(e)
+        }, status=500)
 
 # ===============================
 # Present Details JSON API
@@ -1085,6 +1189,11 @@ def resign_report(request):
             },
             status=500,
         )
+
+
+
+
+
 
 
 def resign_join_report(request):
