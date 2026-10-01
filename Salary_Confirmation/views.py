@@ -27,58 +27,59 @@ def Process_Master(request):
 
 @csrf_exempt
 def Operation_Category(request):
-
     if request.method == 'GET':
-
         id = request.GET.get('id')
         queryset = Master_Operation_Category.objects.all()
-
         if id:
             queryset = queryset.filter(id=id)
-
         data = list(queryset.values())
         return JsonResponse(data, safe=False)
 
     elif request.method == 'POST':
-
         data = json.loads(request.body)
+        
+        # If frontend sends a single dictionary object, wrap it in a list
+        if isinstance(data, dict):
+            data = [data]
 
-        for key in data:
-
-            exists = (
-                Master_Operation_Category.objects
-                .filter(
-                    category_type = key['category_type'],
-                    operations = key['operations'],
-                    machine_name = key['machine_name']
-                )
-                .exists()
-            )
+        for item in data:
+            exists = Master_Operation_Category.objects.filter(
+                category_type=item['category_type'],
+                operations=item['operations'],
+                machine_name=item['machine_name']
+            ).exists()
 
             if exists:
                 return JsonResponse({"message": "Records already exist"}, status=400)
 
-            if not exists:
-                Master_Operation_Category.objects.create(
-                    category_type = key['category_type'],
-                    operations = key['operations'],
-                    machine_name = key['machine_name']
-                )
+            Master_Operation_Category.objects.create(
+                category_type=item['category_type'],
+                operations=item['operations'],
+                machine_name=item['machine_name']
+            )
 
         return JsonResponse({"message": "Records created"}, status=201)
 
     elif request.method == 'PUT':
-
         data = json.loads(request.body)
+        
+        if isinstance(data, dict):
+            data = [data]
 
-        for key in data:
+        for item in data:
+            item_id = item.get('id')
+            
+            # If ID isn't in the payload, extract it from the URL (e.g., /operations/5/)
+            if not item_id:
+                path_parts = request.path.strip('/').split('/')
+                if path_parts[-1].isdigit():
+                    item_id = int(path_parts[-1])
 
-            Master_Operation_Category.objects.filter(
-                id=key['id']
-                ).update(
-                    category_type = key['category_type'],
-                    operations = key['operations'],
-                    machine_name = key['machine_name']
+            if item_id:
+                Master_Operation_Category.objects.filter(id=item_id).update(
+                    category_type=item.get('category_type'),
+                    operations=item.get('operations'),
+                    machine_name=item.get('machine_name')
                 )
 
         return JsonResponse({"message": "Records updated"}, status=200)

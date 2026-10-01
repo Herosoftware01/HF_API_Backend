@@ -1,5 +1,10 @@
 from django.db import models
+from django.core.files.storage import FileSystemStorage
 
+network_storage = FileSystemStorage(
+    location=r'\\10.1.21.11\d\DC_Reciver_image',
+    base_url='/dc_receiver_images_network/' # The URL path used if you need to display it on the frontend
+)
 
 class ViewCuttingDelPrint(models.Model):
     rowno = models.BigIntegerField(db_column='RowNo', primary_key=True)  # Field name made lowercase.
@@ -567,8 +572,9 @@ class Dc_Reciver_Verify(models.Model):
     longitude = models.DecimalField(db_column='Longitude',max_digits=10,decimal_places=7,blank=True,null=True)
     location = models.CharField(db_column='Location',max_length=500,blank=True,null=True)
     concat_location = models.CharField(db_column='Concate_Location', max_length=100, blank=True, null=True)
-    receiver_image = models.ImageField(db_column='ReceiverImage',upload_to='dc_receiver/',blank=True,null=True)
+    receiver_image = models.ImageField(db_column='ReceiverImage',storage=network_storage,upload_to='',blank=True,null=True)
     received_at = models.DateTimeField(db_column='ReceivedAt', auto_now_add=True)
+    status = models.BooleanField(db_column='Status', default=False)
 
 
     class Meta:
