@@ -1,7 +1,7 @@
 import json
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
-from .models import Master_Operation_Category, MasProcess
+from .models import MasProcess
 
 def Process_Master(request):
 
