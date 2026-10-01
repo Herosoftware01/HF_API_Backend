@@ -1078,18 +1078,19 @@ def resign_report(request):
         first_day_of_month = today.replace(day=1)
         is_default_month = False
 
+        # Use __date to safely ignore the time portion of the database field
         if not from_date and not to_date:
-            resign = resign.filter(resigndt__range=(first_day_of_month, today))
+            resign = resign.filter(resigndt__date__range=(first_day_of_month, today))
             effective_from, effective_to = first_day_of_month, today
             is_default_month = True
         elif from_date and to_date:
-            resign = resign.filter(resigndt__range=(from_date, to_date))
+            resign = resign.filter(resigndt__date__range=(from_date, to_date))
             effective_from, effective_to = from_date, to_date
         elif from_date:
-            resign = resign.filter(resigndt__gte=from_date)
+            resign = resign.filter(resigndt__date__gte=from_date)
             effective_from, effective_to = from_date, None
         elif to_date:
-            resign = resign.filter(resigndt__lte=to_date)
+            resign = resign.filter(resigndt__date__lte=to_date)
             effective_from, effective_to = None, to_date
 
         # 1. Fetch dictionaries directly (Skips Model Instantiation)
@@ -1148,7 +1149,7 @@ def resign_report(request):
         else:
             this_month_count = (
                 ResignDtls.objects.using("main")
-                .filter(resigndt__gte=first_day_of_month, resigndt__lte=today)
+                .filter(resigndt__date__gte=first_day_of_month, resigndt__date__lte=today)
                 .count()
             )
 
@@ -1189,7 +1190,6 @@ def resign_report(request):
             },
             status=500,
         )
-
 
 
 

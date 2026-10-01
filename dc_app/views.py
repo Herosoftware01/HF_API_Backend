@@ -218,12 +218,19 @@ def godown_fabric_delivery_plan(request):
 
 
 def fabric_delivery_repl(request):
-    dcno = request.GET.get("dcno")  # Example: ?id=101
+    dcno = request.GET.get("dcno")
 
-    queryset = ViewFabricDeliveryRepl.objects.using('demo').all()
+    queryset = ViewFabricDeliveryRepl.objects.using("demo")
 
     if dcno:
         queryset = queryset.filter(dcno=dcno)
+    else:
+        return JsonResponse({
+            "status": False,
+            "message": "dcno is required",
+            "count": 0,
+            "data": []
+        })
 
     data = list(queryset.values())
 
@@ -702,6 +709,7 @@ def _serialize_record(obj, request=None):
         'location': obj.location,
         'receiver_image': image_url,
         'received_at': obj.received_at.isoformat() if obj.received_at else None,
+        'status': obj.status,
     }
 
 
@@ -850,6 +858,21 @@ def _extract_and_validate(data, files, is_update=False):
             errors['receiver_image'] = 'File size must not exceed 5MB.'
         else:
             cleaned['receiver_image'] = uploaded_file
+
+    # 13. status (Optional, Boolean)
+    if 'status' in data:
+        val = data['status']
+        if isinstance(val, bool):
+            cleaned['status'] = val
+        elif isinstance(val, str):
+            if val.lower() in ['true', '1']:
+                cleaned['status'] = True
+            elif val.lower() in ['false', '0']:
+                cleaned['status'] = False
+            else:
+                errors['status'] = 'Must be a boolean value (true/false).'
+        else:
+            errors['status'] = 'Must be a boolean value (true/false).'
 
     return cleaned, errors
 
