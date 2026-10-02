@@ -337,6 +337,9 @@ ORDER_IMAGES_ROOT = r'\\10.1.21.11\d\Order_Images'
 WORKENTRY_IMAGES_URL = '/workentry_images/'
 WORKENTRY_IMAGES_ROOT = r'\\10.1.21.11\d\Workentry_Images'
 
+DC_RECEIVER_IMAGES_URL = '/dc_receiver_images/'
+DC_RECEIVER_IMAGES_ROOT = r'\\10.1.21.11\d\DC_Reciver_image'
+
 PDF_STORAGE_PATH = r"\\adminserver\File Sharing\AAAA Hero\Syncfusion Pdf Reports"
 
 # Email configurationcmd

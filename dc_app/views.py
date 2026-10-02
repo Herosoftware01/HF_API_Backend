@@ -1,5 +1,5 @@
 from django.http import JsonResponse
-from .models import ViewCuttingDelPrint,ViewKnitDelivery,ViewCutsecFabricdelivery,VueAccInhTransfer,VueAccProdDel,TrsGatemodule, CuttingPrintembdel, ViewYarnProcessDelivery,VueAccProcDel,ViewAccinwardVerification,ViewFabricDeliveryProcess,ViewMistakeqtyPrint,ViewUnitPcdelivery,VueRibDeliveryDetails,ViewGdwnFabricDeliveryPlan,TrsApidtls,ViewFabricDeliveryRepl,HerofashionUser,Holiday,RoleModulePermission,Dc_Incharge_Verify,Dc_Reciver_Verify
+from .models import ViewCuttingDelPrint,ViewKnitDelivery,ViewCutsecFabricdelivery,VueAccInhTransfer,VueAccProdDel,TrsGatemodule, CuttingPrintembdel, ViewYarnProcessDelivery,VueAccProcDel,ViewAccinwardVerification,ViewFabricDeliveryProcess,ViewMistakeqtyPrint,ViewUnitPcdelivery,VueRibDeliveryDetails,ViewGdwnFabricDeliveryPlan,TrsApidtls,ViewFabricDeliveryRepl,HerofashionUser,Holiday,RoleModulePermission,Dc_Incharge_Verify,Dc_Reciver_Verify,ViewGeneralDeiveryType1
 import json
 from django.views.decorators.csrf import csrf_exempt
 from django.forms.models import model_to_dict
@@ -218,12 +218,19 @@ def godown_fabric_delivery_plan(request):
 
 
 def fabric_delivery_repl(request):
-    dcno = request.GET.get("dcno")  # Example: ?id=101
+    dcno = request.GET.get("dcno")
 
-    queryset = ViewFabricDeliveryRepl.objects.using('demo').all()
+    queryset = ViewFabricDeliveryRepl.objects.using("demo")
 
     if dcno:
         queryset = queryset.filter(dcno=dcno)
+    else:
+        return JsonResponse({
+            "status": False,
+            "message": "dcno is required",
+            "count": 0,
+            "data": []
+        })
 
     data = list(queryset.values())
 
@@ -234,6 +241,23 @@ def fabric_delivery_repl(request):
         "data": data
     })
 
+
+def general_delivery_type1(request):
+    dcno = request.GET.get("dcno")  # Example: ?id=101
+
+    queryset = ViewGeneralDeiveryType1.objects.using('test').all()
+
+    if dcno:
+        queryset = queryset.filter(no=dcno)
+
+    data = list(queryset.values())
+
+    return JsonResponse({
+        "status": True,
+        "message": "Success",
+        "count": len(data),
+        "data": data
+    })
 
 
 # --- VIEW ---
@@ -439,6 +463,7 @@ AVAILABLE_MODULES = [
     {"module_id": "godown_fabric", "module_name": "Godown Fabric Delivery"},
     {"module_id": "replacement_del", "module_name": "Replacement Delivery"},
     {"module_id": "unit_pcs", "module_name": "Unit Pcs Delivery"},
+    {"module_id": "general_delivery", "module_name": "General Delivery Type 1"},
 ]
 
 
@@ -702,6 +727,7 @@ def _serialize_record(obj, request=None):
         'location': obj.location,
         'receiver_image': image_url,
         'received_at': obj.received_at.isoformat() if obj.received_at else None,
+        'status': obj.status,
     }
 
 
@@ -850,6 +876,21 @@ def _extract_and_validate(data, files, is_update=False):
             errors['receiver_image'] = 'File size must not exceed 5MB.'
         else:
             cleaned['receiver_image'] = uploaded_file
+
+    # 13. status (Optional, Boolean)
+    if 'status' in data:
+        val = data['status']
+        if isinstance(val, bool):
+            cleaned['status'] = val
+        elif isinstance(val, str):
+            if val.lower() in ['true', '1']:
+                cleaned['status'] = True
+            elif val.lower() in ['false', '0']:
+                cleaned['status'] = False
+            else:
+                errors['status'] = 'Must be a boolean value (true/false).'
+        else:
+            errors['status'] = 'Must be a boolean value (true/false).'
 
     return cleaned, errors
 

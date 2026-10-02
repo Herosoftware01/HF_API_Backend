@@ -1,5 +1,10 @@
 from django.db import models
+from django.core.files.storage import FileSystemStorage
 
+network_storage = FileSystemStorage(
+    location=r'\\10.1.21.11\d\DC_Reciver_image',
+    base_url='/dc_receiver_images_network/' # The URL path used if you need to display it on the frontend
+)
 
 class ViewCuttingDelPrint(models.Model):
     rowno = models.BigIntegerField(db_column='RowNo', primary_key=True)  # Field name made lowercase.
@@ -422,6 +427,42 @@ class ViewFabricDeliveryRepl(models.Model):
         db_table = 'view_fabric_delivery_repl'
 
 
+class ViewGeneralDeiveryType1(models.Model):
+    phone1 = models.CharField(db_column='Phone1', max_length=50, blank=True, null=True)  # Field name made lowercase.
+    id = models.SmallIntegerField(primary_key=True)
+    companyname = models.CharField(max_length=12, blank=True, null=True)
+    address1 = models.CharField(db_column='Address1', max_length=50, blank=True, null=True)  # Field name made lowercase.
+    address2 = models.CharField(db_column='Address2', max_length=50, blank=True, null=True)  # Field name made lowercase.
+    address3 = models.CharField(db_column='Address3', max_length=50, blank=True, null=True)  # Field name made lowercase.
+    place = models.CharField(max_length=66, blank=True, null=True)
+    regno = models.CharField(db_column='RegNo', max_length=20, blank=True, null=True)  # Field name made lowercase.
+    s = models.CharField(max_length=34, blank=True, null=True)
+    suppliername = models.CharField(max_length=35, blank=True, null=True)
+    sadd1 = models.CharField(max_length=50, blank=True, null=True)
+    sadd2 = models.CharField(max_length=50, blank=True, null=True)
+    sadd3 = models.CharField(max_length=50, blank=True, null=True)
+    cityname = models.CharField(max_length=35, blank=True, null=True)
+    statname = models.CharField(max_length=30, blank=True, null=True)
+    code = models.CharField(db_column='Code', max_length=2, blank=True, null=True)  # Field name made lowercase.
+    no = models.IntegerField(db_column='No')  # Field name made lowercase.
+    date = models.DateTimeField(db_column='Date')  # Field name made lowercase.
+    reference = models.CharField(db_column='Reference', max_length=20, blank=True, null=True)  # Field name made lowercase.
+    incharge = models.CharField(max_length=35, blank=True, null=True)
+    item = models.CharField(db_column='Item', max_length=50, blank=True, null=True)  # Field name made lowercase.
+    quantity = models.DecimalField(db_column='Quantity', max_digits=18, decimal_places=4, blank=True, null=True)  # Field name made lowercase.
+    uomname = models.CharField(max_length=25, blank=True, null=True)
+    duedate = models.DateTimeField(db_column='DueDate', blank=True, null=True)  # Field name made lowercase.
+    ty = models.CharField(max_length=10)
+    dd1 = models.DateTimeField(blank=True, null=True)
+    department = models.CharField(db_column='Department', max_length=50, blank=True, null=True)  # Field name made lowercase.
+    qrid = models.CharField(max_length=24, blank=True, null=True)
+
+    class Meta:
+        managed = False
+        db_table = 'view_general_deivery_type1'
+
+
+
 
 class TrsGatemodule(models.Model):
     module = models.CharField(db_column='Module', max_length=50, db_collation='SQL_Latin1_General_CP1_CI_AS')  # Field name made lowercase.
@@ -567,8 +608,9 @@ class Dc_Reciver_Verify(models.Model):
     longitude = models.DecimalField(db_column='Longitude',max_digits=10,decimal_places=7,blank=True,null=True)
     location = models.CharField(db_column='Location',max_length=500,blank=True,null=True)
     concat_location = models.CharField(db_column='Concate_Location', max_length=100, blank=True, null=True)
-    receiver_image = models.ImageField(db_column='ReceiverImage',upload_to='dc_receiver/',blank=True,null=True)
+    receiver_image = models.ImageField(db_column='ReceiverImage',storage=network_storage,upload_to='',blank=True,null=True)
     received_at = models.DateTimeField(db_column='ReceivedAt', auto_now_add=True)
+    status = models.BooleanField(db_column='Status', default=False)
 
 
     class Meta:

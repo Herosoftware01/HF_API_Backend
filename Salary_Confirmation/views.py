@@ -40,8 +40,11 @@ def Employee_Details(request):
         return JsonResponse(data, safe=False)
 
     elif request.method == 'POST':
-
         data = json.loads(request.body)
+        
+        # If frontend sends a single dictionary object, wrap it in a list
+        if isinstance(data, dict):
+            data = [data]
 
         for key in data:
 
@@ -71,10 +74,19 @@ def Employee_Details(request):
                 )
 
     elif request.method == 'PUT':
-
         data = json.loads(request.body)
+        
+        if isinstance(data, dict):
+            data = [data]
 
-        for key in data:
+        for item in data:
+            item_id = item.get('id')
+            
+            # If ID isn't in the payload, extract it from the URL (e.g., /operations/5/)
+            if not item_id:
+                path_parts = request.path.strip('/').split('/')
+                if path_parts[-1].isdigit():
+                    item_id = int(path_parts[-1])
 
             Salcon_Employee_Details.objects.filter(
                 slno=key['slno']

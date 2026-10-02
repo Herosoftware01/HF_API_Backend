@@ -9,7 +9,7 @@ from django.db import transaction
 from imp_reports.models import UnitBundlereport
 from bundle_tracking.models import TrsMcutstickerprod,MasUnit,MasTopbottom
 from qcapp.models import Unit,Line,machine_details,emp_allocate,Empwisesal
-from .models import Assembly_data,end_line_data, unit_input, Msizes,dependency,dependency_data
+from .models import Assembly_data,end_line_data, unit_input, Msizes,dependency,dependency_data,PreporatoryEntry
 from django.utils.dateparse import parse_datetime
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
@@ -1377,7 +1377,129 @@ def delete_process_dependency(request):
         return JsonResponse({"error": str(e)}, status=400)
 
 
+################################# Preporatory Entry API #################################
 
+@api_view(['POST'])
+def preporatory_entry_details(request):
+    jobno = request.data.get('jobno')
+    topbottom = request.data.get('topbottom')
+
+    if not jobno or not topbottom:
+        return Response(
+            {"error": "Jobno and TopBottom required"},
+            status=400
+        )
+        
+    with connections['demo'].cursor() as cursor:
+        # 1. sp_GetProcessDetails (Trn == 'R' filtering)
+        cursor.execute(
+            "EXEC sp_GetProcessDetails %s, %s",
+            [jobno, topbottom]
+        )
+        columns = [col[0] for col in cursor.description]
+        rows = cursor.fetchall()
+
+        result = []
+        for row in rows:
+            item = dict(zip(columns, row))
+            trn = str(item.get('Trn', '') or '').strip().upper()
+            if trn == 'R':
+                item['Trn'] = trn
+                result.append(item)
+
+        # 2. sp_GetRibDef (preporatory_data)
+        cursor.execute(
+            "EXEC sp_GetRibDef %s, %s",
+            [jobno, topbottom]
+        )
+        rib_columns = [col[0] for col in cursor.description]
+        rib_rows = cursor.fetchall()
+        preporatory_data = [dict(zip(rib_columns, row)) for row in rib_rows]
+
+    saved_entries = list(PreporatoryEntry.objects.filter(
+        jobno__iexact=jobno,
+        topbottom__iexact=topbottom,
+    ))
+    saved_by_process = {
+        entry.process.casefold(): entry
+        for entry in saved_entries
+    }
+    for item in result:
+        saved_entry = saved_by_process.get(str(item.get('Process_des') or '').casefold())
+        item['saved_selected_processes'] = (
+            list(saved_entry.selected_processes or []) if saved_entry else []
+        )
+        item['elastic_status'] = bool(saved_entry.elastic_status) if saved_entry else False
+
+    # Rendu data-vum orae response-la anupprom
+    return Response({
+        "details": result,
+        "preporatory_data": preporatory_data,
+        "has_saved_data": bool(saved_entries),
+    })
+
+@api_view(["POST"])
+def save_preporatory_dependency(request):
+  jobno = request.data.get("jobno")
+  topbottom = request.data.get("topbottom")
+  items = request.data.get("items", [])
+
+  if not jobno or not topbottom:
+    return Response(
+        {"error": "Job Number and Top/Bottom are required!"},
+        status=status.HTTP_400_BAD_REQUEST,
+    )
+
+  try:
+    for item in items:
+      process_name = item.get(
+          "process"
+      )  # React-lendaru vara process description name
+      selected_processes = item.get("selected_processes", [])
+      elastic_status = item.get("elastic_status", False)
+
+      if process_name:
+        PreporatoryEntry.objects.update_or_create(
+            jobno=jobno,
+            topbottom=topbottom,
+            process=process_name,
+            defaults={
+                "selected_processes": selected_processes,
+                "elastic_status": elastic_status,
+            },
+        )
+
+    return Response(
+        {"message": "Configurations saved successfully!"},
+        status=status.HTTP_200_OK,
+    )
+
+  except Exception as e:
+    return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["POST"])
+def delete_preporatory_dependency(request):
+    jobno = request.data.get("jobno")
+    topbottom = request.data.get("topbottom")
+
+    if not jobno or not topbottom:
+        return Response(
+                {"error": "Job Number and Top/Bottom are required!"},
+                status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    deleted_count, _ = PreporatoryEntry.objects.filter(
+            jobno__iexact=jobno,
+            topbottom__iexact=topbottom,
+    ).delete()
+    return Response({
+            "message": "Configuration deleted successfully!",
+            "count": deleted_count,
+    }, status=status.HTTP_200_OK)
+
+    
+    
 
 ################################# Unit Permission API #################################
 
