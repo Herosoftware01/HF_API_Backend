@@ -19,7 +19,8 @@ from .models import (
     VueDyeingRatenew,
     Txorderdetstyles,
     TrsOverAllemb,
-    ViewStaffAbsentMonth
+    ViewStaffAbsentMonth,
+    VueOtAmountStaff
 )
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
@@ -3293,3 +3294,47 @@ def Staff_Month_Latemins(request):
         'yr', 'monthname', 'code', 'name', 'wunit', 'cat', 'status', 'latedays', 'latemins'
     ))
     return JsonResponse(data, safe=False)
+
+
+def Staff_OT_Amount(request):
+
+    wunit = request.GET.get('wunit')
+    name = request.GET.get('name')
+    monthname = request.GET.get('monthname')
+    yr = request.GET.get('yr')
+    status = request.GET.get('status')
+    cat = request.GET.get('cat')
+
+    queryset = VueOtAmountStaff.objects.using("main").all()
+
+    if wunit:
+        units = wunit.split(",")
+        queryset = queryset.filter(wunit__in=units)
+
+    if name:
+        names = name.split(",")
+        queryset = queryset.filter(name__in=names)
+
+    if monthname:
+        months = monthname.split(",")
+        queryset = queryset.filter(monthname__in=months)
+
+    if yr:
+        years = yr.split(",")
+        queryset = queryset.filter(yr__in=years)
+
+    if status:
+        statuses = status.split(',')
+        queryset = queryset.filter(status__in=statuses)
+
+    if cat:
+        categories = cat.split(',')
+        queryset = queryset.filter(cat__in=categories)
+
+    queryset = queryset.order_by('-yr', 'mn')
+
+    data = list(queryset.values(
+        'yr', 'monthname', 'code', 'name', 'wunit', 'cat', 'status', 'otamt', 'otmins'
+    ))
+    
+    return JsonResponse(data, safe=False)   
