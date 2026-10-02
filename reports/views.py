@@ -4,6 +4,7 @@ from .models import (
     Repcutpending,
     View_Master_RepcutPend,
     Master_Replace_Cutpend,
+    ViewStaffLateMonth,
     VueHoldwage,
     Empwisesal,
     Employeeworking,
@@ -18,6 +19,7 @@ from .models import (
     VueDyeingRatenew,
     Txorderdetstyles,
     TrsOverAllemb,
+    ViewStaffAbsentMonth
 )
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
@@ -3204,5 +3206,90 @@ def Absent_list(request):
     data = list(queryset.values(
         'id', 'unitname', 'month', 'year', 'workingdays', 'leave_days', 'informed',
         'shiftdays', 'name', 'photo', 'category', 'status'
+    ))
+    return JsonResponse(data, safe=False)
+
+def Staff_Absent_list(request):
+
+    wunit = request.GET.get('wunit')
+    name = request.GET.get('name')
+    monthname = request.GET.get('monthname')
+    yr = request.GET.get('yr')
+    status = request.GET.get('status')
+    cat = request.GET.get('cat')
+
+    queryset = ViewStaffAbsentMonth.objects.using("main").all()
+
+    if wunit:
+        units = wunit.split(",")
+        queryset = queryset.filter(wunit__in=units)
+
+    if name:
+        names = name.split(",")
+        queryset = queryset.filter(name__in=names)
+
+    if monthname:
+        months = monthname.split(",")
+        queryset = queryset.filter(monthname__in=months)
+
+    if yr:
+        years = yr.split(",")
+        queryset = queryset.filter(yr__in=years)
+
+    if status:
+        statuses = status.split(',')
+        queryset = queryset.filter(status__in=statuses)
+
+    if cat:
+        categories = cat.split(',')
+        queryset = queryset.filter(cat__in=categories)
+
+    queryset = queryset.order_by('-yr', 'mn')
+
+    data = list(queryset.values(
+        'yr', 'monthname', 'code', 'absentdays', 'name', 'wunit', 'cat', 'status'
+    ))
+    return JsonResponse(data, safe=False)
+
+
+def Staff_Month_Latemins(request):
+
+    wunit = request.GET.get('wunit')
+    name = request.GET.get('name')
+    monthname = request.GET.get('monthname')
+    yr = request.GET.get('yr')
+    status = request.GET.get('status')
+    cat = request.GET.get('cat')
+
+    queryset = ViewStaffLateMonth.objects.using("main").all()
+
+    if wunit:
+        units = wunit.split(",")
+        queryset = queryset.filter(wunit__in=units)
+
+    if name:
+        names = name.split(",")
+        queryset = queryset.filter(name__in=names)
+
+    if monthname:
+        months = monthname.split(",")
+        queryset = queryset.filter(monthname__in=months)
+
+    if yr:
+        years = yr.split(",")
+        queryset = queryset.filter(yr__in=years)
+
+    if status:
+        statuses = status.split(',')
+        queryset = queryset.filter(status__in=statuses)
+
+    if cat:
+        categories = cat.split(',')
+        queryset = queryset.filter(cat__in=categories)
+
+    queryset = queryset.order_by('-yr', 'mn')
+
+    data = list(queryset.values(
+        'yr', 'monthname', 'code', 'name', 'wunit', 'cat', 'status', 'latedays', 'latemins'
     ))
     return JsonResponse(data, safe=False)

@@ -58,4 +58,6 @@ urlpatterns = [
 
     # Absent List Report
     path('absent_list/', views.Absent_list, name='Absent_list'),
+    path('staff_absent_list/', views.Staff_Absent_list, name='Staff_Absent_list'),
+    path('staff_latemins/', views.Staff_Month_Latemins, name='Staff_Month_Latemins'),
 ] 
