@@ -13,7 +13,9 @@ class MasProcess(models.Model):
 class Salcon_Operation_Category(models.Model):
     id = models.AutoField(primary_key=True)
     slno = models.ForeignKey('Salcon_Employee_Details', on_delete=models.PROTECT)
-    process_id = models.ForeignKey(MasProcess, on_delete=models.PROTECT)
+    process_id = models.IntegerField()
+    jobno = models.CharField(max_length=20)
+    topbottom = models.CharField(max_length=30)
     emp_id = models.IntegerField()
     oper_category = models.CharField(max_length=20)
     sam_time = models.TimeField()
@@ -31,11 +33,10 @@ class Salcon_Operation_Category(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return f"{self.category_type} - {self.operations}"
+        return f"{self.emp_id} - {self.sam_time}"
 
 class Salcon_Employee_Details(models.Model):
-    id = models.AutoField(primary_key=True)
-    slno = models.IntegerField(unique=True)
+    slno = models.AutoField(primary_key=True)
     emp_id = models.IntegerField()
     emp_name = models.CharField(max_length=50)
     prev_salary = models.DecimalField(max_digits=10, decimal_places=2)
@@ -53,7 +54,7 @@ class Salcon_Employee_Details(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return f"{self.emp_name} - {self.experience}"
+        return f"{self.emp_id} - {self.experience}"
 
 class Salcon_Approval(models.Model):
     id = models.AutoField(primary_key=True)
@@ -67,3 +68,15 @@ class Salcon_Approval(models.Model):
     approve_md = models.IntegerField()
     approve_md_date = models.DateTimeField()
 
+    def __str__(self):
+        return f"{self.emp_id} - {self.salary_approved}"
+
+class Salcon_Individual_Assessment(models.Model):
+    id = models.AutoField(primary_key=True)
+    slno = models.ForeignKey('Salcon_Employee_Details', on_delete=models.PROTECT)
+    emp_id = models.IntegerField()
+    assessment_criteria = models.CharField(max_length=100)
+    assessment_status = models.CharField(max_length=50)
+    remarks = models.TextField()
+    prepared_ie = models.CharField(max_length=50)
+    approved_pi = models.CharField(max_length=50)

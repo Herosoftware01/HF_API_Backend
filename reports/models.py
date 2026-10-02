@@ -1081,3 +1081,26 @@ class ViewStaffLateMonth(models.Model):
     class Meta:
         managed = False
         db_table = 'view_staff_late_month'
+
+class VueOtAmountStaff(models.Model):
+    rowno = models.BigIntegerField(db_column='RowNo', blank=True, null=True)
+    ccat = models.CharField(db_column='CCAT', max_length=10, blank=True, null=True)
+    wunit = models.CharField(max_length=70, blank=True, null=True)
+    acat = models.CharField(db_column='ACAT', max_length=70, blank=True, null=True)
+    status = models.CharField(max_length=20, blank=True, null=True)
+    dcalc = models.CharField(max_length=20, blank=True, null=True)
+    senior = models.CharField(max_length=3, blank=True, null=True)
+    wrkhrs = models.DecimalField(max_digits=18, decimal_places=2, blank=True, null=True)
+    wdays = models.IntegerField(db_column='Wdays', blank=True, null=True)
+    sal = models.DecimalField(db_column='SAL', max_digits=21, decimal_places=2, blank=True, null=True)
+    m = models.IntegerField(db_column='M', blank=True, null=True)
+    otamt = models.DecimalField(max_digits=38, decimal_places=6, blank=True, null=True)
+    otmins = models.DecimalField(db_column='OTmins', max_digits=38, decimal_places=2, blank=True, null=True)
+    name = models.CharField(max_length=70)
+    month_name = models.CharField(db_column='Month_Name', max_length=3, blank=True, null=True)
+    monthno = models.IntegerField(db_column='MonthNo', blank=True, null=True)
+    yr = models.IntegerField(db_column='YR', blank=True, null=True)
+
+    class Meta:
+        managed = False
+        db_table = 'vue_ot_amount_staff'
