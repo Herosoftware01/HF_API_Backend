@@ -33,6 +33,7 @@ urlpatterns = [
     path('godown_fabric_delivery_plan/', views.godown_fabric_delivery_plan, name='godown_fabric_delivery_plan'),
     path('fabric_delivery_repl/', views.fabric_delivery_repl, name='fabric_delivery_repl'),
     path('fabric_delivery_repl/<int:dcno>/', views.fabric_delivery_repl, name='fabric_delivery_repl'),
+    path('general_delivery_type1/', views.general_delivery_type1, name='general_delivery_type1'),
 
     path('dc_permissions/save/', views.manage_role_permissions, name='save_role_permissions'),
     
