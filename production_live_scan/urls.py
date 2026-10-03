@@ -49,4 +49,9 @@ urlpatterns = [
         name="user-unit-permission"
     ),
     path('user-unit-permission-list/', UserUnitPermissionListView.as_view(), name='user-unit-permission-list'),
+    path('api/units/', views.get_units, name='get_units'),
+    path('api/jobnos-unit/', views.get_jobnos_by_unit, name='get_jobnos_by_unit'),
+    path('api/topbottom-unit-job/', views.get_topbottom_by_unit_job, name='get_topbottom_by_unit_job'),
+    path('api/table-data/', views.get_table_data, name='get_table_data'),
+    path('api/save-table-entry/', views.save_table_entry, name='save_table_entry'),
 ]  
