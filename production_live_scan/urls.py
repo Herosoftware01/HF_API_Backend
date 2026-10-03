@@ -19,6 +19,7 @@ urlpatterns = [
     path('save-bundles/', UnitInputAPIView.as_view(), name='save-bundles'),
     path('end-save-bundles/', EndUnitInputAPIView.as_view(), name='end-save-bundles'),
     path('get_input_scan_bundles/', GetUnitDataAPIView.as_view(), name='get_input_scan_bundles'),
+    path('bundle-last-process/', views.get_bundle_last_process, name='bundle_last_process'),
     path('get_input_scan_bundlessss/', GetUnitDataAPIViewsss.as_view(), name='get_input_scan_bundlessss'),
     path('get_end_scan_bundles/', EndUnitDataAPIView.as_view(), name='get_end_scan_bundles'),
     path('get_assembly_bundles/', GetUnitAssemply.as_view(), name='get_assembly_bundles'),
