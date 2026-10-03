@@ -1,5 +1,5 @@
 from django.http import JsonResponse
-from .models import ViewCuttingDelPrint,ViewKnitDelivery,ViewCutsecFabricdelivery,VueAccInhTransfer,VueAccProdDel,TrsGatemodule, CuttingPrintembdel, ViewYarnProcessDelivery,VueAccProcDel,ViewAccinwardVerification,ViewFabricDeliveryProcess,ViewMistakeqtyPrint,ViewUnitPcdelivery,VueRibDeliveryDetails,ViewGdwnFabricDeliveryPlan,TrsApidtls,ViewFabricDeliveryRepl,HerofashionUser,Holiday,RoleModulePermission,Dc_Incharge_Verify,Dc_Reciver_Verify
+from .models import ViewCuttingDelPrint,ViewKnitDelivery,ViewCutsecFabricdelivery,VueAccInhTransfer,VueAccProdDel,TrsGatemodule, CuttingPrintembdel, ViewYarnProcessDelivery,VueAccProcDel,ViewAccinwardVerification,ViewFabricDeliveryProcess,ViewMistakeqtyPrint,ViewUnitPcdelivery,VueRibDeliveryDetails,ViewGdwnFabricDeliveryPlan,TrsApidtls,ViewFabricDeliveryRepl,HerofashionUser,Holiday,RoleModulePermission,Dc_Incharge_Verify,Dc_Reciver_Verify,ViewGeneralDeiveryType1
 import json
 from django.views.decorators.csrf import csrf_exempt
 from django.forms.models import model_to_dict
@@ -242,6 +242,23 @@ def fabric_delivery_repl(request):
     })
 
 
+def general_delivery_type1(request):
+    dcno = request.GET.get("dcno")  # Example: ?id=101
+
+    queryset = ViewGeneralDeiveryType1.objects.using('test').all()
+
+    if dcno:
+        queryset = queryset.filter(no=dcno)
+
+    data = list(queryset.values())
+
+    return JsonResponse({
+        "status": True,
+        "message": "Success",
+        "count": len(data),
+        "data": data
+    })
+
 
 # --- VIEW ---
 @csrf_exempt
@@ -446,6 +463,7 @@ AVAILABLE_MODULES = [
     {"module_id": "godown_fabric", "module_name": "Godown Fabric Delivery"},
     {"module_id": "replacement_del", "module_name": "Replacement Delivery"},
     {"module_id": "unit_pcs", "module_name": "Unit Pcs Delivery"},
+    {"module_id": "general_delivery", "module_name": "General Delivery Type 1"},
 ]
 
 

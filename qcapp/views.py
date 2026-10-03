@@ -847,6 +847,7 @@ class EmpAllocateAPIView(APIView):
         # -------------------------
         # VALIDATION
         # -------------------------
+
         if not emp_code or not machine_id:
             return Response(
                 {"error": "emp_code and machine_id are required"},
@@ -858,6 +859,7 @@ class EmpAllocateAPIView(APIView):
         # ==================================================
         # STATUS UPDATE (ONLINE / OFFLINE)
         # ==================================================
+
         if "status" in data and sequence is None:
 
             allocation = (
@@ -896,8 +898,6 @@ class EmpAllocateAPIView(APIView):
                 {"error": "unit and line are required"},
                 status=400
             )
-            
-            
         
         same_allocation = emp_allocate.objects.filter(
             emp_code=emp_code,
@@ -909,6 +909,15 @@ class EmpAllocateAPIView(APIView):
             line=line,
             unit=unit
         ).exists()
+
+        # if same_allocation:
+            
+        #     return Response(
+        #         {
+        #             "error": "Already allocated today"
+        #         },
+        #         status=400
+        #     )
 
         if same_allocation:
             status_update = emp_allocate.objects.filter(
@@ -933,6 +942,7 @@ class EmpAllocateAPIView(APIView):
         # -------------------------
         # EMPLOYEE ALREADY ONLINE ?
         # -------------------------
+
         employee_online = emp_allocate.objects.filter(
             emp_code=emp_code,
             date__date=today,

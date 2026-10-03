@@ -948,7 +948,7 @@ def trs_workentry(request, id=None):
                 if rec.image:
                     filename = os.path.basename(rec.image.name)
                     record['image'] = (
-                        f"http://10.1.21.99:8200/workentry_images/{filename}"
+                        f"https://hfapi.herofashion.com/workentry_images/{filename}"
                     )
                 else:
                     record['image'] = None
