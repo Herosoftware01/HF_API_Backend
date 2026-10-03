@@ -22,10 +22,13 @@ urlpatterns = [
     path('get_end_scan_bundles/', EndUnitDataAPIView.as_view(), name='get_end_scan_bundles'),
     path('get_assembly_bundles/', GetUnitAssemply.as_view(), name='get_assembly_bundles'),
     path("process-details/",views.get_process_details,name="get_process_details"),
+    path("preporatory-entry-details/",views.preporatory_entry_details,name="preporatory_entry_details"),
     path("job-top-bottom/", views.get_job_top_bottom, name="get_job_top_bottom"),
     path("save_process_dependency/",views.save_process_dependency,name="save_process_dependency"),
     path("verify_process_dependency/", views.verify_process_dependency, name="verify_process_dependency"),
     path("delete_process_dependency/", views.delete_process_dependency, name="delete_process_dependency"),
+    path("save_preporatory_dependency/", views.save_preporatory_dependency, name="save_preporatory_dependency"),
+    path("delete_preporatory_dependency/", views.delete_preporatory_dependency, name="delete_preporatory_dependency"),
 
     path(
         "users/",

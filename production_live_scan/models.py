@@ -107,6 +107,24 @@ class end_line_data(models.Model):
     lot = models.CharField(max_length=50)
 
 
+class PreporatoryEntry(models.Model):
+  jobno = models.CharField(max_length=50)
+  topbottom = models.CharField(max_length=100)
+  process = models.CharField(max_length=100)
+  selected_processes = models.CharField(max_length=100, blank=True, null=True)
+  elastic_status = models.BooleanField(
+      default=False
+  )  # Elastic switch status (True/False)
+  updated_at = models.DateTimeField(auto_now=True)
+
+  class Meta:
+    unique_together = (
+        "jobno",
+        "topbottom",
+        "process",
+    ) 
+  def __str__(self):
+    return f"{self.jobno} - {self.topbottom} - Process {self.process}"
 
 
 ################################## USer Permission Models ########################################
