@@ -9,7 +9,7 @@ from django.db import transaction
 from imp_reports.models import UnitBundlereport
 from bundle_tracking.models import TrsMcutstickerprod,MasUnit,MasTopbottom
 from qcapp.models import Unit,Line,machine_details,emp_allocate,Empwisesal
-from .models import Assembly_data,end_line_data, unit_input, Msizes,dependency,dependency_data,PreporatoryEntry
+from .models import Assembly_data,end_line_data, unit_input, Msizes,dependency,dependency_data,PreporatoryEntry,ViewRibdelPreparatory,RibdelEntry
 from django.utils.dateparse import parse_datetime
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
@@ -20,7 +20,7 @@ from rest_framework.decorators import api_view
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
 
-
+from django.db.models import Sum
 
 from django.views import View
 from .models import user_unit_permission
@@ -492,17 +492,17 @@ def get_eligible_assembly_bundle_ids(job_no, process_des, top_bottom=None):
         completed_query = completed_query.filter(tb_name__iexact=top_bottom)
     completed_rows = completed_query.values_list('bundle_id', 'seq')
     for bundle_id, sequence in completed_rows:
-        normalized_sequence = str(sequence or '').strip().casefold()
-        if normalized_sequence:
+        for completed_sequence in split_process_descriptions(sequence):
+            normalized_sequence = completed_sequence.casefold()
             completed_by_bundle.setdefault(str(bundle_id), set()).add(normalized_sequence)
 
     eligible_bundle_ids = {
         bundle_id
         for bundle_id, completed_sequences in completed_by_bundle.items()
-        if (
-            not completed_sequences.isdisjoint(or_sequences)
-            if or_sequences
-            else and_sequences.issubset(completed_sequences)
+        if assembly_dependencies_satisfied(
+            completed_sequences,
+            and_sequences,
+            or_sequences,
         )
     }
     if not eligible_bundle_ids:
@@ -521,6 +521,66 @@ def get_eligible_assembly_bundle_ids(job_no, process_des, top_bottom=None):
         )
 
     return True, eligible_bundle_ids, None
+
+
+def assembly_dependencies_satisfied(completed_sequences, and_sequences, or_sequences):
+    and_requirements_met = and_sequences.issubset(completed_sequences)
+    or_requirements_met = (
+        not or_sequences or not completed_sequences.isdisjoint(or_sequences)
+    )
+    return and_requirements_met and or_requirements_met
+
+
+def split_process_descriptions(process_des):
+    return list(dict.fromkeys(
+        description.strip()
+        for description in str(process_des or '').split(',')
+        if description.strip()
+    ))
+
+
+def bundle_process_pairs(bundles, process_des):
+    return [
+        (bundle, description)
+        for bundle in bundles
+        for description in split_process_descriptions(process_des)
+    ]
+
+
+def assembly_sequence_filter(process_des):
+    sequence_filter = Q(seq__iexact=str(process_des or '').strip())
+    for description in split_process_descriptions(process_des):
+        sequence_filter |= Q(seq__iexact=description)
+    return sequence_filter
+
+
+def get_eligible_assembly_bundle_ids_for_processes(job_no, process_des, top_bottom=None):
+    process_descriptions = split_process_descriptions(process_des)
+    if not process_descriptions:
+        return False, None, "Process sequence is required."
+
+    eligible_bundle_ids = set()
+    all_bundles_eligible = False
+    errors = []
+    for description in process_descriptions:
+        allowed, bundle_ids, error_message = get_eligible_assembly_bundle_ids(
+            job_no, description, top_bottom
+        )
+        if not allowed:
+            if bundle_ids is None:
+                return False, None, error_message
+            errors.append(error_message)
+            continue
+        if bundle_ids is None:
+            all_bundles_eligible = True
+        else:
+            eligible_bundle_ids.update(bundle_ids)
+
+    if all_bundles_eligible:
+        return True, None, None
+    if eligible_bundle_ids:
+        return True, eligible_bundle_ids, None
+    return False, set(), " ".join(dict.fromkeys(errors))
 
 
 class GetUnitDataAPIView(APIView):
@@ -557,7 +617,7 @@ class GetUnitDataAPIView(APIView):
                         {"error": "top_bottom is required to load assembly bundles"},
                         status=status.HTTP_400_BAD_REQUEST
                     )
-                allowed, eligible_bundle_ids, error_message = get_eligible_assembly_bundle_ids(
+                allowed, eligible_bundle_ids, error_message = get_eligible_assembly_bundle_ids_for_processes(
                     job_no, process_des, top_bottom
                 )
                 if not allowed:
@@ -567,8 +627,102 @@ class GetUnitDataAPIView(APIView):
                     )
                 already_scanned_ids = Assembly_data.objects.filter(
                     job_no__iexact=job_no,
-                    seq__iexact=process_des,
-                ).values_list('bundle_id', flat=True)
+                ).filter(assembly_sequence_filter(process_des)).values_list('bundle_id', flat=True)
+                data = data.filter(job_no__iexact=job_no)
+                if top_bottom:
+                    data = data.filter(tb_name__iexact=top_bottom)
+                data = data.exclude(bundle_id__in=already_scanned_ids)
+                if eligible_bundle_ids is not None:
+                    data = data.filter(bundle_id__in=eligible_bundle_ids)
+            else:
+                verified_tb_ids = dependency.objects.filter(
+                    job_no__iexact=job_no,
+                    verify=True
+                ).values_list('tb_id', flat=True)
+                data = data.filter(
+                    job_no__iexact=job_no,
+                    tb_id__in=verified_tb_ids,
+                    scan=False,
+                )
+
+        # JSON response
+        results = list(data.values('bundle_id','mbud', 'job_no','color','bdl_no','size','tb_name', 'pc', 'color', 'entry_date'))
+        return Response({"status": True, "data": results})
+
+
+@api_view(['GET'])
+def get_bundle_last_process(request):
+    bundle_id = str(request.query_params.get('bundle_id') or '').strip()
+    if not bundle_id:
+        return Response(
+            {"error": "bundle_id is required"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    latest_entry = (
+        Assembly_data.objects
+        .filter(bundle_id__iexact=bundle_id)
+        .order_by('-id')
+        .values('seq', 'job_no', 'tb_name')
+        .first()
+    )
+    last_processes = split_process_descriptions(latest_entry['seq']) if latest_entry else []
+    if not last_processes:
+        return Response({"available": False, "message": "Bundle not available"})
+
+    return Response({
+        "available": True,
+        "last_process": last_processes[-1],
+        "job_no": latest_entry['job_no'],
+        "top_bottom": latest_entry['tb_name'],
+    })
+
+
+class GetUnitDataAPIViewsss(APIView):
+    def get(self, request):
+        unit = request.query_params.get('unit')
+        line = request.query_params.get('line')
+        job_no = request.query_params.get('job_no')
+        process_des = request.query_params.get('process_des')
+        top_bottom = str(request.query_params.get('top_bottom', '') or '').strip()
+        selected_date = request.query_params.get('date') 
+
+        if selected_date:
+            date_obj = datetime.strptime(selected_date, '%Y-%m-%d')
+            # data = unit_input.objects.filter(unit=unit, line=line, entry_date__date=date_obj).order_by('-entry_date')
+            data = unit_input.objects.filter(unit=unit, entry_date__date=date_obj).order_by('-entry_date')
+        else:
+            # four_days_ago = datetime.now() - timedelta(days=1)
+            today = date.today()
+            print("Today's date:", today)
+            # data = unit_input.objects.filter(unit=unit, line=line, entry_date__gte=today).order_by('-entry_date')
+            data = unit_input.objects.filter(unit=unit, entry_date__date=today).order_by('-entry_date')
+
+        if job_no is not None:
+            job_no = job_no.strip()
+            if not job_no:
+                return Response(
+                    {"error": "job_no is required to load assembly bundles"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            if process_des is not None:
+                process_des = process_des.strip()
+                if not top_bottom:
+                    return Response(
+                        {"error": "top_bottom is required to load assembly bundles"},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+                allowed, eligible_bundle_ids, error_message = get_eligible_assembly_bundle_ids_for_processes(
+                    job_no, process_des, top_bottom
+                )
+                if not allowed:
+                    return Response(
+                        {"error": error_message},
+                        status=status.HTTP_409_CONFLICT
+                    )
+                already_scanned_ids = Assembly_data.objects.filter(
+                    job_no__iexact=job_no,
+                ).filter(assembly_sequence_filter(process_des)).values_list('bundle_id', flat=True)
                 data = data.filter(job_no__iexact=job_no)
                 if top_bottom:
                     data = data.filter(tb_name__iexact=top_bottom)
@@ -624,7 +778,7 @@ class EndUnitDataAPIView(APIView):
                         {"error": "top_bottom is required to load assembly bundles"},
                         status=status.HTTP_400_BAD_REQUEST
                     )
-                allowed, eligible_bundle_ids, error_message = get_eligible_assembly_bundle_ids(
+                allowed, eligible_bundle_ids, error_message = get_eligible_assembly_bundle_ids_for_processes(
                     job_no, process_des, top_bottom
                 )
                 if not allowed:
@@ -634,8 +788,7 @@ class EndUnitDataAPIView(APIView):
                     )
                 already_scanned_ids = Assembly_data.objects.filter(
                     job_no__iexact=job_no,
-                    seq__iexact=process_des,
-                ).values_list('bundle_id', flat=True)
+                ).filter(assembly_sequence_filter(process_des)).values_list('bundle_id', flat=True)
                 data = data.filter(job_no__iexact=job_no)
                 if top_bottom:
                     data = data.filter(tb_name__iexact=top_bottom)
@@ -664,9 +817,15 @@ class GetUnitAssemply(APIView):
     def get(self, request):
         unit = request.query_params.get('unit')
         line = request.query_params.get('line')
-        selected_date = request.query_params.get('date') 
+        selected_date = request.query_params.get('date')
+        all_dates = request.query_params.get('all_dates', '').lower() == 'true'
 
-        if selected_date:
+        if all_dates:
+            data = Assembly_data.objects.filter(
+                unit=unit,
+                line=line,
+            ).order_by('-entry_date')
+        elif selected_date:
             date_obj = datetime.strptime(selected_date, '%Y-%m-%d')
             data = Assembly_data.objects.filter(unit=unit, line=line, entry_date__date=date_obj).order_by('-entry_date')
         else:
@@ -809,7 +968,7 @@ class SaveAssemblyAPIView(APIView):
 
         process_des = str(allocation.seq or '').strip()
 
-        allowed, eligible_bundle_ids, error_message = get_eligible_assembly_bundle_ids(
+        allowed, eligible_bundle_ids, error_message = get_eligible_assembly_bundle_ids_for_processes(
             job_no, process_des, selected_top_bottom
         )
         if not allowed:
@@ -830,8 +989,7 @@ class SaveAssemblyAPIView(APIView):
         with transaction.atomic():
             already_scanned_ids = Assembly_data.objects.filter(
                 job_no__iexact=job_no,
-                seq__iexact=process_des,
-            ).values_list('bundle_id', flat=True)
+            ).filter(assembly_sequence_filter(process_des)).values_list('bundle_id', flat=True)
             bundle_queryset = unit_input.objects.select_for_update().filter(
                 unit=unit,
                 line=line,
@@ -859,8 +1017,7 @@ class SaveAssemblyAPIView(APIView):
                     tb_id=bundle.tb_id,
                     tb_name=bundle.tb_name,
                     machine=allocation.machine.Identity,
-                    seq=process_des,
-                    # process_des=process_des,
+                    seq=description,
                     date=selected_date or entry_date,
                     bundle_id=bundle.bundle_id,
                     bdl_no=bundle.bdl_no,
@@ -874,7 +1031,7 @@ class SaveAssemblyAPIView(APIView):
                     lot=bundle.lot,
                     emp_id=emp_code
                 )
-                for bundle in bundles
+                for bundle, description in bundle_process_pairs(bundles, process_des)
             ])
             updated = bundle_queryset.update(scan=True)
 
@@ -1505,7 +1662,133 @@ def delete_preporatory_dependency(request):
             "count": deleted_count,
     }, status=status.HTTP_200_OK)
 
+
+
+
+
+# 1. Get Distinct Unit Names
+@api_view(['GET'])
+def get_units(request):
+    units = ViewRibdelPreparatory.objects.values_list('unitname', flat=True).distinct()
+    return Response(list(units))
+
+# 2. Get Job Nos based on UnitName
+@api_view(['GET'])
+def get_jobnos_by_unit(request):
+    unitname = request.GET.get('unitname')
+    jobnos = ViewRibdelPreparatory.objects.filter(unitname=unitname).values_list('jobno', flat=True).distinct()
+    return Response(list(jobnos))
+
+# 3. Get TopBottom Des based on UnitName & JobNo
+@api_view(['GET'])
+def get_topbottom_by_unit_job(request):
+    unitname = request.GET.get('unitname')
+    jobno = request.GET.get('jobno')
+    topbottoms = ViewRibdelPreparatory.objects.filter(unitname=unitname, jobno=jobno).values_list('topbottom_des', flat=True).distinct()
+    return Response(list(topbottoms))
+
+# 4. Get Table Data based on UnitName, JobNo, TopBottom_des
+@api_view(['GET'])
+def get_table_data(request):
+    unitname = request.GET.get('unitname')
+    jobno = request.GET.get('jobno')
+    topbottom_des = request.GET.get('topbottom_des')
     
+    records = list(ViewRibdelPreparatory.objects.filter(
+        unitname=unitname, jobno=jobno, topbottom_des=topbottom_des
+    ).values())
+
+    entered_totals = {
+        (
+            entry["jobno"],
+            entry["topbottom_des"],
+            entry["clrcomb"],
+            entry["siz"],
+            entry["lotno"],
+        ): entry["entered_total"] or 0
+        for entry in RibdelEntry.objects.filter(
+            jobno=jobno,
+            topbottom_des=topbottom_des,
+        ).values(
+            "jobno",
+            "topbottom_des",
+            "clrcomb",
+            "siz",
+            "lotno",
+        ).annotate(entered_total=Sum("entered_qty"))
+    }
+    for record in records:
+        record["total_qty"] = record["delpc"] or 0
+        entry_key = (
+            record["jobno"],
+            record["topbottom_des"],
+            record["clrcomb"],
+            record["siz"],
+            record["lotno"],
+        )
+        record["available_qty"] = max(
+            record["total_qty"] - entered_totals.get(entry_key, 0),
+            0,
+        )
+
+    return Response(records)
+
+# 5. Save Row Entry
+@api_view(['POST'])
+def save_table_entry(request):
+    data = request.data
+    employee_id = str(data.get('employee_id') or '').strip()
+    rowno = data.get('rowno')
+    try:
+        entered_qty = int(data.get('entered_qty', 0))
+    except (TypeError, ValueError):
+        return Response({'error': 'Entered quantity must be a whole number.'}, status=400)
+
+    if not employee_id:
+        return Response({'error': 'Employee is required.'}, status=400)
+    
+    try:
+        row_item = ViewRibdelPreparatory.objects.get(rowno=rowno)
+    except ViewRibdelPreparatory.DoesNotExist:
+        return Response({'error': 'Record not found!'}, status=404)
+        
+    total_qty = row_item.delpc or 0
+    entry_filter = {
+        "jobno": row_item.jobno,
+        "topbottom_des": row_item.topbottom_des,
+        "clrcomb": row_item.clrcomb,
+        "siz": row_item.siz,
+        "lotno": row_item.lotno,
+    }
+    entered_total = RibdelEntry.objects.filter(
+        **entry_filter
+    ).aggregate(total=Sum('entered_qty'))['total'] or 0
+    available_qty = max(total_qty - entered_total, 0)
+    
+    if entered_qty <= 0:
+        return Response({'error': 'Negative or zero entry is not allowed!'}, status=400)
+    if entered_qty > available_qty:
+        return Response(
+            {'error': f'Entered quantity cannot exceed Available Delpc ({available_qty})!'},
+            status=400,
+        )
+        
+    RibdelEntry.objects.create(
+        employee_id=employee_id,
+        jobno=row_item.jobno,
+        topbottom_des=row_item.topbottom_des,
+        clrcomb=row_item.clrcomb,
+        siz=row_item.siz,
+        lotno=row_item.lotno,
+        total_qty=total_qty,
+        entered_qty=entered_qty
+    )
+    
+    return Response({
+        'message': f'Successfully saved entry for Row {row_item.rowno}!',
+        'total_qty': total_qty,
+        'available_qty': available_qty - entered_qty,
+    })
     
 
 ################################# Unit Permission API #################################
