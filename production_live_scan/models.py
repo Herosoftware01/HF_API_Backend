@@ -111,9 +111,7 @@ class PreporatoryEntry(models.Model):
   jobno = models.CharField(max_length=50)
   topbottom = models.CharField(max_length=100)
   process = models.CharField(max_length=100)
-  selected_processes = models.JSONField(
-      default=list, blank=True
-  ) 
+  selected_processes = models.CharField(max_length=100, blank=True, null=True)
   elastic_status = models.BooleanField(
       default=False
   )  # Elastic switch status (True/False)
@@ -127,6 +125,36 @@ class PreporatoryEntry(models.Model):
     ) 
   def __str__(self):
     return f"{self.jobno} - {self.topbottom} - Process {self.process}"
+
+
+
+class ViewRibdelPreparatory(models.Model):
+    rowno = models.BigIntegerField(db_column='RowNo', primary_key=True)  # Field name made lowercase.
+    jobno = models.CharField(max_length=50)
+    topbottom_des = models.CharField(db_column='TopBottom_des', max_length=50, blank=True, null=True)  # Field name made lowercase.
+    siz = models.CharField(max_length=35)
+    clrcomb = models.CharField(max_length=50)
+    unitname = models.CharField(db_column='UnitName', max_length=50, blank=True, null=True)  # Field name made lowercase.
+    lotno = models.CharField(db_column='LOTNO', max_length=10, blank=True, null=True)  # Field name made lowercase.
+    delpc = models.IntegerField(blank=True, null=True)
+    indpart = models.CharField(max_length=50)
+    process = models.CharField(max_length=100)
+
+    class Meta:
+        managed = False
+        db_table = 'view_ribdel_preparatory'
+
+
+class RibdelEntry(models.Model):
+    employee_id = models.CharField(max_length=50)
+    jobno = models.CharField(max_length=50)
+    topbottom_des = models.CharField(max_length=50, blank=True, null=True)
+    clrcomb = models.CharField(max_length=50)
+    siz = models.CharField(max_length=35)
+    lotno = models.CharField(max_length=10, blank=True, null=True)
+    total_qty = models.IntegerField()
+    entered_qty = models.IntegerField()
+    created_at = models.DateTimeField(auto_now_add=True)
 
 
 ################################## USer Permission Models ########################################

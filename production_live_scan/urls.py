@@ -1,6 +1,6 @@
 from django.urls import path
 from . import views
-from .views import UnitInputAPIView,EndUnitDataAPIView,EndUnitInputAPIView,GetUnitDataAPIView,GetUnitAssemply
+from .views import UnitInputAPIView,EndUnitDataAPIView,EndUnitInputAPIView,GetUnitDataAPIView,GetUnitAssemply,GetUnitDataAPIViewsss
 
 
 from .views import (
@@ -19,6 +19,7 @@ urlpatterns = [
     path('save-bundles/', UnitInputAPIView.as_view(), name='save-bundles'),
     path('end-save-bundles/', EndUnitInputAPIView.as_view(), name='end-save-bundles'),
     path('get_input_scan_bundles/', GetUnitDataAPIView.as_view(), name='get_input_scan_bundles'),
+    path('get_input_scan_bundlessss/', GetUnitDataAPIViewsss.as_view(), name='get_input_scan_bundlessss'),
     path('get_end_scan_bundles/', EndUnitDataAPIView.as_view(), name='get_end_scan_bundles'),
     path('get_assembly_bundles/', GetUnitAssemply.as_view(), name='get_assembly_bundles'),
     path("process-details/",views.get_process_details,name="get_process_details"),
@@ -48,4 +49,9 @@ urlpatterns = [
         name="user-unit-permission"
     ),
     path('user-unit-permission-list/', UserUnitPermissionListView.as_view(), name='user-unit-permission-list'),
+    path('api/units/', views.get_units, name='get_units'),
+    path('api/jobnos-unit/', views.get_jobnos_by_unit, name='get_jobnos_by_unit'),
+    path('api/topbottom-unit-job/', views.get_topbottom_by_unit_job, name='get_topbottom_by_unit_job'),
+    path('api/table-data/', views.get_table_data, name='get_table_data'),
+    path('api/save-table-entry/', views.save_table_entry, name='save_table_entry'),
 ]  
