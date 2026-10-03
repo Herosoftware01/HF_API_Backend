@@ -589,7 +589,74 @@ class GetUnitDataAPIView(APIView):
         # JSON response
         results = list(data.values('bundle_id','mbud', 'job_no','color','bdl_no','size','tb_name', 'pc', 'color', 'entry_date'))
         return Response({"status": True, "data": results})
-    
+
+
+class GetUnitDataAPIViewsss(APIView):
+    def get(self, request):
+        unit = request.query_params.get('unit')
+        line = request.query_params.get('line')
+        job_no = request.query_params.get('job_no')
+        process_des = request.query_params.get('process_des')
+        top_bottom = str(request.query_params.get('top_bottom', '') or '').strip()
+        selected_date = request.query_params.get('date') 
+
+        if selected_date:
+            date_obj = datetime.strptime(selected_date, '%Y-%m-%d')
+            # data = unit_input.objects.filter(unit=unit, line=line, entry_date__date=date_obj).order_by('-entry_date')
+            data = unit_input.objects.filter(unit=unit, entry_date__date=date_obj).order_by('-entry_date')
+        else:
+            # four_days_ago = datetime.now() - timedelta(days=1)
+            today = date.today()
+            print("Today's date:", today)
+            # data = unit_input.objects.filter(unit=unit, line=line, entry_date__gte=today).order_by('-entry_date')
+            data = unit_input.objects.filter(unit=unit, entry_date__date=today).order_by('-entry_date')
+
+        if job_no is not None:
+            job_no = job_no.strip()
+            if not job_no:
+                return Response(
+                    {"error": "job_no is required to load assembly bundles"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            if process_des is not None:
+                process_des = process_des.strip()
+                if not top_bottom:
+                    return Response(
+                        {"error": "top_bottom is required to load assembly bundles"},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+                allowed, eligible_bundle_ids, error_message = get_eligible_assembly_bundle_ids(
+                    job_no, process_des, top_bottom
+                )
+                if not allowed:
+                    return Response(
+                        {"error": error_message},
+                        status=status.HTTP_409_CONFLICT
+                    )
+                already_scanned_ids = Assembly_data.objects.filter(
+                    job_no__iexact=job_no,
+                    seq__iexact=process_des,
+                ).values_list('bundle_id', flat=True)
+                data = data.filter(job_no__iexact=job_no)
+                if top_bottom:
+                    data = data.filter(tb_name__iexact=top_bottom)
+                data = data.exclude(bundle_id__in=already_scanned_ids)
+                if eligible_bundle_ids is not None:
+                    data = data.filter(bundle_id__in=eligible_bundle_ids)
+            else:
+                verified_tb_ids = dependency.objects.filter(
+                    job_no__iexact=job_no,
+                    verify=True
+                ).values_list('tb_id', flat=True)
+                data = data.filter(
+                    job_no__iexact=job_no,
+                    tb_id__in=verified_tb_ids,
+                    scan=False,
+                )
+
+        # JSON response
+        results = list(data.values('bundle_id','mbud', 'job_no','color','bdl_no','size','tb_name', 'pc', 'color', 'entry_date'))
+        return Response({"status": True, "data": results})
 
 
 
