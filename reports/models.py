@@ -1047,3 +1047,53 @@ class ViewAbsentList(models.Model):
     class Meta:
         managed = False
         db_table = 'view_absent_list'
+
+class ViewStaffAbsentMonth(models.Model):
+    rn = models.BigIntegerField(primary_key=True)
+    yr = models.IntegerField(blank=True, null=True)
+    mn = models.IntegerField(blank=True, null=True)
+    monthname = models.CharField(max_length=30, blank=True, null=True)
+    code = models.IntegerField(blank=True, null=True)
+    absentdays = models.IntegerField(blank=True, null=True)
+    name = models.CharField(max_length=70)
+    wunit = models.CharField(max_length=70, blank=True, null=True)
+    cat = models.CharField(max_length=70, blank=True, null=True)
+    status = models.CharField(max_length=20, blank=True, null=True)
+
+    class Meta:
+        managed = False
+        db_table = 'view_staff_absent_month'
+
+
+class ViewStaffLateMonth(models.Model):
+    rn = models.BigIntegerField(blank=True, null=True)
+    yr = models.IntegerField(db_column='Yr', blank=True, null=True)
+    mn = models.IntegerField(db_column='Mn', blank=True, null=True) 
+    monthname = models.CharField(db_column='MonthName', max_length=30, blank=True, null=True)
+    code = models.IntegerField(blank=True, null=True)
+    name = models.CharField(max_length=100, blank=True, null=True)
+    wunit = models.CharField(max_length=70, blank=True, null=True)
+    cat = models.CharField(max_length=70, blank=True, null=True)
+    status = models.CharField(max_length=20, blank=True, null=True)
+    latedays = models.IntegerField(db_column='LateDays', blank=True, null=True)
+    latemins = models.IntegerField(db_column='LateMins', blank=True, null=True)
+
+    class Meta:
+        managed = False
+        db_table = 'view_staff_late_month'
+
+class VueOtAmountStaff(models.Model):  
+    wunit = models.CharField(max_length=70, blank=True, null=True)
+    cat = models.CharField(db_column='ACAT', max_length=70, blank=True, null=True)
+    status = models.CharField(max_length=20, blank=True, null=True)
+    otamt = models.DecimalField(max_digits=38, decimal_places=6, blank=True, null=True)
+    otmins = models.DecimalField(db_column='OTmins', max_digits=38, decimal_places=2, blank=True, null=True)
+    name = models.CharField(max_length=70)
+    monthname = models.CharField(db_column='Month_Name', max_length=3, blank=True, null=True)
+    mn = models.IntegerField(db_column='MonthNo', blank=True, null=True)
+    yr = models.IntegerField(db_column='YR', blank=True, null=True)
+    code = models.IntegerField(db_column='EmpID')
+
+    class Meta:
+        managed = False
+        db_table = 'vue_ot_amount_staff'
