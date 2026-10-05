@@ -8,36 +8,13 @@
 from django.db import models
 
 
-class ViewGeneralDeiveryType1(models.Model):
-    phone1 = models.CharField(db_column='Phone1', max_length=50, blank=True, null=True)  # Field name made lowercase.
-    id = models.SmallIntegerField(blank=True, null=True)
-    companyname = models.CharField(max_length=12, blank=True, null=True)
-    address1 = models.CharField(db_column='Address1', max_length=50, blank=True, null=True)  # Field name made lowercase.
-    address2 = models.CharField(db_column='Address2', max_length=50, blank=True, null=True)  # Field name made lowercase.
-    address3 = models.CharField(db_column='Address3', max_length=50, blank=True, null=True)  # Field name made lowercase.
-    place = models.CharField(max_length=66, blank=True, null=True)
-    regno = models.CharField(db_column='RegNo', max_length=20, blank=True, null=True)  # Field name made lowercase.
-    s = models.CharField(max_length=34, blank=True, null=True)
-    suppliername = models.CharField(max_length=35, blank=True, null=True)
-    sadd1 = models.CharField(max_length=50, blank=True, null=True)
-    sadd2 = models.CharField(max_length=50, blank=True, null=True)
-    sadd3 = models.CharField(max_length=50, blank=True, null=True)
-    cityname = models.CharField(max_length=35, blank=True, null=True)
-    statname = models.CharField(max_length=30, blank=True, null=True)
-    code = models.CharField(db_column='Code', max_length=2, blank=True, null=True)  # Field name made lowercase.
-    no = models.IntegerField(db_column='No')  # Field name made lowercase.
-    date = models.DateTimeField(db_column='Date')  # Field name made lowercase.
-    reference = models.CharField(db_column='Reference', max_length=20, blank=True, null=True)  # Field name made lowercase.
-    incharge = models.CharField(max_length=35, blank=True, null=True)
-    item = models.CharField(db_column='Item', max_length=50, blank=True, null=True)  # Field name made lowercase.
-    quantity = models.DecimalField(db_column='Quantity', max_digits=18, decimal_places=4, blank=True, null=True)  # Field name made lowercase.
-    uomname = models.CharField(max_length=25, blank=True, null=True)
-    duedate = models.DateTimeField(db_column='DueDate', blank=True, null=True)  # Field name made lowercase.
-    ty = models.CharField(max_length=10)
-    dd1 = models.DateTimeField(blank=True, null=True)
-    department = models.CharField(db_column='Department', max_length=50, blank=True, null=True)  # Field name made lowercase.
-    qrid = models.CharField(max_length=24, blank=True, null=True)
+class ViewEmployeeAtt(models.Model):
+    code = models.IntegerField()
+    dt = models.DateTimeField(blank=True, null=True)
+    ashift = models.DecimalField(max_digits=38, decimal_places=2, blank=True, null=True)
+    aot = models.DecimalField(max_digits=38, decimal_places=2, blank=True, null=True)
+    a = models.CharField(max_length=100, blank=True, null=True)
 
     class Meta:
         managed = False
-        db_table = 'view_general_deivery_type1'
+        db_table = 'view_employee_att'

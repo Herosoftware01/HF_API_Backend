@@ -442,6 +442,51 @@ class Empjoin(models.Model):
         db_table = 'vue_empjoin'
 
 
+class ViewEmployeeSalaryDetails(models.Model):
+    company = models.CharField(max_length=50, blank=True, null=True)
+    esino = models.CharField(max_length=50, blank=True, null=True)
+    pfno = models.CharField(max_length=100, blank=True, null=True)
+    uanno = models.CharField(max_length=50, blank=True, null=True)
+    doj = models.DateTimeField(blank=True, null=True)
+    code = models.IntegerField(primary_key=True)
+    name = models.CharField(max_length=100, blank=True, null=True)
+    fname = models.CharField(db_column='Fname', max_length=1)  # Field name made lowercase.
+    sex = models.CharField(max_length=6)
+    category = models.CharField(db_column='Category', max_length=50, blank=True, null=True)  # Field name made lowercase.
+    mon = models.IntegerField(db_column='MON', blank=True, null=True)  # Field name made lowercase.
+    yr = models.IntegerField(blank=True, null=True)
+    monthname = models.CharField(max_length=30, blank=True, null=True)
+    day = models.DecimalField(db_column='DAY', max_digits=38, decimal_places=2, blank=True, null=True)  # Field name made lowercase.
+    ot = models.DecimalField(max_digits=38, decimal_places=2, blank=True, null=True)
+    salary1 = models.DecimalField(max_digits=18, decimal_places=2, blank=True, null=True)
+    paidholiday = models.IntegerField()
+    onehr_wag = models.DecimalField(max_digits=22, decimal_places=6, blank=True, null=True)
+    double_wag = models.DecimalField(max_digits=24, decimal_places=6, blank=True, null=True)
+    ot_amt = models.DecimalField(max_digits=38, decimal_places=6, blank=True, null=True)
+    sum_ofwage = models.DecimalField(max_digits=38, decimal_places=4, blank=True, null=True)
+    hra = models.DecimalField(max_digits=38, decimal_places=6, blank=True, null=True)
+    earned = models.DecimalField(max_digits=38, decimal_places=4, blank=True, null=True)
+    esi = models.DecimalField(max_digits=38, decimal_places=0, blank=True, null=True)
+    pf = models.DecimalField(max_digits=38, decimal_places=0, blank=True, null=True)
+    netamt = models.DecimalField(max_digits=38, decimal_places=0, blank=True, null=True)
+
+    class Meta:
+        managed = False
+        db_table = 'view_employee_salary_details'
+
+class ViewEmployeeAtt(models.Model):
+    code = models.IntegerField()
+    dt = models.DateTimeField(blank=True, null=True)
+    ashift = models.DecimalField(max_digits=38, decimal_places=2, blank=True, null=True)
+    aot = models.DecimalField(max_digits=38, decimal_places=2, blank=True, null=True)
+    a = models.CharField(max_length=100, blank=True, null=True)
+
+    class Meta:
+        managed = False
+        db_table = 'view_employee_att'
+
+
+
 class TrsOverAllemb(models.Model):
     id = models.AutoField(db_column='ID', primary_key=True)  # Field name made lowercase.
     dt = models.DateTimeField(db_column='Dt')  # Field name made lowercase.

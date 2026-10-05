@@ -9,7 +9,8 @@ from django.core.exceptions import ValidationError
 from decimal import Decimal, InvalidOperation
 from django.db import transaction
 from django.http.multipartparser import MultiPartParser, MultiPartParserError
-
+from django.utils import timezone
+from datetime import date
 
 
 def cutting_del_print(request):
@@ -241,12 +242,28 @@ def fabric_delivery_repl(request):
         "data": data
     })
 
-
 def general_delivery_type1(request):
-    dcno = request.GET.get("dcno")  # Example: ?id=101
+    dcno = request.GET.get("dcno")
+
+    today = date.today()
+
+    # Current financial year: April 1 → March 31
+    if today.month >= 4:
+        fy_start = date(today.year, 4, 1)
+        fy_end = date(today.year + 1, 3, 31)
+    else:
+        fy_start = date(today.year - 1, 4, 1)
+        fy_end = date(today.year, 3, 31)
 
     queryset = ViewGeneralDeiveryType1.objects.using('test').all()
 
+    # Current account/financial year
+    queryset = queryset.filter(
+        date__gte=fy_start,
+        date__lte=fy_end
+    )
+
+    # DC number filter
     if dcno:
         queryset = queryset.filter(no=dcno)
 
@@ -258,6 +275,7 @@ def general_delivery_type1(request):
         "count": len(data),
         "data": data
     })
+
 
 
 # --- VIEW ---
@@ -463,8 +481,18 @@ AVAILABLE_MODULES = [
     {"module_id": "godown_fabric", "module_name": "Godown Fabric Delivery"},
     {"module_id": "replacement_del", "module_name": "Replacement Delivery"},
     {"module_id": "unit_pcs", "module_name": "Unit Pcs Delivery"},
-    {"module_id": "general_delivery", "module_name": "General Delivery Type 1"},
+    {"module_id": "general_transaction_delivery", "module_name": "General Delivery Type 1"},
 ]
+
+AVAILABLE_MODULE_MAP = {
+    module["module_id"]: module["module_name"] for module in AVAILABLE_MODULES
+}
+
+# Older clients/database rows may still use one of these IDs.
+LEGACY_MODULE_IDS = {
+    "general_delivery": "general_transaction_delivery",
+    "general_delivery_type1": "general_transaction_delivery",
+}
 
 
 @csrf_exempt
@@ -486,7 +514,10 @@ def manage_role_permissions(request, role_param=None):
             
         # Fetch existing DB permissions for this role
         db_permissions = RoleModulePermission.objects.filter(role=role)
-        db_perm_dict = {p.module_id: p.is_enabled for p in db_permissions}
+        db_perm_dict = {
+            LEGACY_MODULE_IDS.get(p.module_id, p.module_id): p.is_enabled
+            for p in db_permissions
+        }
         
         # Build response based on single source of truth (AVAILABLE_MODULES)
         response_data = []
@@ -512,15 +543,34 @@ def manage_role_permissions(request, role_param=None):
             if not role:
                 return JsonResponse({"status": False, "message": "Role is required"}, status=400)
                 
-            # Iterate and save using update_or_create to handle both Create and Update
+            normalized_permissions = []
+            unknown_module_ids = []
+
             for perm in permissions:
-                module_id = perm.get('module_id')
-                is_enabled = perm.get('is_enabled', False)
-                
-                # Fetch module_name securely from the constant to prevent arbitrary data injection
-                module_name = next((m['module_name'] for m in AVAILABLE_MODULES if m['module_id'] == module_id), None)
-                
-                if module_name:
+                requested_module_id = perm.get('module_id')
+                module_id = LEGACY_MODULE_IDS.get(requested_module_id, requested_module_id)
+                module_name = AVAILABLE_MODULE_MAP.get(module_id)
+
+                if not module_name:
+                    unknown_module_ids.append(requested_module_id)
+                    continue
+
+                normalized_permissions.append((
+                    module_id,
+                    module_name,
+                    perm.get('is_enabled', False),
+                ))
+
+            if unknown_module_ids:
+                return JsonResponse({
+                    "status": False,
+                    "message": "Unknown module_id",
+                    "module_ids": unknown_module_ids,
+                }, status=400)
+
+            # Save the complete permission list as one database transaction.
+            with transaction.atomic():
+                for module_id, module_name, is_enabled in normalized_permissions:
                     RoleModulePermission.objects.update_or_create(
                         role=role,
                         module_id=module_id,
