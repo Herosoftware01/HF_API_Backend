@@ -40,6 +40,8 @@ from .models import (
     LabAtt,
     RptCutting,
     VueOrdersinhand,
+    ViewEmployeeSalaryDetails,
+    ViewEmployeeAtt,
 )
 from .models import (
     BillAge,
@@ -914,6 +916,62 @@ def abs_details(request):
 
     except Exception as e:
         return JsonResponse({"status": "error", "message": str(e)}, status=500)
+
+
+def emp_payslip(request):
+    if request.method != "GET":
+        return JsonResponse({"error": "Method not allowed"}, status=405)
+
+    # 1. Base Queryset using the specified database
+    queryset = ViewEmployeeSalaryDetails.objects.using("demo").all()
+
+    # 2. Dynamically determine the current financial year (April to March)
+    # ``datetime`` is imported above with ``from datetime import datetime``,
+    # so it is the class (not the datetime module).  Calling
+    # ``datetime.date.today()`` therefore tries to use the class's ``date``
+    # method descriptor as though it were the date class.
+    today = datetime.today().date()
+    if today.month >= 4:
+        start_year = today.year
+        end_year = today.year + 1
+    else:
+        start_year = today.year - 1
+        end_year = today.year
+
+    # Apply the dynamic filter
+    queryset = queryset.filter(
+        Q(yr=start_year, mon__gte=4) | Q(yr=end_year, mon__lte=3)
+    )
+
+    # 3. Extract additional query parameters
+    emp_code = request.GET.get("code")
+    month = request.GET.get("month")
+    company = request.GET.get("company")
+
+    # 4. Apply dynamic filters matching the exact model field names
+    filters = {}
+    if emp_code:
+        filters["code"] = emp_code
+    if month:
+        filters["mon"] = month  
+    if company:
+        filters["company"] = company
+
+    if filters:
+        queryset = queryset.filter(**filters)
+
+    # 5. Fetch all matching records without pagination
+    data = list(queryset.values())
+
+    return JsonResponse(
+        {
+            "total_records": len(data),
+            "data": data,
+        },
+        safe=False,
+    )
+    
+
 
 
 @csrf_exempt

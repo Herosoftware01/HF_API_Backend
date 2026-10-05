@@ -23,6 +23,7 @@ urlpatterns = [
     path('present_details/', views.present_details, name='present_details'),
     path('resign_report/', views.resign_report, name='resign_report'),
     path('resign_join_report/', views.resign_join_report, name='resign_join_report'),
+    path('emp_payslip/', views.emp_payslip, name='emp_salary_details'),
     path('hr_resignation_details/', views.hr_resignation_details, name='hr_resignation_details'),
     path('join_data/', views.join_data, name='join_data'),
     path('staff_overview/', views.staff_overview, name='staff_overview'),
