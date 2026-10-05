@@ -56,6 +56,17 @@ class MachineAllocationSerializer(serializers.ModelSerializer):
         model = MachineAllocation
         fields = ['id', 'machine', 'machine_id', 'unit', 'line', 'allocated_at', 'employees','needle_count','needle_details','sequence_info']  # ✅ include machine_id
 
+    def get_selected_date(self):
+        selected_date = self.context.get("selected_date")
+        if isinstance(selected_date, date):
+            return selected_date
+        if selected_date:
+            try:
+                return date.fromisoformat(str(selected_date))
+            except ValueError:
+                pass
+        return timezone.localdate()
+
     def validate(self, data):
         if data.get('line') and data.get('unit') and data['line'].unit != data['unit']:
             raise serializers.ValidationError("Selected line does not belong to the selected unit")
@@ -67,12 +78,12 @@ class MachineAllocationSerializer(serializers.ModelSerializer):
         return allocation
 
     def get_employees(self, obj):
-        today = timezone.now().date()
+        selected_date = self.get_selected_date()
         latest_emp = (
             emp_allocate.objects
             .filter(
                 machine_id=obj.machine.id,
-                date__date=today,
+                date__date=selected_date,
                 unit=obj.unit.id,     # 👈 important
                 line=obj.line.id      # 👈 important
             )
@@ -105,6 +116,7 @@ class MachineAllocationSerializer(serializers.ModelSerializer):
 
         return [
             {
+                "allocation_id": latest_emp.id,
                 "emp_code": latest_emp.emp_code,
                 "name": str(name),
                 "status": latest_emp.status,
@@ -113,13 +125,13 @@ class MachineAllocationSerializer(serializers.ModelSerializer):
         ]
     
     def get_sequence_info(self, obj):
-        today = timezone.now().date()
+        selected_date = self.get_selected_date()
 
         latest_emp = (
             emp_allocate.objects
             .filter(
                 machine=obj.machine,
-                date__date=today,
+                date__date=selected_date,
                 unit=obj.unit.id,
                 line=obj.line.id
             )
@@ -154,13 +166,13 @@ class MachineAllocationSerializer(serializers.ModelSerializer):
 
     # ✅ Needle count (TODAY SUM)
     def get_needle_count(self, obj):
-        today = timezone.now().date()
+        selected_date = self.get_selected_date()
 
         total = (
             Needle_change.objects
             .filter(
                 machine=obj.machine.Identity,   # ⚠️ important mapping
-                date__date=today,
+                date__date=selected_date,
                 unit=str(obj.unit.id),
                 line=str(obj.line.id)
             )
@@ -170,13 +182,13 @@ class MachineAllocationSerializer(serializers.ModelSerializer):
         return total or 0
     
     def get_needle_details(self, obj):
-        today = timezone.now().date()
+        selected_date = self.get_selected_date()
 
         records = (
             Needle_change.objects
             .filter(
                 machine=obj.machine.Identity,
-                date__date=today,
+                date__date=selected_date,
                 unit=str(obj.unit.id),
                 line=str(obj.line.id)
             )
@@ -254,4 +266,3 @@ class CutSampleSerializer(serializers.ModelSerializer):
     class Meta:
         model = cut_sample_data_final
         fields = '__all__'
-

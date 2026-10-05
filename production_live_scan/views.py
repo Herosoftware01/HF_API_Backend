@@ -499,10 +499,10 @@ def get_eligible_assembly_bundle_ids(job_no, process_des, top_bottom=None):
     eligible_bundle_ids = {
         bundle_id
         for bundle_id, completed_sequences in completed_by_bundle.items()
-        if (
-            not completed_sequences.isdisjoint(or_sequences)
-            if or_sequences
-            else and_sequences.issubset(completed_sequences)
+        if assembly_dependencies_satisfied(
+            completed_sequences,
+            and_sequences,
+            or_sequences,
         )
     }
     if not eligible_bundle_ids:
@@ -523,12 +523,28 @@ def get_eligible_assembly_bundle_ids(job_no, process_des, top_bottom=None):
     return True, eligible_bundle_ids, None
 
 
+def assembly_dependencies_satisfied(completed_sequences, and_sequences, or_sequences):
+    and_requirements_met = and_sequences.issubset(completed_sequences)
+    or_requirements_met = (
+        not or_sequences or not completed_sequences.isdisjoint(or_sequences)
+    )
+    return and_requirements_met and or_requirements_met
+
+
 def split_process_descriptions(process_des):
     return list(dict.fromkeys(
         description.strip()
         for description in str(process_des or '').split(',')
         if description.strip()
     ))
+
+
+def bundle_process_pairs(bundles, process_des):
+    return [
+        (bundle, description)
+        for bundle in bundles
+        for description in split_process_descriptions(process_des)
+    ]
 
 
 def assembly_sequence_filter(process_des):
@@ -632,6 +648,34 @@ class GetUnitDataAPIView(APIView):
         # JSON response
         results = list(data.values('bundle_id','mbud', 'job_no','color','bdl_no','size','tb_name', 'pc', 'color', 'entry_date'))
         return Response({"status": True, "data": results})
+
+
+@api_view(['GET'])
+def get_bundle_last_process(request):
+    bundle_id = str(request.query_params.get('bundle_id') or '').strip()
+    if not bundle_id:
+        return Response(
+            {"error": "bundle_id is required"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    latest_entry = (
+        Assembly_data.objects
+        .filter(bundle_id__iexact=bundle_id)
+        .order_by('-id')
+        .values('seq', 'job_no', 'tb_name')
+        .first()
+    )
+    last_processes = split_process_descriptions(latest_entry['seq']) if latest_entry else []
+    if not last_processes:
+        return Response({"available": False, "message": "Bundle not available"})
+
+    return Response({
+        "available": True,
+        "last_process": last_processes[-1],
+        "job_no": latest_entry['job_no'],
+        "top_bottom": latest_entry['tb_name'],
+    })
 
 
 class GetUnitDataAPIViewsss(APIView):
@@ -840,9 +884,15 @@ class GetUnitAssemply(APIView):
     def get(self, request):
         unit = request.query_params.get('unit')
         line = request.query_params.get('line')
-        selected_date = request.query_params.get('date') 
+        selected_date = request.query_params.get('date')
+        all_dates = request.query_params.get('all_dates', '').lower() == 'true'
 
-        if selected_date:
+        if all_dates:
+            data = Assembly_data.objects.filter(
+                unit=unit,
+                line=line,
+            ).order_by('-entry_date')
+        elif selected_date:
             date_obj = datetime.strptime(selected_date, '%Y-%m-%d')
             data = Assembly_data.objects.filter(unit=unit, line=line, entry_date__date=date_obj).order_by('-entry_date')
         else:
@@ -1009,7 +1059,7 @@ class SaveAssemblyAPIView(APIView):
             ).filter(assembly_sequence_filter(process_des)).values_list('bundle_id', flat=True)
             bundle_queryset = unit_input.objects.select_for_update().filter(
                 unit=unit,
-                line=line,
+                # line=line,
                 job_no__iexact=job_no,
                 bundle_id__in=unique_ids,
             )
@@ -1034,8 +1084,7 @@ class SaveAssemblyAPIView(APIView):
                     tb_id=bundle.tb_id,
                     tb_name=bundle.tb_name,
                     machine=allocation.machine.Identity,
-                    seq=process_des,
-                    # process_des=process_des,
+                    seq=description,
                     date=selected_date or entry_date,
                     bundle_id=bundle.bundle_id,
                     bdl_no=bundle.bdl_no,
@@ -1049,7 +1098,7 @@ class SaveAssemblyAPIView(APIView):
                     lot=bundle.lot,
                     emp_id=emp_code
                 )
-                for bundle in bundles
+                for bundle, description in bundle_process_pairs(bundles, process_des)
             ])
             updated = bundle_queryset.update(scan=True)
 
