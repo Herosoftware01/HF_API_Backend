@@ -1,7 +1,11 @@
-from unittest.mock import patch
+import json
+from contextlib import nullcontext
+from datetime import datetime, timezone as datetime_timezone
+from types import SimpleNamespace
+from unittest.mock import MagicMock, patch
 
-from django.test import TestCase
-from rest_framework.test import APIRequestFactory
+from django.test import SimpleTestCase, TestCase
+from rest_framework.test import APIRequestFactory, force_authenticate
 
 from .views import (
     assembly_dependencies_satisfied,
@@ -9,6 +13,7 @@ from .views import (
     get_eligible_assembly_bundle_ids_for_processes,
     get_bundle_last_process,
     split_process_descriptions,
+    verify_process_dependency,
 )
 
 
@@ -146,3 +151,61 @@ class BundleLastProcessTests(TestCase):
             response.data,
             {"available": False, "message": "Bundle not available"},
         )
+
+
+class DependencyVerificationTests(SimpleTestCase):
+    def test_verification_saves_verifier_id_and_timestamp(self):
+        verifier = SimpleNamespace(
+            pk=42,
+            is_authenticated=True,
+        )
+        dependencies = MagicMock()
+        dependencies.exists.return_value = True
+        dependencies.update.return_value = 2
+        verified_at = datetime(2026, 10, 6, tzinfo=datetime_timezone.utc)
+        request = APIRequestFactory().post(
+            "/verify_process_dependency/",
+            data=json.dumps({
+                "username": "admin",
+                "password": "admin",
+                "job_no": "J7123A",
+                "tb_id": 3,
+            }),
+            content_type="application/json",
+        )
+        force_authenticate(request, user=verifier)
+
+        with (
+            patch(
+                "production_live_scan.views.dependency.objects.select_for_update"
+            ) as select_for_update,
+            patch("production_live_scan.views.transaction.atomic", return_value=nullcontext()),
+            patch("production_live_scan.views.timezone.now", return_value=verified_at),
+        ):
+            select_for_update.return_value.filter.return_value = dependencies
+            response = verify_process_dependency(request)
+
+        self.assertEqual(response.status_code, 200)
+        dependencies.update.assert_called_once_with(
+            verify=True,
+            verify_user="42",
+            verify_date=verified_at,
+        )
+
+    def test_verification_requires_admin_popup_credentials(self):
+        verifier = SimpleNamespace(pk=17, is_authenticated=True)
+        request = APIRequestFactory().post(
+            "/verify_process_dependency/",
+            data=json.dumps({
+                "username": "operator",
+                "password": "password",
+                "job_no": "J7123A",
+                "tb_id": 3,
+            }),
+            content_type="application/json",
+        )
+        force_authenticate(request, user=verifier)
+
+        response = verify_process_dependency(request)
+
+        self.assertEqual(response.status_code, 403)

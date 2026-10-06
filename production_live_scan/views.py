@@ -17,6 +17,8 @@ import json
 from django.db import connections
 from django.db.models import Q
 from rest_framework.decorators import api_view
+from rest_framework.decorators import permission_classes
+from rest_framework import permissions
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
 
@@ -933,10 +935,17 @@ class SaveAssemblyAPIView(APIView):
         line = request.data.get('line')
         bundle_ids = request.data.get('bundle_ids', [])
         raw_date = request.data.get('date')
+        entry_mode = str(request.data.get('entry_mode', '')).strip().lower()
 
         if not emp_code or not machine_id or not job_no or not selected_seq or not selected_top_bottom or not unit or not line or not bundle_ids:
             return Response(
                 {"error": "employee, machine, job no, sequence, top/bottom, unit, line and bundles are required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if entry_mode not in {'manual', 'scan'}:
+            return Response(
+                {"error": "entry_mode must be either 'manual' or 'live'"},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -992,7 +1001,7 @@ class SaveAssemblyAPIView(APIView):
             ).filter(assembly_sequence_filter(process_des)).values_list('bundle_id', flat=True)
             bundle_queryset = unit_input.objects.select_for_update().filter(
                 unit=unit,
-                line=line,
+                # line=line,
                 job_no__iexact=job_no,
                 bundle_id__in=unique_ids,
             )
@@ -1003,6 +1012,7 @@ class SaveAssemblyAPIView(APIView):
             found_ids = {bundle.bundle_id for bundle in bundles}
             missing_ids = [value for value in unique_ids if value not in found_ids]
             if missing_ids:
+                print("Some bundles are unavailable or already scanned:", missing_ids)
                 return Response(
                     {"error": "Some bundles are unavailable or already scanned.", "bundle_ids": missing_ids},
                     status=status.HTTP_409_CONFLICT
@@ -1029,7 +1039,8 @@ class SaveAssemblyAPIView(APIView):
                     entry_date=entry_date,
                     scan=False,
                     lot=bundle.lot,
-                    emp_id=emp_code
+                    emp_id=emp_code,
+                    entry_mode=entry_mode
                 )
                 for bundle, description in bundle_process_pairs(bundles, process_des)
             ])
@@ -1408,6 +1419,8 @@ def save_process_dependency(request):
                     dep.and_or = bool(row.get('and_or', 0))
                     dep.or_only = bool(row.get('or_only', 0))
                     dep.verify = False
+                    dep.verify_user = None
+                    dep.verify_date = None
                     dep.date = timezone.now()
                     dep.save()
 
@@ -1475,14 +1488,12 @@ def save_process_dependency(request):
     )
 
 
-@csrf_exempt
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
 def verify_process_dependency(request):
-    if request.method != "POST":
-        return JsonResponse({"error": "Invalid request method"}, status=405)
-
     try:
-        data = json.loads(request.body)
-        username = data.get('username', '').strip()
+        data = request.data
+        username = str(data.get('username', '')).strip()
         password = data.get('password', '')
         if username != 'admin' or password != 'admin':
             return JsonResponse({"error": "Invalid admin credentials"}, status=403)
@@ -1499,7 +1510,11 @@ def verify_process_dependency(request):
                     {"error": "Save the dependency before verifying"},
                     status=404
                 )
-            updated = dependencies.update(verify=True)
+            updated = dependencies.update(
+                verify=True,
+                verify_user=str(request.user.pk),
+                verify_date=timezone.now(),
+            )
 
         return JsonResponse({"message": "Verified successfully", "count": updated})
     except Exception as e:
