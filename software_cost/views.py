@@ -2,6 +2,7 @@ import os
 
 from django.forms.models import model_to_dict
 from django.http import JsonResponse
+from django.http.multipartparser import MultiPartParser, MultiPartParserError
 import json
 import re
 from django.utils import timezone
@@ -750,12 +751,12 @@ def task_master_api(request, id=None):
         if task_status:
             data = data.filter(task_status__iexact=task_status.strip())
 
-        return JsonResponse(
-            list(data.values(
+        response_data = list(data.values(
                 'id',
                 'project_id',
                 'code_id',
                 'task_name',
+                'task_image',
                 'task_description',
                 'assing_date',
                 'task_priority',
@@ -765,13 +766,29 @@ def task_master_api(request, id=None):
                 'task_end_date',
                 'updated_at',
                 'task_status1'
-            )),
-            safe=False
-        )
+            ))
+
+        for record in response_data:
+            if record['task_image']:
+                filename = os.path.basename(record['task_image'])
+                record['task_image'] = (
+                    f"https://hfapi.herofashion.com/workentry_images/{filename}"
+                )
+            else:
+                record['task_image'] = None
+
+        return JsonResponse(response_data, safe=False)
 
     elif request.method == 'POST':
         try:
-            body = json.loads(request.body)
+            is_multipart = (
+                request.content_type
+                and request.content_type.startswith('multipart/form-data')
+            )
+            body = request.POST if is_multipart else json.loads(request.body)
+            image_file = (
+                request.FILES.get('task_image') or request.FILES.get('image')
+            ) if is_multipart else None
 
             proj_id = body.get('project_id')
             user_id = body.get('code_id')
@@ -782,14 +799,18 @@ def task_master_api(request, id=None):
                 user_id = None
 
             parsed_duration = safe_parse_duration(body.get('task_duration'))
+            task_status1 = body.get('task_status1', False)
+            if isinstance(task_status1, str):
+                task_status1 = task_status1.strip().lower() in ('true', '1', 'yes')
 
             obj = task_master.objects.create(
                 project_id=proj_id,
                 code_id=user_id,
                 task_name=body.get('task_name'),
+                task_image=image_file,
                 assing_date=body.get('assing_date'),
                 task_priority=body.get('task_priority', 'Medium'),
-                task_status1=body.get('task_status1', False),
+                task_status1=task_status1,
                 task_duration=parsed_duration,
                 task_description=body.get('task_description', ''),
                 task_status=body.get('task_status', 'Pending')
@@ -810,7 +831,27 @@ def task_master_api(request, id=None):
 
     elif request.method in ['PUT', 'PATCH']:
         try:
-            body = json.loads(request.body)
+            is_multipart = (
+                request.content_type
+                and request.content_type.startswith('multipart/form-data')
+            )
+            if is_multipart:
+                try:
+                    body, files = MultiPartParser(
+                        request.META,
+                        request,
+                        request.upload_handlers,
+                        request.encoding,
+                    ).parse()
+                except MultiPartParserError as exc:
+                    return JsonResponse(
+                        {"status": False, "message": f"Invalid multipart body: {exc}"},
+                        status=400,
+                    )
+                image_file = files.get('task_image') or files.get('image')
+            else:
+                body = json.loads(request.body)
+                image_file = None
 
             task_id = id if id else body.get('id')
             if not task_id:
@@ -828,6 +869,9 @@ def task_master_api(request, id=None):
 
             if 'task_name' in body:
                 obj.task_name = body.get('task_name')
+
+            if image_file:
+                obj.task_image = image_file
 
             if 'task_priority' in body:
                 obj.task_priority = body.get('task_priority')
@@ -906,7 +950,7 @@ def trs_workentry(request, id=None):
                 if data.image:
                     filename = os.path.basename(data.image.name)
                     response_data['image'] = (
-                        f"http://10.1.21.99:8200/workentry_images/{filename}"
+                        f"https://hfpai.herofashion.com/workentry_images/{filename}"
                     )
                 else:
                     response_data['image'] = None
