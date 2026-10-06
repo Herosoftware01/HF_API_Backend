@@ -974,14 +974,12 @@ class EmpAllocateAPIView(APIView):
         # -------------------------
         # EMPLOYEE ALREADY ONLINE ?
         # -------------------------
-
-        employee_online = emp_allocate.objects.filter(
+        latest_employee = emp_allocate.objects.filter(
             emp_code=emp_code,
-            date__date=selected_date,
-            status=True
-        ).exists()
+            date__date=selected_date
+        ).order_by("-id").first()
 
-        if employee_online:
+        if latest_employee and latest_employee.status:
             return Response(
                 {
                     "error": f"Employee {emp_code} already assigned and online"
@@ -992,13 +990,12 @@ class EmpAllocateAPIView(APIView):
         # -------------------------
         # MACHINE ALREADY ONLINE ?
         # -------------------------
-        machine_online = emp_allocate.objects.filter(
+        latest_machine = emp_allocate.objects.filter(
             machine_id=machine_id,
-            date__date=selected_date,
-            status=True
-        ).exists()
+            date__date=selected_date
+        ).order_by("-id").first()
 
-        if machine_online:
+        if latest_machine and latest_machine.status:
             return Response(
                 {
                     "error": f"Machine {machine_id} already allocated and online"

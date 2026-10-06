@@ -2,80 +2,7 @@ from datetime import datetime
 
 from django.db import models
 
-class VueHoldwage(models.Model):
-    rownum = models.BigIntegerField(db_column='RowNum', primary_key=True)   # Field name made lowercase.
-    accountdetails1 = models.CharField(db_column='Accountdetails1', max_length=200, blank=True, null=True)  # Field name made lowercase.
-    code = models.IntegerField()
-    name = models.CharField(max_length=100, blank=True, null=True)
-    period = models.CharField(db_column='Period', max_length=50)  # Field name made lowercase.
-    holdamount = models.DecimalField(db_column='HoldAmount', max_digits=18, decimal_places=2)  # Field name made lowercase.
-    chold = models.DecimalField(max_digits=18, decimal_places=2, blank=True, null=True)
-    tot = models.DecimalField(max_digits=19, decimal_places=2, blank=True, null=True)
-
-    class Meta:
-        managed = False
-        db_table = 'vue_holdwage'
-
-class Holdwagepaid(models.Model):
-    entry_no = models.IntegerField(primary_key=True)
-    dt = models.DateField()
-    aadhar_no = models.CharField(max_length=20)
-    code = models.IntegerField()
-    emp_name = models.CharField(max_length=50, db_collation='SQL_Latin1_General_CP1_CI_AS')
-    t_period = models.CharField(max_length=50, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)
-    paid_amt = models.DecimalField(max_digits=18, decimal_places=0)
-    remarks = models.CharField(max_length=100, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)
-
-    class Meta:
-        managed = False
-        db_table = 'trs_holdwagepaid'
-
-
-
-
-class Empwisesal(models.Model):
-    dept = models.CharField(max_length=50, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)
-    code = models.IntegerField(primary_key=True)
-    name = models.CharField(max_length=100, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)
-    salary = models.DecimalField(
-        db_column='Salary',
-        max_digits=18,
-        decimal_places=2,
-        blank=True,
-        null=True
-    ) # Field name made lowercase.
-    sl = models.IntegerField(blank=True, null=True)
-    wrkunit = models.CharField(max_length=50, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)
-    photo = models.CharField(max_length=400, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)
-    monthlysalary = models.CharField(db_column='MonthlySalary', max_length=1, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)  # Field name made lowercase.
-    accountdetails1 = models.CharField(db_column='Accountdetails1', max_length=200, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)  # Field name made lowercase.
-    
-    designation = models.CharField(
-        db_column='mcategory',
-        max_length=50,
-        blank=True,
-        null=True
-    )
-    status = models.CharField(max_length=25, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)
-  
    
-    class Meta:
-        managed = False
-        db_table = 'Empwisesal'
-
-
-class Employeeworking(models.Model):
-    code = models.IntegerField(primary_key=True)
-    name = models.CharField(max_length=100, blank=True, null=True)
-    workunit = models.CharField(db_column='WorkUnit', max_length=70, blank=True, null=True)
-    category = models.CharField(db_column='Category', max_length=70, blank=True, null=True)
-    type = models.CharField(max_length=6)
-
-    class Meta:
-        managed = False
-        db_table = 'EmployeeWorking'     
-
-
 
 class LaySp(models.Model):
     date = models.DateField()
@@ -442,6 +369,85 @@ class Empjoin(models.Model):
         db_table = 'vue_empjoin'
 
 
+class ViewActshift(models.Model):
+    rowno = models.BigIntegerField(db_column='RowNo', primary_key=True)  # Field name made lowercase.
+    unitname = models.CharField(db_column='Unitname', max_length=50)  # Field name made lowercase.
+    id = models.IntegerField()
+    actshift = models.DecimalField(db_column='Actshift', max_digits=38, decimal_places=2, blank=True, null=True)  # Field name made lowercase.
+    code = models.IntegerField()
+    name = models.CharField(max_length=100, blank=True, null=True)
+    status = models.CharField(max_length=25, blank=True, null=True)
+    mno = models.IntegerField(blank=True, null=True)
+    yr = models.IntegerField(blank=True, null=True)
+    monthname = models.CharField(db_column='MonthName', max_length=30, blank=True, null=True)  # Field name made lowercase.
+    category = models.CharField(db_column='Category', max_length=50, blank=True, null=True)  # Field name made lowercase.
+
+    class Meta:
+        managed = False
+        db_table = 'view_actshift'
+
+
+class ViewActshiftDay(models.Model):
+    rowno = models.BigIntegerField(db_column='RowNo', primary_key=True)  # Field name made lowercase.
+    unitname = models.CharField(db_column='Unitname', max_length=50)  # Field name made lowercase.
+    id = models.IntegerField()
+    dt = models.DateTimeField()
+    actshift = models.DecimalField(db_column='Actshift', max_digits=18, decimal_places=2)  # Field name made lowercase.
+    code = models.IntegerField()
+    name = models.CharField(max_length=100, blank=True, null=True)
+    status = models.CharField(max_length=25, blank=True, null=True)
+    category = models.CharField(db_column='Category', max_length=50, blank=True, null=True)  # Field name made lowercase.
+
+    class Meta:
+        managed = False
+        db_table = 'view_actshift_day'
+
+
+class ViewEmployeeSalaryDetails(models.Model):
+    company = models.CharField(max_length=50, blank=True, null=True)
+    esino = models.CharField(max_length=50, blank=True, null=True)
+    pfno = models.CharField(max_length=100, blank=True, null=True)
+    uanno = models.CharField(max_length=50, blank=True, null=True)
+    doj = models.DateTimeField(blank=True, null=True)
+    code = models.IntegerField(primary_key=True)
+    name = models.CharField(max_length=100, blank=True, null=True)
+    fname = models.CharField(db_column='Fname', max_length=1)  # Field name made lowercase.
+    sex = models.CharField(max_length=6)
+    category = models.CharField(db_column='Category', max_length=50, blank=True, null=True)  # Field name made lowercase.
+    mon = models.IntegerField(db_column='MON', blank=True, null=True)  # Field name made lowercase.
+    yr = models.IntegerField(blank=True, null=True)
+    monthname = models.CharField(max_length=30, blank=True, null=True)
+    day = models.DecimalField(db_column='DAY', max_digits=38, decimal_places=2, blank=True, null=True)  # Field name made lowercase.
+    ot = models.DecimalField(max_digits=38, decimal_places=2, blank=True, null=True)
+    salary1 = models.DecimalField(max_digits=18, decimal_places=2, blank=True, null=True)
+    paidholiday = models.IntegerField()
+    onehr_wag = models.DecimalField(max_digits=22, decimal_places=6, blank=True, null=True)
+    double_wag = models.DecimalField(max_digits=24, decimal_places=6, blank=True, null=True)
+    ot_amt = models.DecimalField(max_digits=38, decimal_places=6, blank=True, null=True)
+    sum_ofwage = models.DecimalField(max_digits=38, decimal_places=4, blank=True, null=True)
+    hra = models.DecimalField(max_digits=38, decimal_places=6, blank=True, null=True)
+    earned = models.DecimalField(max_digits=38, decimal_places=4, blank=True, null=True)
+    esi = models.DecimalField(max_digits=38, decimal_places=0, blank=True, null=True)
+    pf = models.DecimalField(max_digits=38, decimal_places=0, blank=True, null=True)
+    netamt = models.DecimalField(max_digits=38, decimal_places=0, blank=True, null=True)
+
+    class Meta:
+        managed = False
+        db_table = 'view_employee_salary_details'
+
+class ViewEmployeeAtt(models.Model):
+    code = models.IntegerField()
+    dt = models.DateTimeField(blank=True, null=True)
+    ashift = models.DecimalField(max_digits=38, decimal_places=2, blank=True, null=True)
+    aot = models.DecimalField(max_digits=38, decimal_places=2, blank=True, null=True)
+    a = models.CharField(max_length=100, blank=True, null=True)
+
+    class Meta:
+        managed = False
+        db_table = 'view_employee_att'
+
+
+
 class TrsOverAllemb(models.Model):
     id = models.AutoField(db_column='ID', primary_key=True)  # Field name made lowercase.
     dt = models.DateTimeField(db_column='Dt')  # Field name made lowercase.
@@ -508,90 +514,6 @@ class ContractSec(models.Model):
     class Meta:
         managed = False
         db_table = 'Contract_sec'
-
-
-class BillAge(models.Model):
-    no = models.IntegerField(db_column='No',primary_key=True)  # Field name made lowercase.
-    edate = models.DateTimeField(db_column='EDate')  # Field name made lowercase.
-    billdate = models.DateTimeField(db_column='BillDate')  # Field name made lowercase.
-    billno = models.CharField(db_column='BillNo', max_length=63, blank=True, null=True)  # Field name made lowercase.
-    narration = models.CharField(max_length=255, blank=True, null=True)
-    username = models.CharField(db_column='Username', max_length=35, blank=True, null=True)  # Field name made lowercase.
-    module = models.CharField(db_column='Module', max_length=50, blank=True, null=True)  # Field name made lowercase.
-    company = models.CharField(db_column='Company', max_length=12, blank=True, null=True)  # Field name made lowercase.
-    ageing = models.IntegerField(db_column='Ageing', blank=True, null=True)  # Field name made lowercase.
-    suppliers = models.CharField(db_column='Suppliers', max_length=35, blank=True, null=True)  # Field name made lowercase.
-    employees = models.CharField(db_column='Employees', max_length=35, blank=True, null=True)  # Field name made lowercase.
-    amount = models.DecimalField(db_column='Amount', max_digits=19, decimal_places=4)  # Field name made lowercase.
-    billpassed = models.SmallIntegerField(db_column='BillPassed')  # Field name made lowercase.
-
-    class Meta:
-        managed = False
-        db_table = 'bill_age'
-
-
-class BillPass(models.Model):
-    no = models.IntegerField(db_column='No', primary_key=True)  # Field name made lowercase.
-    edate = models.DateTimeField(db_column='EDate', blank=True, null=True)  # Field name made lowercase.
-    billdate = models.DateTimeField(db_column='BillDate')  # Field name made lowercase.
-    billno = models.CharField(db_column='BillNo', max_length=63, blank=True, null=True)  # Field name made lowercase.
-    billno1 = models.CharField(max_length=50)
-    paymentdate = models.DateTimeField(blank=True, null=True)
-    daysbetweenbillandpayment = models.IntegerField(db_column='DaysBetweenBillAndPayment', blank=True, null=True)  # Field name made lowercase.
-    module1 = models.CharField(db_column='Module1', max_length=50, blank=True, null=True)  # Field name made lowercase.
-    paymentstatus = models.CharField(db_column='PaymentStatus', max_length=6, blank=True, null=True)  # Field name made lowercase.
-    ageing = models.IntegerField(db_column='Ageing', blank=True, null=True)  # Field name made lowercase.
-    daysbetweenbillandedate = models.IntegerField(db_column='DaysBetweenBillAndEDate', blank=True, null=True)  # Field name made lowercase.
-    module = models.CharField(db_column='Module', max_length=255, blank=True, null=True)  # Field name made lowercase.
-    suppliers = models.CharField(db_column='Suppliers', max_length=35, blank=True, null=True)  # Field name made lowercase.
-    employees = models.CharField(db_column='Employees', max_length=35, blank=True, null=True)  # Field name made lowercase.
-    amount = models.DecimalField(db_column='Amount', max_digits=19, decimal_places=4)  # Field name made lowercase.
-    billpassed = models.SmallIntegerField(db_column='BillPassed')  # Field name made lowercase.
-    br_ageing = models.IntegerField(db_column='BR Ageing', blank=True, null=True)  # Field name made lowercase. Field renamed to remove unsuitable characters.
-    billdate_ageing = models.IntegerField(db_column='BillDate Ageing', blank=True, null=True)  # Field name made lowercase. Field renamed to remove unsuitable characters.
-
-    class Meta:
-        managed = False
-        db_table = 'Bill_pass'
-
-class BillMdapprove(models.Model):
-    billpaid = models.SmallIntegerField(db_column='BillPaid')  # Field name made lowercase.
-    billpassed = models.SmallIntegerField(db_column='BillPassed')  # Field name made lowercase.
-    lz_module_name11 = models.CharField(db_column='LZ_Module Name11', max_length=255, blank=True, null=True)  # Field name made lowercase. Field renamed to remove unsuitable characters.
-    username = models.CharField(db_column='Username', max_length=35, blank=True, null=True)  # Field name made lowercase.
-    company_name = models.CharField(db_column='Company_Name', max_length=50, blank=True, null=True)  # Field name made lowercase.
-    billno = models.CharField(max_length=50)
-    billno1 = models.CharField(db_column='Billno1', max_length=63, blank=True, null=True)  # Field name made lowercase.
-    supplier = models.CharField(db_column='Supplier', max_length=35, blank=True, null=True)  # Field name made lowercase.
-    edate = models.DateTimeField(db_column='EDate')  # Field name made lowercase.
-    billdate = models.DateTimeField(db_column='BillDate')  # Field name made lowercase.
-    lz_module_name1 = models.CharField(db_column='LZ_Module Name1', max_length=50, blank=True, null=True)  # Field name made lowercase. Field renamed to remove unsuitable characters.
-    field_rowdata = models.IntegerField(db_column='_ROWDATA',primary_key=True)  # Field name made lowercase. Field renamed because it started with '_'.
-    lz_no = models.IntegerField(db_column='LZ_No', blank=True, null=True)  # Field name made lowercase.
-    mdapproval = models.CharField(db_column='MDApproval', max_length=12, blank=True, null=True)  # Field name made lowercase.
-    hz_version = models.IntegerField(db_column='HZ_Version', blank=True, null=True)  # Field name made lowercase.
-    le_date = models.DateTimeField(db_column='LE_Date', blank=True, null=True)  # Field name made lowercase.
-    lz_reference = models.CharField(db_column='LZ_Reference', max_length=50, blank=True, null=True)  # Field name made lowercase.
-    lz_beno = models.IntegerField(db_column='LZ_BENo', blank=True, null=True)  # Field name made lowercase.
-    le_bedate = models.DateTimeField(db_column='LE_BEDate', blank=True, null=True)  # Field name made lowercase.
-    lz_module_name = models.IntegerField(db_column='LZ_Module Name', blank=True, null=True)  # Field name made lowercase. Field renamed to remove unsuitable characters.
-    lz_supplier = models.CharField(db_column='LZ_Supplier', max_length=35, blank=True, null=True)  # Field name made lowercase.
-    lz_billno = models.CharField(db_column='LZ_BillNo', max_length=50, blank=True, null=True)  # Field name made lowercase.
-    le_billdate = models.DateTimeField(db_column='LE_BillDate', blank=True, null=True)  # Field name made lowercase.
-    ra_assessable_amount = models.DecimalField(db_column='RA_Assessable Amount', max_digits=19, decimal_places=4, blank=True, null=True)  # Field name made lowercase. Field renamed to remove unsuitable characters.
-    ra_taxableocamount = models.DecimalField(db_column='RA_TaxableOCAmount', max_digits=19, decimal_places=4, blank=True, null=True)  # Field name made lowercase.
-    # ra_tax_amount = models.DecimalField(db_column='RA_Tax Amount', max_digits=19, decimal_places=4, blank=True, null=True)  # Field name made lowercase. Field renamed to remove unsuitable characters.
-    ra_nontaxableocamount = models.DecimalField(db_column='RA_NonTaxableOCAmount', max_digits=19, decimal_places=4, blank=True, null=True)  # Field name made lowercase.
-    ra_billvalue = models.DecimalField(db_column='RA_BillValue', max_digits=19, decimal_places=4, blank=True, null=True)  # Field name made lowercase.
-    # ra_t_debit = models.DecimalField(db_column='RA_T.Debit', max_digits=19, decimal_places=4, blank=True, null=True)  # Field name made lowercase. Field renamed to remove unsuitable characters.
-    ra_tds_deducted_amount = models.DecimalField(db_column='RA_TDS Deducted Amount', max_digits=19, decimal_places=4, blank=True, null=True)  # Field name made lowercase. Field renamed to remove unsuitable characters.
-    ra_bill_pass_value = models.DecimalField(db_column='RA_Bill Pass Value', max_digits=19, decimal_places=4, blank=True, null=True)  # Field name made lowercase. Field renamed to remove unsuitable characters.
-    lz_isauthorized_field = models.CharField(db_column='LZ_isAuthorized?', max_length=13, blank=True, null=True)  # Field name made lowercase. Field renamed to remove unsuitable characters. Field renamed because it ended with '_'.
-    lz_incharge = models.CharField(db_column='LZ_Incharge', max_length=35, blank=True, null=True)  # Field name made lowercase.
-
-    class Meta:
-        managed = False
-        db_table = 'Bill_mdapprove'
 
 
 
@@ -1027,6 +949,48 @@ class Master_Replace_Cutpend(models.Model):
     class Meta:
         managed = False
         db_table = 'Master_Repcutpend'
+
+class Empwisesal(models.Model):
+    dept = models.CharField(max_length=50, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)
+    code = models.IntegerField(primary_key=True)
+    name = models.CharField(max_length=100, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)
+    salary = models.DecimalField(
+        db_column='Salary',
+        max_digits=18,
+        decimal_places=2,
+        blank=True,
+        null=True
+    ) # Field name made lowercase.
+    sl = models.IntegerField(blank=True, null=True)
+    wrkunit = models.CharField(max_length=50, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)
+    photo = models.CharField(max_length=400, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)
+    monthlysalary = models.CharField(db_column='MonthlySalary', max_length=1, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)  # Field name made lowercase.
+    accountdetails1 = models.CharField(db_column='Accountdetails1', max_length=200, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)  # Field name made lowercase.
+    
+    designation = models.CharField(
+        db_column='mcategory',
+        max_length=50,
+        blank=True,
+        null=True
+    )
+    status = models.CharField(max_length=25, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)
+  
+   
+    class Meta:
+        managed = False
+        db_table = 'Empwisesal'
+
+
+class Employeeworking(models.Model):
+    code = models.IntegerField(primary_key=True)
+    name = models.CharField(max_length=100, blank=True, null=True)
+    workunit = models.CharField(db_column='WorkUnit', max_length=70, blank=True, null=True)
+    category = models.CharField(db_column='Category', max_length=70, blank=True, null=True)
+    type = models.CharField(max_length=6)
+
+    class Meta:
+        managed = False
+        db_table = 'EmployeeWorking' 
 
 class ViewAbsentList(models.Model):
     id = models.IntegerField(primary_key=True)
