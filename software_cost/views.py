@@ -9,7 +9,80 @@ from django.utils import timezone
 from datetime import timedelta
 from django.views.decorators.csrf import csrf_exempt
 from .models import Workentry,user_master,project_master,category_master,subcategory_master,task_master,workentry_pause,role_menu_permissions
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
+from django.conf import settings
+from django.utils.dateparse import parse_datetime
 
+IST = ZoneInfo("Asia/Kolkata")
+
+
+def to_db_dt(val):
+    """Accepts '2026-10-06T10:00:00Z', '...+05:30', '2026-10-06 10:00:00', or datetime.
+    Naive values are treated as IST. Returns a value suitable for the DB."""
+    if val in (None, "", "null", "None"):
+        return None
+
+    dt = val if isinstance(val, datetime) else parse_datetime(str(val).strip())
+    if dt is None:
+        raise ValueError(f"Invalid datetime: {val}")
+
+    if timezone.is_naive(dt):
+        dt = dt.replace(tzinfo=IST)      # naive input = IST
+    dt = dt.astimezone(IST)
+
+    # USE_TZ=True -> aware datetime, USE_TZ=False -> naive IST
+    return dt if settings.USE_TZ else dt.replace(tzinfo=None)
+
+
+def local_date(dt):
+    if timezone.is_aware(dt):
+        dt = dt.astimezone(IST)
+    return dt.date()
+
+
+def calc_duration(start, end, paused=timedelta(0)):
+    """Returns ('HH:MM:SS', total_minutes). Change the format if your field expects another."""
+    secs = max(int((end - start - paused).total_seconds()), 0)
+    h, rem = divmod(secs, 3600)
+    m, s = divmod(rem, 60)
+    return f"{h:02d}:{m:02d}:{s:02d}", round(secs / 60)
+
+
+def paused_total(workentry_id):
+    total = timedelta(0)
+    for p in workentry_pause.objects.filter(workentry_id=workentry_id, pause_end_time__isnull=False):
+        total += (p.pause_end_time - p.pause_start_time)
+    return total
+
+
+def build_time_fields(body, obj=None, subtract_pauses=False):
+    """Parses the dates and recalculates duration on the server, so the client can't send a wrong one."""
+    start = to_db_dt(body.get('startdatetime', getattr(obj, 'startdatetime', None)))
+    end = to_db_dt(body.get('enddatetime', getattr(obj, 'enddatetime', None)))
+
+    fields = {'startdatetime': start, 'enddatetime': end}
+
+    if start:
+        fields['entrydate'] = local_date(start)   # entrydate always matches the start time
+
+    if start and end:
+        if end < start:
+            raise ValueError("enddatetime cannot be before startdatetime")
+        paused = paused_total(obj.id) if (obj and subtract_pauses) else timedelta(0)
+        fields['duration'], fields['durationminutes'] = calc_duration(start, end, paused)
+
+    return fields
+
+
+def localize_record(record):
+    """Make GET responses return IST consistently instead of UTC 'Z'."""
+    for k, v in record.items():
+        if isinstance(v, datetime):
+            if timezone.is_aware(v):
+                v = v.astimezone(IST)
+            record[k] = v.isoformat()
+    return record
 
 
 AVAILABLE_MENU = ['Master', 'Work Entry', 'Reports', 'Task']
@@ -1020,63 +1093,49 @@ def trs_workentry(request, id=None):
 
             def parse_null(val):
                 return val if val not in ["", "null", "None"] else None
-
+            
             if id:
                 # UPDATE LOGIC
                 obj = Workentry.objects.get(id=id)
                 obj.username = body.get('username', obj.username)
-                obj.entrydate = body.get('entrydate', obj.entrydate)
                 obj.project = body.get('project', obj.project)
                 obj.category = body.get('category', obj.category)
                 obj.subcat = body.get('subcat', obj.subcat)
-                obj.startdatetime = body.get('startdatetime', obj.startdatetime)
-                
+
                 new_task = parse_null(body.get("task_id"))
                 if new_task:
                     obj.task_id_id = new_task
-                    
-                obj.description = body.get('description', obj.description)
-                obj.enddatetime = body.get('enddatetime', obj.enddatetime)
-                obj.endstatus = body.get('endstatus', obj.endstatus)
-                obj.duration = body.get('duration', obj.duration)
-                
-                new_dur = parse_null(body.get('durationminutes'))
-                if new_dur:
-                    obj.durationminutes = new_dur
-                    
-                obj.status = parse_bool(body.get('status', obj.status))
-                obj.modifieddate = timezone.now()
 
+                obj.description = body.get('description', obj.description)
+                obj.endstatus = body.get('endstatus', obj.endstatus)
+                obj.status = parse_bool(body.get('status', obj.status))
+
+                for k, v in build_time_fields(body, obj).items():
+                    setattr(obj, k, v)
+
+                obj.modifieddate = timezone.now()
                 if image_file:
                     obj.image = image_file
-
                 obj.save()
-
-                return JsonResponse({
-                    "status": True,
-                    "message": "Record updated successfully"
-                })
-
+                ...
             else:
                 # INSERT LOGIC
+                tf = build_time_fields(body)
                 obj = Workentry.objects.create(
                     username=body.get("username"),
-                    entrydate=body.get("entrydate"),
                     project=body.get("project"),
                     category=body.get("category"),
                     subcat=body.get("subcat"),
                     status=parse_bool(body.get("status", False)),
-                    startdatetime=body.get("startdatetime"),
                     task_id_id=parse_null(body.get("task_id")),
                     description=body.get("description"),
-                    enddatetime=body.get("enddatetime"),
                     endstatus=body.get("endstatus"),
-                    duration=body.get("duration"),
-                    durationminutes=parse_null(body.get("durationminutes")),
                     createddate=timezone.now(),
                     modifieddate=timezone.now(),
-                    image=image_file
+                    image=image_file,
+                    **tf,   # startdatetime, enddatetime, entrydate, duration, durationminutes
                 )
+                
 
                 return JsonResponse({
                     "status": True,
