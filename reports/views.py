@@ -70,6 +70,7 @@ from django.db.models import (
     Avg,
 )
 from django.db import connections
+from django.core.serializers.json import DjangoJSONEncoder
 from django.db.models import OuterRef, Subquery
 from datetime import datetime, timedelta, date
 from django.utils import timezone
@@ -971,7 +972,49 @@ def emp_payslip(request):
         safe=False,
     )
     
+@csrf_exempt
+def get_employee_attendance(request):
+    if request.method == 'GET':
+        # Start with the base queryset
+        queryset = ViewEmployeeAtt.objects.using("demo").all()
 
+        # Get the 'month' parameter from the URL query string
+        month = request.GET.get('month')
+
+        if month:
+            try:
+                # Convert to integer and validate
+                month_int = int(month)
+                if 1 <= month_int <= 12:
+                    # Filter by the month of the 'dt' field
+                    queryset = queryset.filter(dt__month=month_int)
+                else:
+                    return JsonResponse(
+                        {'error': 'Month parameter must be between 1 and 12'}, 
+                        status=400
+                    )
+            except ValueError:
+                return JsonResponse(
+                    {'error': 'Invalid month parameter. Must be an integer.'}, 
+                    status=400
+                )
+
+        # Pull specific fields as a list of dictionaries
+        queryset = queryset.values(
+            'code', 
+            'dt', 
+            'ashift', 
+            'aot', 
+            'a'
+        )
+        
+        data = list(queryset)
+
+        # Return the JSON response
+        return JsonResponse(data, encoder=DjangoJSONEncoder, safe=False, status=200)
+
+    # Return 405 Method Not Allowed for POST/PUT/DELETE
+    return JsonResponse({'error': 'Method not allowed'}, status=405)
 
 
 @csrf_exempt

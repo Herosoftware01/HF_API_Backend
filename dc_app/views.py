@@ -279,12 +279,12 @@ def general_delivery_type1(request):
 
 
 # --- VIEW ---
-@csrf_exempt
+csrf_exempt
 def gate_module_api(request, pk=None):
     # ---------------- GET ----------------
     if request.method == "GET":
 
-        # 1. Single Record by Primary Key (if URL is like /api/1774/)
+        # 1. Single Record by Primary Key
         if pk:
             try:
                 obj = TrsGatemodule.objects.using('demo').get(pk=pk)
@@ -295,16 +295,26 @@ def gate_module_api(request, pk=None):
             except TrsGatemodule.DoesNotExist:
                 return JsonResponse({"status": False, "message": "Record not found"}, status=404)
 
-        # 2. Filter by DC Number (if URL is like /api/?no=5107)
-        dc_no = request.GET.get("no")
+        # Base Queryset
         queryset = TrsGatemodule.objects.using('demo').all().order_by("-date")
 
+        # 2. Extract Filters from Frontend Request
+        dc_no = request.GET.get("no")
+        filter_date = request.GET.get("date")  # <--- Capture the single date parameter
+
+        # Apply Filters Dynamically
         if dc_no:
             queryset = queryset.filter(no=dc_no)
-        else:
-            # Optional: Limit to 50 records if no search is provided to prevent crashing
+        
+        if filter_date:
+            # __date extracts the YYYY-MM-DD part from the database's DateTimeField
+            queryset = queryset.filter(date__date=filter_date)
+
+        # Optional: If no filters are applied, limit to 50 to prevent crashing/slowdown
+        if not dc_no and not filter_date:
             queryset = queryset[:50] 
 
+        # Format Response
         data = []
         for obj in queryset:
             item = model_to_dict(obj)
