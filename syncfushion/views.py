@@ -909,15 +909,6 @@ def CutBalpend(request):
 
     return JsonResponse(data, safe=False)
 
-# def AccPoPend(request):
-#     queryset = ViewAccpopending.objects.using("test").all()
-#     data = list(queryset.values(
-#         'slno',  'orderno', 'des', 'uom', 'fdelvdate',
-#         'ag', 'img', 'balpoqty', 'clr'
-#     ))
-   
-#     return JsonResponse(data, safe=False)
-
 
 def AccPoPend(request):
     queryset = ViewAccpopending.objects.using("test").all()
