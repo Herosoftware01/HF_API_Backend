@@ -3080,10 +3080,19 @@ def Cutting_Replace_Pending(request):
     if request.method == "GET":
 
         jobno = request.GET.get("jobno")
+        topbottom = request.GET.get("topbottom")
+        styleid = request.GET.get("styleid")
+        
         queryset = Repcutpending.objects.using("demo").all()
 
         if jobno:
             queryset = queryset.filter(jobno=jobno)
+
+        if topbottom:
+            queryset = queryset.filter(topbottom=topbottom)
+
+        if styleid:
+            queryset = queryset.filter(styleid=styleid)
 
         data = list(queryset.values())
         return JsonResponse(data, safe=False)
@@ -3363,7 +3372,7 @@ def Staff_OT_Amount(request):
     status = request.GET.get('status')
     cat = request.GET.get('cat')
 
-    queryset = VueOtAmountStaff.objects.using("main").all()
+    queryset = VueOtAmountStaff.objects.using("demo").all()
 
     if wunit:
         units = wunit.split(",")
