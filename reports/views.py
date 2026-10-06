@@ -62,6 +62,8 @@ from django.db.models.functions import TruncDate, TruncDay
 from dateutil.relativedelta import relativedelta
 from collections import defaultdict
 from django.views.decorators.csrf import csrf_exempt
+import calendar
+from collections import OrderedDict
 
 # dt_timezone = timezone.make_aware(timezone.datetime(2012, 1, 1), timezone=timezone.UTC)
 
@@ -363,6 +365,371 @@ def empwisesal(request):
             )
 
         return JsonResponse(data, safe=False)
+
+
+def get_emp_shift_summary(request):
+    if request.method != "GET":
+        return JsonResponse(
+            {"error": "Only GET method is allowed"},
+            status=405
+        )
+
+    try:
+        config = request.GET.get("config")
+
+        # =====================================================
+        # CONFIG
+        # =====================================================
+        if config == "1":
+            base_qs = ViewActshift.objects.using("demo").all()
+
+            years = list(
+                base_qs
+                .exclude(yr__isnull=True)
+                .values_list("yr", flat=True)
+                .distinct()
+                .order_by("-yr")
+            )
+
+            months = list(
+                base_qs
+                .exclude(mno__isnull=True)
+                .exclude(monthname__isnull=True)
+                .exclude(monthname="")
+                .values("mno", "monthname")
+                .distinct()
+                .order_by("mno")
+            )
+
+            statuses = list(
+                base_qs
+                .exclude(status__isnull=True)
+                .exclude(status="")
+                .values_list("status", flat=True)
+                .distinct()
+                .order_by("status")
+            )
+
+            units = list(
+                base_qs
+                .exclude(unitname__isnull=True)
+                .exclude(unitname="")
+                .values_list("unitname", flat=True)
+                .distinct()
+                .order_by("unitname")
+            )
+
+            categories = list(
+                base_qs
+                .exclude(category__isnull=True)
+                .exclude(category="")
+                .values_list("category", flat=True)
+                .distinct()
+                .order_by("category")
+            )
+
+            return JsonResponse({
+                "years": years,
+                "months": months,
+                "statuses": statuses,
+                "units": units,
+                "categories": categories,
+            })
+
+        # =====================================================
+        # COMMON PARAMETERS
+        # =====================================================
+        report_type = request.GET.get(
+            "report_type",
+            "monthly"
+        ).strip().lower()
+
+        yr_str = request.GET.get("yr")
+        month_str = request.GET.get("monthname")
+
+        status_str = request.GET.get("status")
+        unit_str = request.GET.get("unitname")
+        category_str = request.GET.get("category")
+        code_str = request.GET.get("code")
+
+        if not yr_str:
+            return JsonResponse(
+                {"error": "Missing 'yr' parameter"},
+                status=400
+            )
+
+        if not month_str:
+            return JsonResponse(
+                {"error": "Missing 'monthname' parameter"},
+                status=400
+            )
+
+        try:
+            year = int(yr_str)
+        except ValueError:
+            return JsonResponse(
+                {"error": "Invalid year"},
+                status=400
+            )
+
+        # Convert September -> 9
+        try:
+            month_number = list(
+                calendar.month_name
+            ).index(month_str.strip().title())
+
+            if month_number == 0:
+                raise ValueError
+
+        except ValueError:
+            return JsonResponse(
+                {"error": "Invalid monthname"},
+                status=400
+            )
+
+        # =====================================================
+        # MONTHLY SUMMARY
+        # =====================================================
+        if report_type == "monthly":
+            qs = ViewActshift.objects.using("demo").filter(
+                yr=year,
+                mno=month_number
+            )
+
+            if status_str:
+                qs = qs.filter(
+                    status__iexact=status_str.strip()
+                )
+
+            if unit_str:
+                qs = qs.filter(
+                    unitname__iexact=unit_str.strip()
+                )
+
+            if category_str:
+                qs = qs.filter(
+                    category__iexact=category_str.strip()
+                )
+
+            if code_str:
+                try:
+                    qs = qs.filter(
+                        code=int(code_str)
+                    )
+                except ValueError:
+                    return JsonResponse(
+                        {
+                            "error":
+                            "Employee code must be numeric"
+                        },
+                        status=400
+                    )
+
+            data = list(
+                qs.values(
+                    "rowno",
+                    "code",
+                    "name",
+                    "unitname",
+                    "category",
+                    "actshift",
+                    "status",
+                    "mno",
+                    "yr",
+                    "monthname",
+                ).order_by(
+                    "unitname",
+                    "category",
+                    "code"
+                )
+            )
+
+            return JsonResponse({
+                "report_type": "monthly",
+                "count": len(data),
+                "data": data,
+            })
+
+        # =====================================================
+        # DAILY MONTH MATRIX
+        # =====================================================
+        if report_type == "daily":
+
+            start_date = date(
+                year,
+                month_number,
+                1
+            )
+
+            last_day = calendar.monthrange(
+                year,
+                month_number
+            )[1]
+
+            end_date = date(
+                year,
+                month_number,
+                last_day
+            )
+
+            qs = ViewActshiftDay.objects.using(
+                "demo"
+            ).filter(
+                dt__date__range=(
+                    start_date,
+                    end_date
+                )
+            )
+
+            # ---------------------------------------------
+            # OPTIONAL FILTERS
+            # ---------------------------------------------
+            if status_str:
+                qs = qs.filter(
+                    status__iexact=status_str.strip()
+                )
+
+            if unit_str:
+                qs = qs.filter(
+                    unitname__iexact=unit_str.strip()
+                )
+
+            if category_str:
+                qs = qs.filter(
+                    category__iexact=category_str.strip()
+                )
+
+            if code_str:
+                try:
+                    qs = qs.filter(
+                        code=int(code_str)
+                    )
+                except ValueError:
+                    return JsonResponse(
+                        {
+                            "error":
+                            "Employee code must be numeric"
+                        },
+                        status=400
+                    )
+
+            qs = qs.values(
+                "rowno",
+                "code",
+                "name",
+                "unitname",
+                "category",
+                "status",
+                "dt",
+                "actshift",
+            ).order_by(
+                "unitname",
+                "category",
+                "code",
+                "dt"
+            )
+
+            # =================================================
+            # DAY HEADERS
+            # =================================================
+            days = []
+
+            weekday_short = [
+                "Mo",
+                "Tu",
+                "We",
+                "Th",
+                "Fr",
+                "Sa",
+                "Su",
+            ]
+
+            for day_no in range(
+                1,
+                last_day + 1
+            ):
+                current_date = date(
+                    year,
+                    month_number,
+                    day_no
+                )
+
+                days.append({
+                    "day": day_no,
+                    "date": current_date.isoformat(),
+                    "weekday": weekday_short[
+                        current_date.weekday()
+                    ],
+                    "is_sunday":
+                        current_date.weekday() == 6,
+                })
+
+            # =================================================
+            # PIVOT EMPLOYEE -> DAYS
+            # =================================================
+            employees = OrderedDict()
+
+            for row in qs:
+                employee_code = row["code"]
+
+                if employee_code not in employees:
+                    employees[employee_code] = {
+                        "code": row["code"],
+                        "name": row["name"],
+                        "unitname": row["unitname"],
+                        "category": row["category"],
+                        "status": row["status"],
+                        "days": {},
+                    }
+
+                day_number = row["dt"].day
+
+                # Current model has DecimalField.
+                # If DB has A/X/W etc, replace this
+                # with the real shift/attendance-code field.
+                value = (
+                    str(row["actshift"])
+                    if row["actshift"] is not None
+                    else ""
+                )
+
+                employees[
+                    employee_code
+                ]["days"][str(day_number)] = value
+
+            employee_list = list(
+                employees.values()
+            )
+
+            return JsonResponse({
+                "report_type": "daily",
+                "year": year,
+                "month": month_number,
+                "monthname": calendar.month_name[
+                    month_number
+                ],
+                "days": days,
+                "count": len(employee_list),
+                "data": employee_list,
+            })
+
+        return JsonResponse(
+            {
+                "error":
+                "report_type must be monthly or daily"
+            },
+            status=400
+        )
+
+    except Exception as e:
+        return JsonResponse(
+            {
+                "error":
+                "Unable to load employee shift report.",
+                "details": str(e),
+            },
+            status=500
+        )
 
 def get_friday_thursday_range(reference_date=None):
     if reference_date is None:
