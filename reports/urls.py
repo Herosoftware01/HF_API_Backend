@@ -3,9 +3,7 @@ from . import views
 
 urlpatterns = [
     
-    path('report/', views.holdwage_report, name='holdwage_report'),
-    path('empwisesal/', views.empwisesal, name='empwisesal'),
-    path("holdwagepaid/", views.holdwagepaid_api, name="holdwagepaid_api"),
+
     path('get_lay_sp_data/', views.get_lay_sp_data, name='get_lay_sp_data'),
     path('get_master_final_mistake_data/', views.get_master_final_mistake_data, name='get_master_final_mistake_data'),
     path('get_unit_bundle_data/', views.get_unit_bundle_report_data, name='get_unit_bundle_data'),
@@ -17,6 +15,8 @@ urlpatterns = [
     path('measurement_report/', views.measurement_report, name='measurement_report'),
 
     # HR Reports
+    path('empwisesal/', views.empwisesal, name='empwisesal'),
+    path('emp_shift_summary/', views.get_emp_shift_summary, name='get_emp_shift_summary'),
     path('attendance/', views.attendance, name='attendance'),
     path('emp_overall/', views.emp_overall, name="emp_overall"),
     path('absent_details/', views.abs_details, name='absent_details'),
@@ -24,6 +24,7 @@ urlpatterns = [
     path('resign_report/', views.resign_report, name='resign_report'),
     path('resign_join_report/', views.resign_join_report, name='resign_join_report'),
     path('emp_payslip/', views.emp_payslip, name='emp_salary_details'),
+    path('emp_monthly_att/', views.get_employee_attendance, name='get_employee_attendance'),
     path('hr_resignation_details/', views.hr_resignation_details, name='hr_resignation_details'),
     path('join_data/', views.join_data, name='join_data'),
     path('staff_overview/', views.staff_overview, name='staff_overview'),
@@ -38,13 +39,6 @@ urlpatterns = [
     path('emp_pre_abe/', views.labour_attendance_api, name='labour_attendance_api'),
 
     # Finance Reports
-    path('bill_age/', views.bill, name='bill_age'),
-    path('pass_age/', views.pass_data_api, name='pass_age'),
-    path('bill_mdapprove/', views.approval_api, name='bill_mdapprove'),
-    path('bill_dash/', views.bill_dashboard , name='bill_dash'),
-    path('bill_details/', views.bill_details , name='bill_details'),
-    path('pay_dash/', views.pay_dashboard , name='pay_dash'),
-    path('pay_details/', views.pay_bill_details , name='pay_details'),
     path('dyeing_data/', views.dyeing_data , name='dyeing_data'),
     path('dyeing_order_details/', views.dyeing_order_details , name='dyeing_order_details'),
 

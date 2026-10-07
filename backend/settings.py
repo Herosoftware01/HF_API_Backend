@@ -104,8 +104,9 @@ INSTALLED_APPS = [
     'fashionr',
     'software_cost',
     'Salary_Confirmation',
-    'GateInward'
-    
+    'GateInward',
+    'finance',
+
 ]
 
 DATA_UPLOAD_MAX_MEMORY_SIZE = 1024 * 1024 * 200
@@ -312,8 +313,8 @@ TIME_ZONE = 'Asia/Kolkata'
 
 USE_I18N = True
 
-USE_TZ = False
-# USE_TZ = True
+# USE_TZ = False
+USE_TZ = True
 
 
 

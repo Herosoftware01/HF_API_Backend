@@ -42,6 +42,8 @@ urlpatterns = [
     path('software_cost/', include('software_cost.urls')) ,
     path('skill_app/', include('Salary_Confirmation.urls')) ,
     path('gateinward/', include('GateInward.urls')) ,
+    path('finance/', include('finance.urls')) ,
+
 ] 
 
 

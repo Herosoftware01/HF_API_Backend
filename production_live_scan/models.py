@@ -52,6 +52,7 @@ class Assembly_data(models.Model):
     scan = models.BooleanField(default=False)
     lot = models.CharField(max_length=50)
     emp_id = models.CharField(max_length=20, blank=True, null=True)
+    entry_mode = models.CharField(max_length=20, blank=True, null=True)
     # process_des = models.CharField(max_length=500)
 
 
@@ -69,6 +70,8 @@ class dependency(models.Model):
     and_or = models.BooleanField(default=False)
     verify = models.BooleanField(default=False)
     or_only = models.BooleanField(default=False)
+    verify_user = models.CharField(max_length=50, blank=True, null=True)
+    verify_date = models.DateTimeField(blank=True, null=True)
     # assemply_scan = models.BooleanField(default=False)
 
 

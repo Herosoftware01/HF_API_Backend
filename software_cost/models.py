@@ -55,6 +55,7 @@ class task_master(models.Model):
     project = models.ForeignKey(project_master, on_delete=models.CASCADE, null=True, blank=True) # Connects task to a project
     code = models.ForeignKey(user_master, on_delete=models.CASCADE, null=True, blank=True)
     task_name = models.CharField(max_length=100)
+    task_image = models.ImageField(storage=network_storage, upload_to='', blank=True, null=True)  # Store images in the network location
     assing_date = models.DateTimeField(auto_now_add=True)
     task_description = models.TextField(null=True, blank=True)
     task_start_date = models.DateTimeField(null=True, blank=True)

@@ -17,6 +17,8 @@ import json
 from django.db import connections
 from django.db.models import Q
 from rest_framework.decorators import api_view
+from rest_framework.decorators import permission_classes
+from rest_framework import permissions
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
 
@@ -743,7 +745,74 @@ class GetUnitDataAPIViewsss(APIView):
         # JSON response
         results = list(data.values('bundle_id','mbud', 'job_no','color','bdl_no','size','tb_name', 'pc', 'color', 'entry_date'))
         return Response({"status": True, "data": results})
-    
+
+
+class GetUnitDataAPIViewsss(APIView):
+    def get(self, request):
+        unit = request.query_params.get('unit')
+        line = request.query_params.get('line')
+        job_no = request.query_params.get('job_no')
+        process_des = request.query_params.get('process_des')
+        top_bottom = str(request.query_params.get('top_bottom', '') or '').strip()
+        selected_date = request.query_params.get('date') 
+
+        if selected_date:
+            date_obj = datetime.strptime(selected_date, '%Y-%m-%d')
+            # data = unit_input.objects.filter(unit=unit, line=line, entry_date__date=date_obj).order_by('-entry_date')
+            data = unit_input.objects.filter(unit=unit, entry_date__date=date_obj).order_by('-entry_date')
+        else:
+            # four_days_ago = datetime.now() - timedelta(days=1)
+            today = date.today()
+            print("Today's date:", today)
+            # data = unit_input.objects.filter(unit=unit, line=line, entry_date__gte=today).order_by('-entry_date')
+            data = unit_input.objects.filter(unit=unit, entry_date__date=today).order_by('-entry_date')
+
+        if job_no is not None:
+            job_no = job_no.strip()
+            if not job_no:
+                return Response(
+                    {"error": "job_no is required to load assembly bundles"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            if process_des is not None:
+                process_des = process_des.strip()
+                if not top_bottom:
+                    return Response(
+                        {"error": "top_bottom is required to load assembly bundles"},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+                allowed, eligible_bundle_ids, error_message = get_eligible_assembly_bundle_ids(
+                    job_no, process_des, top_bottom
+                )
+                if not allowed:
+                    return Response(
+                        {"error": error_message},
+                        status=status.HTTP_409_CONFLICT
+                    )
+                already_scanned_ids = Assembly_data.objects.filter(
+                    job_no__iexact=job_no,
+                    seq__iexact=process_des,
+                ).values_list('bundle_id', flat=True)
+                data = data.filter(job_no__iexact=job_no)
+                if top_bottom:
+                    data = data.filter(tb_name__iexact=top_bottom)
+                data = data.exclude(bundle_id__in=already_scanned_ids)
+                if eligible_bundle_ids is not None:
+                    data = data.filter(bundle_id__in=eligible_bundle_ids)
+            else:
+                verified_tb_ids = dependency.objects.filter(
+                    job_no__iexact=job_no,
+                    verify=True
+                ).values_list('tb_id', flat=True)
+                data = data.filter(
+                    job_no__iexact=job_no,
+                    tb_id__in=verified_tb_ids,
+                    scan=False,
+                )
+
+        # JSON response
+        results = list(data.values('bundle_id','mbud', 'job_no','color','bdl_no','size','tb_name', 'pc', 'color', 'entry_date'))
+        return Response({"status": True, "data": results})
 
 
 
@@ -933,10 +1002,17 @@ class SaveAssemblyAPIView(APIView):
         line = request.data.get('line')
         bundle_ids = request.data.get('bundle_ids', [])
         raw_date = request.data.get('date')
+        entry_mode = str(request.data.get('entry_mode', '')).strip().lower()
 
         if not emp_code or not machine_id or not job_no or not selected_seq or not selected_top_bottom or not unit or not line or not bundle_ids:
             return Response(
                 {"error": "employee, machine, job no, sequence, top/bottom, unit, line and bundles are required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if entry_mode not in {'manual', 'scan'}:
+            return Response(
+                {"error": "entry_mode must be either 'manual' or 'live'"},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -992,7 +1068,7 @@ class SaveAssemblyAPIView(APIView):
             ).filter(assembly_sequence_filter(process_des)).values_list('bundle_id', flat=True)
             bundle_queryset = unit_input.objects.select_for_update().filter(
                 unit=unit,
-                line=line,
+                # line=line,
                 job_no__iexact=job_no,
                 bundle_id__in=unique_ids,
             )
@@ -1003,6 +1079,7 @@ class SaveAssemblyAPIView(APIView):
             found_ids = {bundle.bundle_id for bundle in bundles}
             missing_ids = [value for value in unique_ids if value not in found_ids]
             if missing_ids:
+                print("Some bundles are unavailable or already scanned:", missing_ids)
                 return Response(
                     {"error": "Some bundles are unavailable or already scanned.", "bundle_ids": missing_ids},
                     status=status.HTTP_409_CONFLICT
@@ -1029,7 +1106,8 @@ class SaveAssemblyAPIView(APIView):
                     entry_date=entry_date,
                     scan=False,
                     lot=bundle.lot,
-                    emp_id=emp_code
+                    emp_id=emp_code,
+                    entry_mode=entry_mode
                 )
                 for bundle, description in bundle_process_pairs(bundles, process_des)
             ])
@@ -1408,6 +1486,8 @@ def save_process_dependency(request):
                     dep.and_or = bool(row.get('and_or', 0))
                     dep.or_only = bool(row.get('or_only', 0))
                     dep.verify = False
+                    dep.verify_user = None
+                    dep.verify_date = None
                     dep.date = timezone.now()
                     dep.save()
 
@@ -1475,14 +1555,12 @@ def save_process_dependency(request):
     )
 
 
-@csrf_exempt
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
 def verify_process_dependency(request):
-    if request.method != "POST":
-        return JsonResponse({"error": "Invalid request method"}, status=405)
-
     try:
-        data = json.loads(request.body)
-        username = data.get('username', '').strip()
+        data = request.data
+        username = str(data.get('username', '')).strip()
         password = data.get('password', '')
         if username != 'admin' or password != 'admin':
             return JsonResponse({"error": "Invalid admin credentials"}, status=403)
@@ -1499,7 +1577,11 @@ def verify_process_dependency(request):
                     {"error": "Save the dependency before verifying"},
                     status=404
                 )
-            updated = dependencies.update(verify=True)
+            updated = dependencies.update(
+                verify=True,
+                verify_user=str(request.user.pk),
+                verify_date=timezone.now(),
+            )
 
         return JsonResponse({"message": "Verified successfully", "count": updated})
     except Exception as e:

@@ -2,7 +2,7 @@ from django.urls import path
 from . import views
 
 urlpatterns = [
-    
+       
     # Operation Category Endpoints
     path('process_mas/', views.Process_Master, name='Process Master'),
     path('emp_details/', views.Employee_Details, name='Employee Details'),
