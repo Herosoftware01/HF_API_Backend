@@ -28,7 +28,7 @@ from datetime import time
 from django.utils import timezone
 from django.db.models import Case, When, Value, IntegerField,Sum
 from django.utils.timezone import localtime
-from production_live_scan.models import Assembly_data, dependency
+from production_live_scan.models import Assembly_data, dependency, user_unit_permission
 from datetime import time as time_cls, datetime as datetime_cls, timedelta
 from collections import defaultdict
 from herofashion.models import User
@@ -542,7 +542,14 @@ class UnitListAPIView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
-        units = Unit.objects.all()
+        if request.query_params.get("app") == "employee_allocation":
+            permitted_unit_ids = user_unit_permission.objects.filter(
+                user_id=request.user.pk,
+                app="employee_allocation",
+            ).values_list("unit_id", flat=True)
+            units = Unit.objects.filter(id__in=permitted_unit_ids)
+        else:
+            units = Unit.objects.all()
         serializer = UnitSerializer(units, many=True)
         return Response(serializer.data)
 

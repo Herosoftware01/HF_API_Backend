@@ -3,8 +3,9 @@ from datetime import date, datetime
 from unittest.mock import patch
 
 from django.test import RequestFactory, SimpleTestCase
+from rest_framework.test import APIRequestFactory, force_authenticate
 
-from .views import get_shift, qc_hourly_signature
+from .views import UnitListAPIView, get_shift, qc_hourly_signature
 
 
 class GetShiftTests(SimpleTestCase):
@@ -44,3 +45,30 @@ class QcHourlySignatureTests(SimpleTestCase):
         self.assertEqual(response.status_code, 200)
         call_kwargs = mock_model.objects.get_or_create.call_args.kwargs
         self.assertEqual(call_kwargs["approval_hour"], 1)
+
+
+class EmployeeAllocationUnitPermissionTests(SimpleTestCase):
+    def test_units_are_limited_to_authenticated_users_employee_allocation_grants(self):
+        request = APIRequestFactory().get(
+            "/qcapp/api/units/",
+            {"app": "employee_allocation"},
+        )
+        force_authenticate(
+            request,
+            user=type("AuthenticatedUser", (), {"pk": 42, "is_authenticated": True})(),
+        )
+
+        with (
+            patch("qcapp.views.user_unit_permission.objects.filter") as permissions,
+            patch("qcapp.views.Unit.objects.filter") as units,
+            patch("qcapp.views.UnitSerializer") as serializer,
+        ):
+            permitted_unit_ids = [3, 5]
+            permissions.return_value.values_list.return_value = permitted_unit_ids
+            serializer.return_value.data = [{"id": 3}, {"id": 5}]
+
+            response = UnitListAPIView.as_view()(request)
+
+        self.assertEqual(response.data, [{"id": 3}, {"id": 5}])
+        permissions.assert_called_once_with(user_id=42, app="employee_allocation")
+        units.assert_called_once_with(id__in=permitted_unit_ids)
