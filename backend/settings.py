@@ -104,6 +104,7 @@ INSTALLED_APPS = [
     'fashionr',
     'software_cost',
     'Salary_Confirmation',
+    'GateInward'
     
 ]
 
