@@ -4,14 +4,18 @@ from datetime import datetime, timezone as datetime_timezone
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
-from django.test import SimpleTestCase, TestCase
+from django.test import RequestFactory, SimpleTestCase, TestCase
 from rest_framework.test import APIRequestFactory, force_authenticate
 
 from .views import (
+    UserUnitPermissionView,
     assembly_dependencies_satisfied,
     bundle_process_pairs,
     get_eligible_assembly_bundle_ids_for_processes,
     get_bundle_last_process,
+    delete_process_dependency,
+    SaveAssemblySelectionView,
+    save_process_dependency,
     split_process_descriptions,
     verify_process_dependency,
 )
@@ -153,11 +157,75 @@ class BundleLastProcessTests(TestCase):
         )
 
 
+class SaveAssemblySelectionTests(SimpleTestCase):
+    def test_save_copies_selected_bundles_and_marks_only_unit_transfer(self):
+        request = APIRequestFactory().post(
+            "/api/assembly/save/",
+            {
+                "selected_ids": [12],
+                "unit_id": 3,
+                "line_id": 8,
+            },
+            format="json",
+        )
+        bundle = SimpleNamespace(
+            id=12,
+            job_no="J7123A",
+            tb_id=4,
+            tb_name="Shorts",
+            machine="M-1",
+            seq="Side seam",
+            bundle_id="bundle-12",
+            bdl_no="12",
+            mbud="mbud",
+            size="M",
+            size_id=5,
+            color="Black",
+            pc="1",
+            lot="lot-1",
+            emp_id="EMP123",
+        )
+        bundles = MagicMock()
+        bundles.count.return_value = 1
+        bundles.__iter__.return_value = iter([bundle])
+        transfer_time = datetime(2026, 10, 7, 10, 30, tzinfo=datetime_timezone.utc)
+
+        with (
+            patch("production_live_scan.views.Unit.objects.filter") as unit_filter,
+            patch("production_live_scan.views.Line.objects.filter") as line_filter,
+            patch(
+                "production_live_scan.views.Assembly_data.objects.select_for_update"
+            ) as select_for_update,
+            patch("production_live_scan.views.Assembly_data.objects.filter") as assembly_filter,
+            patch("production_live_scan.views.bundle_transfer.objects.bulk_create") as bulk_create,
+            patch("production_live_scan.views.transaction.atomic", return_value=nullcontext()),
+            patch("production_live_scan.views.timezone.now", return_value=transfer_time),
+        ):
+            unit_filter.return_value.exists.return_value = True
+            line_filter.return_value.exists.return_value = True
+            select_for_update.return_value.filter.return_value = bundles
+            assembly_filter.return_value.update.return_value = 1
+
+            response = SaveAssemblySelectionView.as_view()(request)
+
+        self.assertEqual(response.status_code, 200)
+        transferred = bulk_create.call_args.args[0][0]
+        self.assertEqual(transferred.unit, 3)
+        self.assertEqual(transferred.line, 8)
+        self.assertEqual(transferred.bundle_id, "bundle-12")
+        self.assertEqual(transferred.date, transfer_time)
+        self.assertEqual(transferred.entry_date, transfer_time)
+        self.assertEqual(transferred.emp_id, "EMP123")
+        assembly_filter.return_value.update.assert_called_once_with(unit_transfer=True)
+
+
 class DependencyVerificationTests(SimpleTestCase):
-    def test_verification_saves_verifier_id_and_timestamp(self):
+    def test_verification_saves_logged_in_username_and_timestamp(self):
         verifier = SimpleNamespace(
             pk=42,
+            username="line-supervisor",
             is_authenticated=True,
+            get_username=lambda: "line-supervisor",
         )
         dependencies = MagicMock()
         dependencies.exists.return_value = True
@@ -186,9 +254,13 @@ class DependencyVerificationTests(SimpleTestCase):
             response = verify_process_dependency(request)
 
         self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            json.loads(response.content)["verify_user"],
+            "line-supervisor",
+        )
         dependencies.update.assert_called_once_with(
             verify=True,
-            verify_user="42",
+            verify_user="line-supervisor",
             verify_date=verified_at,
         )
 
@@ -209,3 +281,122 @@ class DependencyVerificationTests(SimpleTestCase):
         response = verify_process_dependency(request)
 
         self.assertEqual(response.status_code, 403)
+
+
+class DependencyMutationPasswordTests(SimpleTestCase):
+    def test_save_accepts_action_password(self):
+        request = RequestFactory().post(
+            "/save_process_dependency/",
+            data=json.dumps({"password": "12345", "dependencies": []}),
+            content_type="application/json",
+        )
+        existing_group = MagicMock()
+        existing_group.filter.return_value.exists.return_value = False
+        existing_group.exists.return_value = False
+
+        with (
+            patch(
+                "production_live_scan.views.dependency.objects.select_for_update"
+            ) as select_for_update,
+            patch("production_live_scan.views.transaction.atomic", return_value=nullcontext()),
+        ):
+            select_for_update.return_value.filter.return_value = existing_group
+            response = save_process_dependency(request)
+
+        self.assertEqual(response.status_code, 201)
+
+    def test_save_requires_action_password(self):
+        request = RequestFactory().post(
+            "/save_process_dependency/",
+            data=json.dumps({"password": "wrong", "dependencies": []}),
+            content_type="application/json",
+        )
+
+        with patch("production_live_scan.views.dependency.objects") as dependency_objects:
+            response = save_process_dependency(request)
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(json.loads(response.content)["error"], "Invalid password")
+        dependency_objects.select_for_update.assert_not_called()
+
+    def test_delete_accepts_action_password(self):
+        request = RequestFactory().post(
+            "/delete_process_dependency/",
+            data=json.dumps({
+                "password": "12345",
+                "job_no": "J7123A",
+                "tb_id": 3,
+            }),
+            content_type="application/json",
+        )
+        dependencies = MagicMock()
+        dependencies.exists.return_value = True
+        dependencies.delete.return_value = (1, {"production_live_scan.dependency": 1})
+
+        with (
+            patch(
+                "production_live_scan.views.dependency.objects.select_for_update"
+            ) as select_for_update,
+            patch("production_live_scan.views.transaction.atomic", return_value=nullcontext()),
+        ):
+            select_for_update.return_value.filter.return_value = dependencies
+            response = delete_process_dependency(request)
+
+        self.assertEqual(response.status_code, 200)
+        dependencies.delete.assert_called_once()
+
+    def test_delete_requires_action_password(self):
+        request = RequestFactory().post(
+            "/delete_process_dependency/",
+            data=json.dumps({
+                "password": "",
+                "job_no": "J7123A",
+                "tb_id": 3,
+            }),
+            content_type="application/json",
+        )
+
+        with patch("production_live_scan.views.dependency.objects") as dependency_objects:
+            response = delete_process_dependency(request)
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(json.loads(response.content)["error"], "Invalid password")
+        dependency_objects.select_for_update.assert_not_called()
+
+
+class UserUnitPermissionTests(SimpleTestCase):
+    def test_machine_transfer_permissions_are_saved(self):
+        request = RequestFactory().post(
+            "/user-unit-permission/",
+            data=json.dumps({
+                "user_id": 7,
+                "app": "machine_transfer",
+                "unit_ids": [1, 2],
+            }),
+            content_type="application/json",
+        )
+
+        with (
+            patch("production_live_scan.views.User.objects.filter") as users,
+            patch("production_live_scan.views.Unit.objects.filter") as units,
+            patch(
+                "production_live_scan.views.user_unit_permission.objects.filter"
+            ) as existing_permissions,
+            patch(
+                "production_live_scan.views.user_unit_permission.objects.bulk_create"
+            ) as bulk_create,
+            patch("production_live_scan.views.transaction.atomic", return_value=nullcontext()),
+        ):
+            users.return_value.first.return_value = SimpleNamespace(id=7)
+            units.return_value.values_list.return_value = [1, 2]
+
+            response = UserUnitPermissionView.as_view()(request)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(json.loads(response.content)["app"], "machine_transfer")
+        self.assertEqual(json.loads(response.content)["unit_ids"], [1, 2])
+        self.assertTrue(all(
+            permission.app == "machine_transfer"
+            for permission in bulk_create.call_args.args[0]
+        ))
+        existing_permissions.assert_called_once_with(user_id=7, app="machine_transfer")
