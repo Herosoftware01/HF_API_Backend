@@ -104,8 +104,9 @@ INSTALLED_APPS = [
     'fashionr',
     'software_cost',
     'Salary_Confirmation',
-    'finance'
-    
+    'GateInward',
+    'finance',
+
 ]
 
 DATA_UPLOAD_MAX_MEMORY_SIZE = 1024 * 1024 * 200
@@ -121,8 +122,8 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # else:
 #     SECURE_CROSS_ORIGIN_OPENER_POLICY = "same-origin"
 
-# DEBUG = False
-DEBUG = True
+DEBUG = False
+# DEBUG = True
 
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
