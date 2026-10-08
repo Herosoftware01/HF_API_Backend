@@ -1,6 +1,6 @@
 from django.urls import path
 from . import views
-from .views import UnitInputAPIView,EndUnitDataAPIView,EndUnitInputAPIView,GetUnitDataAPIView,GetUnitAssemply,GetUnitDataAPIViewsss
+from .views import UnitInputAPIView,EndUnitDataAPIView,EndUnitInputAPIView,GetUnitDataAPIView,GetUnitAssemply,GetUnitDataAPIViewsss,GetJobsView,GetColorsView,GetSizesView, GetTbNamesView, GetSequencesView, SaveAssemblySelectionView
 
 
 from .views import (
@@ -55,4 +55,10 @@ urlpatterns = [
     path('api/topbottom-unit-job/', views.get_topbottom_by_unit_job, name='get_topbottom_by_unit_job'),
     path('api/table-data/', views.get_table_data, name='get_table_data'),
     path('api/save-table-entry/', views.save_table_entry, name='save_table_entry'),
+    path('api/jobs/', GetJobsView.as_view(), name='get-jobs'),
+    path('api/tb-names/', GetTbNamesView.as_view(), name='get-tb-names'),
+    path('api/colors/', GetColorsView.as_view(), name='get-colors'),
+    path('api/sizes/', GetSizesView.as_view(), name='get-sizes'),
+    path('api/sequences/', GetSequencesView.as_view(), name='get-sequences'),
+    path('api/assembly/save/', SaveAssemblySelectionView.as_view(), name='save-assembly'),
 ]  
