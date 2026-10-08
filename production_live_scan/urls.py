@@ -55,6 +55,7 @@ urlpatterns = [
     path('api/topbottom-unit-job/', views.get_topbottom_by_unit_job, name='get_topbottom_by_unit_job'),
     path('api/table-data/', views.get_table_data, name='get_table_data'),
     path('api/save-table-entry/', views.save_table_entry, name='save_table_entry'),
+    
     path('api/jobs/', GetJobsView.as_view(), name='get-jobs'),
     path('api/tb-names/', GetTbNamesView.as_view(), name='get-tb-names'),
     path('api/colors/', GetColorsView.as_view(), name='get-colors'),

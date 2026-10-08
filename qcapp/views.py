@@ -1651,18 +1651,354 @@ def get_allocate_report(request):
     return JsonResponse(data, safe=False)
 
 
+# def get_allocate_live(request):
+#     unit_id = request.GET.get("unit")
+#     line_id = request.GET.get("line")
+#     selected_date = request.GET.get("date")
+#     selected_shift = request.GET.get("shift", "day")
+#     if selected_date:
+#         try:
+#             report_day = datetime.strptime(
+#                 selected_date,
+#                 "%Y-%m-%d"
+#             ).date()
+#         except ValueError:
+#             report_day = date.today()
+#     else:
+#         report_day = date.today()
+#     # --------------------------------
+#     # LINE
+#     # --------------------------------
+#     selected_line = Line.objects.filter(
+#         id=line_id
+#     ).only("line_number").first()
+#     assembly_line = (
+#         selected_line.line_number
+#         if selected_line
+#         else line_id
+#     )
+
+#     if selected_shift == "night":
+#         shift_start = datetime.combine(
+#             report_day - timedelta(days=1),
+#             time(20, 48)
+#         )
+#         shift_end = datetime.combine(
+#             report_day,
+#             time(8, 0)
+#         )
+#         slot_ranges = (
+#             (time(20, 48), time(21, 30)),
+#             (time(21, 30), time(22, 30)),
+#             (time(22, 30), time(23, 30)),
+#             (time(0, 0), time(1, 0)),
+#             (time(1, 0), time(2, 0)),
+#             (time(2, 0), time(3, 0)),
+#             (time(3, 0), time(4, 0)),
+#             (time(4, 0), time(5, 0)),
+#             (time(5, 0), time(6, 0)),
+#             (time(6, 0), time(7, 0)),
+#             (time(7, 0), time(8, 0)),
+#         )
+
+#     else:
+
+#         shift_start = datetime.combine(
+#             report_day,
+#             time.min
+#         )
+
+#         shift_end = shift_start + timedelta(days=1)
+
+#         slot_ranges = (
+#             (time(8, 30), time(9, 30)),
+#             (time(9, 30), time(10, 30)),
+#             (time(10, 45), time(11, 45)),
+#             (time(11, 45), time(12, 45)),
+#             (time(13, 30), time(14, 30)),
+#             (time(14, 30), time(15, 30)),
+#             (time(15, 30), time(16, 30)),
+#             (time(16, 30), time(17, 30)),
+#             (time(17, 45), time(18, 45)),
+#             (time(18, 45), time(20, 0)),
+#         )
+
+#     # --------------------------------
+#     # EMP ALLOCATION
+#     # --------------------------------
+#     s_data = emp_allocate.objects.filter(
+#         unit=unit_id,
+#         line=line_id,
+#         date__gte=shift_start,
+#         date__lt=shift_end
+#     ).values(
+#         "emp_code",
+#         "machine__Identity",
+#         "date",
+#         "seq",
+#         "jobno",
+#         "top_bottom"
+#     )
+
+#     # --------------------------------
+#     # SCANS
+#     # --------------------------------
+#     scans = list(
+#         Assembly_data.objects.filter(
+#             unit=unit_id,
+#             line=assembly_line,
+#             entry_date__gte=shift_start,
+#             entry_date__lt=shift_end,
+#         ).values(
+#             "machine",
+#             "job_no",
+#             "tb_name",
+#             "seq",
+#             "pc",
+#             "entry_date"
+#         )
+#     )
+
+#     # --------------------------------
+#     # HELPERS
+#     # --------------------------------
+#     def normalized(value):
+#         return str(value or "").strip().casefold()
+
+#     def scan_key(machine, job_no, top_bottom, seq):
+#         return tuple(
+#             normalized(value)
+#             for value in (
+#                 machine,
+#                 job_no,
+#                 top_bottom,
+#                 seq
+#             )
+#         )
+
+#     def operation_key(job_no, top_bottom, process_des):
+#         return tuple(
+#             normalized(value)
+#             for value in (
+#                 job_no,
+#                 top_bottom,
+#                 process_des
+#             )
+#         )
+
+#     def hourly_target(wsec):
+#         value = str(wsec or "").strip()
+#         if not value:
+#             return ""
+#         try:
+#             minutes_text, seconds_text = (
+#                 value.split(".", 1) + [""]
+#             )[:2]
+
+#             minutes = int(minutes_text or 0)
+
+#             seconds = (
+#                 int((seconds_text + "00")[:2])
+#                 if seconds_text
+#                 else 0
+#             )
+
+#             operation_seconds = (
+#                 minutes * 60
+#             ) + seconds
+
+#             return (
+#                 int(3600 / operation_seconds)
+#                 if operation_seconds > 0
+#                 else ""
+#             )
+
+#         except (
+#             TypeError,
+#             ValueError,
+#             ZeroDivisionError
+#         ):
+#             return ""
+
+#     dependency_targets = {
+#         operation_key(
+#             row["job_no"],
+#             row["tb_name"],
+#             row["process_des"]
+#         ): row["wsec"]
+
+#         for row in dependency.objects.filter(
+#             job_no__in=[
+#                 row["jobno"]
+#                 for row in s_data
+#             ]
+#         ).values(
+#             "job_no",
+#             "tb_name",
+#             "process_des",
+#             "wsec"
+#         )
+#     }
+#     hourly_totals = defaultdict(
+#         lambda: [0] * len(slot_ranges)
+#     )
+#     for scan in scans:
+
+#         scan_datetime = scan["entry_date"]
+
+#         if timezone.is_aware(scan_datetime):
+#             scan_datetime = localtime(scan_datetime)
+
+#         scan_time = scan_datetime.time().replace(
+#             tzinfo=None
+#         )
+
+#         slot_index = next(
+#             (
+#                 index
+#                 for index, (start, end)
+#                 in enumerate(slot_ranges)
+
+#                 if start <= scan_time < end
+#             ),
+#             None
+#         )
+
+#         if slot_index is None:
+#             continue
+
+#         try:
+#             pieces = int(scan["pc"] or 0)
+
+#         except (TypeError, ValueError):
+
+#             try:
+#                 pieces = int(
+#                     float(scan["pc"])
+#                 )
+
+#             except (
+#                 TypeError,
+#                 ValueError
+#             ):
+#                 pieces = 0
+
+#         key = scan_key(
+#             scan["machine"],
+#             scan["job_no"],
+#             scan["tb_name"],
+#             scan["seq"]
+#         )
+
+#         hourly_totals[key][slot_index] += pieces
+
+#     # --------------------------------
+#     # FINAL DATA
+#     # --------------------------------
+#     data = []
+
+#     for row in s_data:
+
+#         emp = Empwisesal.objects.using(
+#             "main"
+#         ).filter(
+#             code=row["emp_code"]
+#         ).first()
+
+#         if emp and emp.name:
+#             employee_name = emp.name
+#         else:
+#             # Second priority: Cont_employee
+#             contractor_emp = Cont_employee.objects.filter(
+#                 code=row["emp_code"]
+#             ).first()
+
+#             employee_name = (
+#                 contractor_emp.name
+#                 if contractor_emp
+#                 else ""
+#             )
+
+#         allocation_key = scan_key(
+#             row["machine__Identity"],
+#             row["jobno"],
+#             row["top_bottom"],
+#             row["seq"]
+#         )
+
+#         employee_hours = hourly_totals[
+#             allocation_key
+#         ]
+
+#         allocation_datetime = row["date"]
+
+#         if timezone.is_aware(
+#             allocation_datetime
+#         ):
+#             allocation_datetime = localtime(
+#                 allocation_datetime
+#             )
+
+#         allocation_time = (
+#             allocation_datetime
+#             .time()
+#             .replace(tzinfo=None)
+#         )
+
+#         allocation_slot = next(
+#             (
+#                 index + 1
+#                 for index, (start, end)
+#                 in enumerate(slot_ranges)
+
+#                 if start <= allocation_time < end
+#             ),
+#             1
+#         )
+
+#         allocation_time_display = (
+#             allocation_datetime.strftime(
+#                 "%I:%M %p"
+#             )
+#         )
+#         allocation_time_display = allocation_datetime.strftime("%I:%M %p")
+#         data.append({
+#             "emp_code": row["emp_code"],
+#             "machine": row["machine__Identity"],
+#             "seq": row["seq"],
+#             "jobno": row["jobno"],
+#             "top_bottom": row["top_bottom"],
+#             "name": employee_name,
+#             "allocation_slot": allocation_slot,
+#             "allocation_time": allocation_time_display,
+
+#             "target": hourly_target(
+#                 dependency_targets.get(
+#                     operation_key(
+#                         row["jobno"],
+#                         row["top_bottom"],
+#                         row["seq"]
+#                     ),
+#                     ""
+#                 )
+#             ),
+
+#             "hours": employee_hours,
+#         })
+
+#     return JsonResponse(
+#         data,
+#         safe=False
+#     )
+
 
 
 def get_allocate_live(request):
-
     unit_id = request.GET.get("unit")
     line_id = request.GET.get("line")
     selected_date = request.GET.get("date")
     selected_shift = request.GET.get("shift", "day")
-
-    # --------------------------------
-    # REPORT DATE
-    # --------------------------------
+    
     if selected_date:
         try:
             report_day = datetime.strptime(
@@ -1687,19 +2023,15 @@ def get_allocate_live(request):
         else line_id
     )
 
-
     if selected_shift == "night":
-
         shift_start = datetime.combine(
             report_day - timedelta(days=1),
             time(20, 48)
         )
-
         shift_end = datetime.combine(
             report_day,
             time(8, 0)
         )
-
         slot_ranges = (
             (time(20, 48), time(21, 30)),
             (time(21, 30), time(22, 30)),
@@ -1713,16 +2045,12 @@ def get_allocate_live(request):
             (time(6, 0), time(7, 0)),
             (time(7, 0), time(8, 0)),
         )
-
     else:
-
         shift_start = datetime.combine(
             report_day,
             time.min
         )
-
         shift_end = shift_start + timedelta(days=1)
-
         slot_ranges = (
             (time(8, 30), time(9, 30)),
             (time(9, 30), time(10, 30)),
@@ -1737,7 +2065,7 @@ def get_allocate_live(request):
         )
 
     # --------------------------------
-    # EMP ALLOCATION
+    # EMP ALLOCATION (As it is, no splitting)
     # --------------------------------
     s_data = emp_allocate.objects.filter(
         unit=unit_id,
@@ -1748,7 +2076,7 @@ def get_allocate_live(request):
         "emp_code",
         "machine__Identity",
         "date",
-        "seq",
+        "seq",       # E.g., "Shorts Side Pocket Attach, Shorts Pocket Dummy Stitch"
         "jobno",
         "top_bottom"
     )
@@ -1778,14 +2106,13 @@ def get_allocate_live(request):
     def normalized(value):
         return str(value or "").strip().casefold()
 
-    def scan_key(machine, job_no, top_bottom, seq):
+    def scan_key(machine, job_no, top_bottom):
         return tuple(
             normalized(value)
             for value in (
                 machine,
                 job_no,
-                top_bottom,
-                seq
+                top_bottom
             )
         )
 
@@ -1801,74 +2128,55 @@ def get_allocate_live(request):
 
     def hourly_target(wsec):
         value = str(wsec or "").strip()
-
         if not value:
             return ""
-
         try:
             minutes_text, seconds_text = (
                 value.split(".", 1) + [""]
             )[:2]
-
             minutes = int(minutes_text or 0)
-
             seconds = (
                 int((seconds_text + "00")[:2])
                 if seconds_text
                 else 0
             )
-
             operation_seconds = (
                 minutes * 60
             ) + seconds
-
             return (
                 int(3600 / operation_seconds)
                 if operation_seconds > 0
                 else ""
             )
-
-        except (
-            TypeError,
-            ValueError,
-            ZeroDivisionError
-        ):
+        except (TypeError, ValueError, ZeroDivisionError):
             return ""
 
     # --------------------------------
-    # DEPENDENCY TARGETS
+    # DEPENDENCY TARGETS (Sum or get target for the combined sequences)
     # --------------------------------
+    job_nos_list = list(set([row["jobno"] for row in s_data]))
+    dependency_rows = dependency.objects.filter(
+        job_no__in=job_nos_list
+    ).values("job_no", "tb_name", "process_des", "wsec")
+
     dependency_targets = {
         operation_key(
             row["job_no"],
             row["tb_name"],
             row["process_des"]
         ): row["wsec"]
-
-        for row in dependency.objects.filter(
-            job_no__in=[
-                row["jobno"]
-                for row in s_data
-            ]
-        ).values(
-            "job_no",
-            "tb_name",
-            "process_des",
-            "wsec"
-        )
+        for row in dependency_rows
     }
 
     # --------------------------------
-    # HOURLY TOTALS
+    # HOURLY TOTALS (Grouped by Machine + Job + TopBottom)
     # --------------------------------
     hourly_totals = defaultdict(
         lambda: [0] * len(slot_ranges)
     )
 
     for scan in scans:
-
         scan_datetime = scan["entry_date"]
-
         if timezone.is_aware(scan_datetime):
             scan_datetime = localtime(scan_datetime)
 
@@ -1881,7 +2189,6 @@ def get_allocate_live(request):
                 index
                 for index, (start, end)
                 in enumerate(slot_ranges)
-
                 if start <= scan_time < end
             ),
             None
@@ -1892,25 +2199,17 @@ def get_allocate_live(request):
 
         try:
             pieces = int(scan["pc"] or 0)
-
         except (TypeError, ValueError):
-
             try:
-                pieces = int(
-                    float(scan["pc"])
-                )
-
-            except (
-                TypeError,
-                ValueError
-            ):
+                pieces = int(float(scan["pc"]))
+            except (TypeError, ValueError):
                 pieces = 0
 
+        # Key without seq, so all scans for this machine/job/tb go to same bucket
         key = scan_key(
             scan["machine"],
             scan["job_no"],
-            scan["tb_name"],
-            scan["seq"]
+            scan["tb_name"]
         )
 
         hourly_totals[key][slot_index] += pieces
@@ -1921,32 +2220,37 @@ def get_allocate_live(request):
     data = []
 
     for row in s_data:
-
         emp = Empwisesal.objects.using(
             "main"
         ).filter(
             code=row["emp_code"]
         ).first()
 
+        if emp and emp.name:
+            employee_name = emp.name
+        else:
+            # Second priority: Cont_employee
+            contractor_emp = Cont_employee.objects.filter(
+                code=row["emp_code"]
+            ).first()
+
+            employee_name = (
+                contractor_emp.name
+                if contractor_emp
+                else ""
+            )
+
         allocation_key = scan_key(
             row["machine__Identity"],
             row["jobno"],
-            row["top_bottom"],
-            row["seq"]
+            row["top_bottom"]
         )
 
-        employee_hours = hourly_totals[
-            allocation_key
-        ]
+        employee_hours = hourly_totals[allocation_key]
 
         allocation_datetime = row["date"]
-
-        if timezone.is_aware(
-            allocation_datetime
-        ):
-            allocation_datetime = localtime(
-                allocation_datetime
-            )
+        if timezone.is_aware(allocation_datetime):
+            allocation_datetime = localtime(allocation_datetime)
 
         allocation_time = (
             allocation_datetime
@@ -1959,39 +2263,39 @@ def get_allocate_live(request):
                 index + 1
                 for index, (start, end)
                 in enumerate(slot_ranges)
-
                 if start <= allocation_time < end
             ),
             1
         )
 
-        allocation_time_display = (
-            allocation_datetime.strftime(
-                "%I:%M %p"
-            )
-        )
         allocation_time_display = allocation_datetime.strftime("%I:%M %p")
+
+        # Handle target calculation if multiple seqs are comma-separated
+        seq_str = row["seq"] or ""
+        individual_seqs = [s.strip() for s in seq_str.split(",") if s.strip()]
+        
+        # Calculate combined or primary target (e.g., taking the sum or first available)
+        total_target = 0
+        for s in individual_seqs:
+            t_val = dependency_targets.get(
+                operation_key(row["jobno"], row["top_bottom"], s),
+                ""
+            )
+            if t_val:
+                parsed_t = hourly_target(t_val)
+                if isinstance(parsed_t, int):
+                    total_target += parsed_t
+
         data.append({
             "emp_code": row["emp_code"],
             "machine": row["machine__Identity"],
-            "seq": row["seq"],
+            "seq": row["seq"],  # String apdiyae "Shorts Side Pocket Attach, Shorts Pocket Dummy Stitch" nu pogum
             "jobno": row["jobno"],
             "top_bottom": row["top_bottom"],
-            "name": emp.name if emp else "",
+            "name": employee_name,
             "allocation_slot": allocation_slot,
             "allocation_time": allocation_time_display,
-
-            "target": hourly_target(
-                dependency_targets.get(
-                    operation_key(
-                        row["jobno"],
-                        row["top_bottom"],
-                        row["seq"]
-                    ),
-                    ""
-                )
-            ),
-
+            "target": total_target if total_target > 0 else "",
             "hours": employee_hours,
         })
 
@@ -1999,6 +2303,9 @@ def get_allocate_live(request):
         data,
         safe=False
     )
+
+
+
 
 def machine_allocation_api(request):
     selected_date = request.GET.get("date")
