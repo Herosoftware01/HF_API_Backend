@@ -122,8 +122,8 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # else:
 #     SECURE_CROSS_ORIGIN_OPENER_POLICY = "same-origin"
 
-# DEBUG = False
-DEBUG = True
+DEBUG = False
+# DEBUG = True
 
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
@@ -313,10 +313,7 @@ TIME_ZONE = 'Asia/Kolkata'
 
 USE_I18N = True
 
-# USE_TZ = False
-USE_TZ = True
-
-
+USE_TZ = False
 
 STATIC_URL = '/static/'
 

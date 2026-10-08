@@ -9,7 +9,7 @@ from django.db import transaction
 from imp_reports.models import UnitBundlereport
 from bundle_tracking.models import TrsMcutstickerprod,MasUnit,MasTopbottom
 from qcapp.models import Unit,Line,machine_details,emp_allocate,Empwisesal
-from .models import Assembly_data,end_line_data, unit_input, Msizes,dependency,dependency_data,PreporatoryEntry,ViewRibdelPreparatory,RibdelEntry
+from .models import Assembly_data,bundle_transfer,end_line_data, unit_input, Msizes,dependency,dependency_data,PreporatoryEntry,ViewRibdelPreparatory,RibdelEntry
 from django.utils.dateparse import parse_datetime
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
@@ -426,7 +426,6 @@ class EndUnitInputAPIView(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
         
-from django.db.models.functions import TruncDate
 from datetime import datetime, timedelta
 
 
@@ -891,19 +890,25 @@ class GetUnitAssemply(APIView):
 
         if all_dates:
             data = Assembly_data.objects.filter(
-                unit=unit,
-                line=line,
+                unit=unit, line=line,
             ).order_by('-entry_date')
         elif selected_date:
             date_obj = datetime.strptime(selected_date, '%Y-%m-%d')
-            data = Assembly_data.objects.filter(unit=unit, line=line, entry_date__date=date_obj).order_by('-entry_date')
+            data = Assembly_data.objects.filter(
+                unit=unit,
+                line=line,
+                entry_date__date=date_obj,
+            ).order_by('-entry_date')
         else:
-            # four_days_ago = datetime.now() - timedelta(days=4)
-            four_days_ago = date.today()
-            data = Assembly_data.objects.filter(unit=unit, line=line, entry_date__gte=four_days_ago).order_by('-entry_date')
+            data = Assembly_data.objects.filter(
+                unit=unit,
+                line=line,
+                entry_date__gte=date.today(),
+            ).order_by('-entry_date')
 
-        # JSON response
-        results = list(data.values('bundle_id','bdl_no', 'job_no','seq', 'pc', 'color', 'entry_date'))
+        results = list(data.values(
+            'bundle_id', 'bdl_no', 'job_no', 'seq', 'pc', 'color', 'entry_date'
+        ))
         return Response({"status": True, "data": results})
     
 
@@ -1012,7 +1017,7 @@ class SaveAssemblyAPIView(APIView):
 
         if entry_mode not in {'manual', 'scan'}:
             return Response(
-                {"error": "entry_mode must be either 'manual' or 'live'"},
+                {"error": "entry_mode must be either 'manual' or 'scan'"},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -1088,8 +1093,8 @@ class SaveAssemblyAPIView(APIView):
             entry_date = timezone.now()
             Assembly_data.objects.bulk_create([
                 Assembly_data(
-                    unit=bundle.unit,
-                    line=bundle.line,
+                    unit=unit,
+                    line=line,
                     job_no=bundle.job_no,
                     tb_id=bundle.tb_id,
                     tb_name=bundle.tb_name,
@@ -1355,13 +1360,15 @@ def save_process_dependency(request):
     if request.method == "POST":
         try:
             data = json.loads(request.body)
+            if not isinstance(data, dict) or data.get("password") != "12345":
+                return JsonResponse({"error": "Invalid password"}, status=403)
+
             edit_confirmed = False
             changed_processes = []
 
-            if isinstance(data, dict):
-                edit_confirmed = data.get("edit_confirmed") is True
-                changed_processes = data.get("changed_processes") or []
-                data = data.get("dependencies") or []
+            edit_confirmed = data.get("edit_confirmed") is True
+            changed_processes = data.get("changed_processes") or []
+            data = data.get("dependencies") or []
 
             def safe_integer(value, default=0):
                 try:
@@ -1560,13 +1567,14 @@ def save_process_dependency(request):
 def verify_process_dependency(request):
     try:
         data = request.data
-        username = str(data.get('username', '')).strip()
+        # username = str(data.get('username', '')).strip()
         password = data.get('password', '')
-        if username != 'admin' or password != 'admin':
+        if password != 'admin':
             return JsonResponse({"error": "Invalid admin credentials"}, status=403)
 
         job_no = data.get('job_no')
         tb_id = data.get('tb_id')
+        verifier_username = request.user.get_username()
         with transaction.atomic():
             dependencies = dependency.objects.select_for_update().filter(
                 job_no=job_no,
@@ -1579,11 +1587,17 @@ def verify_process_dependency(request):
                 )
             updated = dependencies.update(
                 verify=True,
-                verify_user=str(request.user.pk),
+                verify_user=verifier_username,
                 verify_date=timezone.now(),
             )
 
-        return JsonResponse({"message": "Verified successfully", "count": updated})
+        print(f"username {verifier_username} verified {updated} dependencies for job_no {job_no} and tb_id {tb_id}")
+
+        return JsonResponse({
+            "message": "Verified successfully",
+            "count": updated,
+            "verify_user": verifier_username,
+        })
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=400)
 
@@ -1595,6 +1609,9 @@ def delete_process_dependency(request):
 
     try:
         data = json.loads(request.body)
+        if not isinstance(data, dict) or data.get("password") != "12345":
+            return JsonResponse({"error": "Invalid password"}, status=403)
+
         with transaction.atomic():
             dependencies = dependency.objects.select_for_update().filter(
                 job_no=data.get('job_no'),
@@ -1915,7 +1932,7 @@ class UserUnitPermissionView(View):
                     "success": False,
                     "message": "User is required"
                 }, status=400)
-            if app not in ["qcapp", "live_app"]:
+            if app not in dict(user_unit_permission.APP_CHOICES):
                 return JsonResponse({
                     "success": False,
                     "message": "Invalid app"
@@ -2037,3 +2054,114 @@ class UserUnitPermissionListView(View):
 
 
 ################################### End of Unit Permission API #################################
+
+##################### Bundle Transfer API ########################
+
+class GetJobsView(APIView):
+    def get(self, request):
+        jobs = Assembly_data.objects.values_list('job_no',flat=True).distinct().order_by('job_no')
+        return Response(list(jobs))
+
+class GetTbNamesView(APIView):
+    def get(self, request):
+        job_no = request.GET.get('job_no')
+        tb_names = Assembly_data.objects.filter(job_no=job_no).values_list('tb_name', flat=True).distinct().order_by('tb_name')
+        return Response(list(tb_names))
+
+class GetColorsView(APIView):
+    def get(self, request):
+        job_no = request.GET.get('job_no')
+        tb_name = request.GET.get('tb_name')
+        colors = Assembly_data.objects.filter(job_no=job_no, tb_name=tb_name).values_list('color', flat=True).distinct().order_by('color')
+        return Response(list(colors))
+
+class GetSizesView(APIView):
+    def get(self, request):
+        job_no = request.GET.get('job_no')
+        tb_name = request.GET.get('tb_name')
+        color = request.GET.get('color')
+        sizes = Assembly_data.objects.filter(job_no=job_no, tb_name=tb_name, color=color).values_list('size', flat=True).distinct().order_by('size')
+        return Response(list(sizes))
+
+class GetSequencesView(APIView):
+    def get(self, request):
+        job_no = request.GET.get('job_no')
+        tb_name = request.GET.get('tb_name')
+        color = request.GET.get('color')
+        size = request.GET.get('size')
+        
+        sequences = Assembly_data.objects.filter(
+            job_no=job_no, 
+            tb_name=tb_name,
+            color=color,
+            size=size,
+            unit_transfer=False
+        ).values('id', 'seq', 'bundle_id', 'bdl_no', 'size', 'color', 'pc', 'scan').order_by('seq')
+        
+        return Response(list(sequences))
+
+class SaveAssemblySelectionView(APIView):
+    def post(self, request):
+        selected_ids = request.data.get('selected_ids', [])
+        unit_id = request.data.get('unit_id')
+        line_id = request.data.get('line_id')
+
+        if not isinstance(selected_ids, list) or not selected_ids:
+            return Response({'error': 'No bundles selected for saving.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            selected_ids = [int(selected_id) for selected_id in selected_ids]
+            unit_id = int(unit_id)
+            line_id = int(line_id)
+        except (TypeError, ValueError):
+            return Response(
+                {'error': 'Valid bundle, unit, and line selections are required.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if not Unit.objects.filter(pk=unit_id).exists():
+            return Response({'error': 'Selected unit was not found.'}, status=status.HTTP_400_BAD_REQUEST)
+        if not Line.objects.filter(pk=line_id, unit_id=unit_id).exists():
+            return Response(
+                {'error': 'Selected line does not belong to the selected unit.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        unique_ids = set(selected_ids)
+        with transaction.atomic():
+            bundles = Assembly_data.objects.select_for_update().filter(id__in=unique_ids)
+            if bundles.count() != len(unique_ids):
+                return Response(
+                    {'error': 'One or more selected bundles were not found.'},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+            transfer_time = timezone.now()
+            bundle_transfer.objects.bulk_create([
+                bundle_transfer(
+                    unit=unit_id,
+                    line=line_id,
+                    job_no=bundle.job_no,
+                    tb_id=bundle.tb_id,
+                    tb_name=bundle.tb_name,
+                    machine=bundle.machine,
+                    seq=bundle.seq,
+                    date=transfer_time,
+                    bundle_id=bundle.bundle_id,
+                    bdl_no=bundle.bdl_no,
+                    mbud=bundle.mbud,
+                    size=bundle.size,
+                    size_id=bundle.size_id,
+                    color=bundle.color,
+                    pc=bundle.pc,
+                    entry_date=transfer_time,
+                    lot=bundle.lot,
+                    emp_id=bundle.emp_id,
+                )
+                for bundle in bundles
+            ])
+            Assembly_data.objects.filter(id__in=unique_ids).update(unit_transfer=True)
+
+        return Response(
+            {'success': True, 'message': 'Bundles transferred successfully!'},
+            status=status.HTTP_200_OK,
+        )

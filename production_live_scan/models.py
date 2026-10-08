@@ -53,7 +53,30 @@ class Assembly_data(models.Model):
     lot = models.CharField(max_length=50)
     emp_id = models.CharField(max_length=20, blank=True, null=True)
     entry_mode = models.CharField(max_length=20, blank=True, null=True)
+    unit_transfer = models.BooleanField(default=False)
     # process_des = models.CharField(max_length=500)
+
+
+class bundle_transfer(models.Model):
+    id = models.AutoField(primary_key=True)
+    unit = models.IntegerField()
+    line = models.IntegerField()
+    job_no = models.CharField(max_length=50)
+    tb_id = models.IntegerField()
+    tb_name = models.CharField(max_length=100)
+    machine = models.CharField(max_length=100)
+    seq = models.CharField(max_length=500)
+    date = models.DateTimeField()
+    bundle_id = models.CharField(max_length=50)
+    bdl_no = models.CharField(max_length=50)
+    mbud = models.CharField(max_length=50)
+    size = models.CharField(max_length=50)
+    size_id = models.IntegerField()
+    color = models.CharField(max_length=100)
+    pc = models.CharField(max_length=50)
+    entry_date = models.DateTimeField()
+    lot = models.CharField(max_length=50)
+    emp_id = models.CharField(max_length=20, blank=True, null=True)
 
 
 class dependency(models.Model):
@@ -160,7 +183,7 @@ class RibdelEntry(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
 
-################################## USer Permission Models ########################################
+################################## User Permission Models ########################################
 
 
 class user_unit_permission(models.Model):
@@ -168,6 +191,9 @@ class user_unit_permission(models.Model):
     APP_CHOICES = (
         ("qcapp", "QC App"),
         ("live_app", "Live App"),
+        ("machine_transfer", "Machine Transfer"),
+        ("employee_allocation", "Employee Allocation"),
+        ("bundle_scan", "Bundle Scan"),
     )
 
     user = models.ForeignKey(

@@ -28,7 +28,7 @@ from datetime import time
 from django.utils import timezone
 from django.db.models import Case, When, Value, IntegerField,Sum
 from django.utils.timezone import localtime
-from production_live_scan.models import Assembly_data, dependency
+from production_live_scan.models import Assembly_data, dependency, user_unit_permission
 from datetime import time as time_cls, datetime as datetime_cls, timedelta
 from collections import defaultdict
 from herofashion.models import User
@@ -542,7 +542,14 @@ class UnitListAPIView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
-        units = Unit.objects.all()
+        if request.query_params.get("app") == "employee_allocation":
+            permitted_unit_ids = user_unit_permission.objects.filter(
+                user_id=request.user.pk,
+                app="employee_allocation",
+            ).values_list("unit_id", flat=True)
+            units = Unit.objects.filter(id__in=permitted_unit_ids)
+        else:
+            units = Unit.objects.all()
         serializer = UnitSerializer(units, many=True)
         return Response(serializer.data)
 
@@ -1206,6 +1213,12 @@ from django.db.models import Max
 class MachineTransferListCreateAPIView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
+    def get_permitted_unit_ids(self, user):
+        return user_unit_permission.objects.filter(
+            user_id=user.pk,
+            app="machine_transfer",
+        ).values_list("unit_id", flat=True)
+
     def get(self, request):
         # Step 1: Get latest allocation id per machine
         latest_ids = MachineAllocation.objects.values('machine').annotate(
@@ -1213,7 +1226,10 @@ class MachineTransferListCreateAPIView(APIView):
         ).values_list('latest_id', flat=True)
 
         # Step 2: Fetch only those latest allocations
-        allocations = MachineAllocation.objects.filter(id__in=latest_ids).select_related('machine', 'unit', 'line')
+        allocations = MachineAllocation.objects.filter(
+            id__in=latest_ids,
+            unit_id__in=self.get_permitted_unit_ids(request.user),
+        ).select_related('machine', 'unit', 'line')
 
         serializer = MachineTrasnsferSerializer(allocations, many=True)
         return Response(serializer.data)
@@ -1221,6 +1237,15 @@ class MachineTransferListCreateAPIView(APIView):
     def post(self, request):
         serializer = MachineTrasnsferSerializer(data=request.data)
         if serializer.is_valid():
+            if not user_unit_permission.objects.filter(
+                user_id=request.user.pk,
+                app="machine_transfer",
+                unit_id=serializer.validated_data["unit"].pk,
+            ).exists():
+                return Response(
+                    {"unit": ["You do not have machine transfer permission for this unit."]},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
             serializer.save()  # Allows multiple allocations per day
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -1229,32 +1254,58 @@ class MachineTransferListCreateAPIView(APIView):
 class MachineTransferDetailAPIView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
-    def get_object(self, pk):
-        return get_object_or_404(MachineAllocation, pk=pk)
+    def get_object(self, request, pk):
+        permitted_unit_ids = user_unit_permission.objects.filter(
+            user_id=request.user.pk,
+            app="machine_transfer",
+        ).values_list("unit_id", flat=True)
+        return get_object_or_404(
+            MachineAllocation.objects.filter(unit_id__in=permitted_unit_ids),
+            pk=pk,
+        )
 
     def get(self, request, pk):
-        allocation = self.get_object(pk)
+        allocation = self.get_object(request, pk)
         serializer = MachineTrasnsferSerializer(allocation)
         return Response(serializer.data)
 
     def put(self, request, pk):
-        allocation = self.get_object(pk)
+        allocation = self.get_object(request, pk)
         serializer = MachineTrasnsferSerializer(allocation, data=request.data)
         if serializer.is_valid():
+            if not user_unit_permission.objects.filter(
+                user_id=request.user.pk,
+                app="machine_transfer",
+                unit_id=serializer.validated_data["unit"].pk,
+            ).exists():
+                return Response(
+                    {"unit": ["You do not have machine transfer permission for this unit."]},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
             serializer.save()
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def patch(self, request, pk):
-        allocation = self.get_object(pk)
+        allocation = self.get_object(request, pk)
         serializer = MachineTrasnsferSerializer(allocation, data=request.data, partial=True)
         if serializer.is_valid():
+            target_unit = serializer.validated_data.get("unit", allocation.unit)
+            if not user_unit_permission.objects.filter(
+                user_id=request.user.pk,
+                app="machine_transfer",
+                unit_id=target_unit.pk,
+            ).exists():
+                return Response(
+                    {"unit": ["You do not have machine transfer permission for this unit."]},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
             serializer.save()
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def delete(self, request, pk):
-        allocation = self.get_object(pk)
+        allocation = self.get_object(request, pk)
         allocation.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
