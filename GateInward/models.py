@@ -54,3 +54,24 @@ class VueAccPodetails(models.Model):
     class Meta:
         managed = False
         db_table = 'vue_acc_podetails'
+
+class TrsGatemoduleInward(models.Model):
+    module = models.CharField(db_column='Module', max_length=50)
+    qr = models.CharField(primary_key=True, db_column='Qr_Code_Dtls', max_length=200)
+    companyid = models.IntegerField(db_column='CompanyID')
+    year = models.IntegerField(db_column='Year')
+    no = models.IntegerField(db_column='No')
+    date = models.DateTimeField(db_column='Date')
+    jobno = models.CharField(db_column='Jobno', max_length=50, blank=True, null=True)
+    suppliername = models.CharField(db_column='SupplierName', max_length=200)
+    descr = models.CharField(db_column='Descr', max_length=500)
+    rls_bdls = models.IntegerField()
+    kg = models.DecimalField(max_digits=18, decimal_places=3)
+    mtrs = models.DecimalField(max_digits=18, decimal_places=2)
+    verify = models.CharField(db_column='Verify', max_length=50, blank=True, null=True)
+    prepered = models.CharField(max_length=50, blank=True, null=True)
+    fhero = models.CharField(max_length=50, blank=True, null=True)
+
+    class Meta:
+        managed = False
+        db_table = 'Trs_Gatemodule_Inward'
