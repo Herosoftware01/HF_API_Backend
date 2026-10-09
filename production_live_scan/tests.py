@@ -14,6 +14,7 @@ from .views import (
     get_already_assembled_bundle_ids,
     get_eligible_assembly_bundle_ids,
     get_eligible_assembly_bundle_ids_for_processes,
+    get_assembly_dependency_statuses,
     get_bundle_last_process,
     GetUnitDataAPIView,
     delete_process_dependency,
@@ -167,6 +168,30 @@ class AssemblyProcessSequenceTests(SimpleTestCase):
 
         self.assertEqual(result, (True, set(), None))
 
+    @patch("production_live_scan.views.dependency.objects.filter")
+    def test_dependency_statuses_report_verified_and_unverified_processes(
+        self,
+        dependency_filter,
+    ):
+        dependency_filter.return_value.filter.return_value.order_by.return_value.first.side_effect = [
+            SimpleNamespace(verify=True),
+            SimpleNamespace(verify=False),
+        ]
+
+        statuses = get_assembly_dependency_statuses(
+            "J7123A",
+            "Verified process, Unverified process",
+            "Top",
+        )
+
+        self.assertEqual(
+            statuses,
+            [
+                {"process": "Verified process", "verified": True},
+                {"process": "Unverified process", "verified": False},
+            ],
+        )
+
 
 class AssemblyTransferFilteringTests(SimpleTestCase):
     def test_bundle_listing_includes_destination_transfer_bundles(self):
@@ -213,6 +238,10 @@ class AssemblyTransferFilteringTests(SimpleTestCase):
                 "production_live_scan.views.get_eligible_assembly_bundle_ids_for_processes",
                 return_value=(True, None, None),
             ),
+            patch(
+                "production_live_scan.views.get_assembly_dependency_statuses",
+                return_value=[{"process": "Current process", "verified": True}],
+            ),
             patch("production_live_scan.views.get_transfer_unit_and_line", return_value=(11, 22)),
             patch(
                 "production_live_scan.views.get_already_assembled_bundle_ids",
@@ -237,6 +266,10 @@ class AssemblyTransferFilteringTests(SimpleTestCase):
         self.assertEqual(
             [row['bundle_id'] for row in response.data['data']],
             ["input-bundle", "transferred-bundle"],
+        )
+        self.assertEqual(
+            response.data["dependency_statuses"],
+            [{"process": "Current process", "verified": True}],
         )
 
     @patch("production_live_scan.views.Assembly_data.objects.filter")

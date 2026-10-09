@@ -642,6 +642,26 @@ def get_eligible_assembly_bundle_ids_for_processes(
     return False, set(), " ".join(dict.fromkeys(errors))
 
 
+def get_assembly_dependency_statuses(job_no, process_des, top_bottom=None):
+    statuses = []
+    for description in split_process_descriptions(process_des):
+        dependency_query = dependency.objects.filter(
+            job_no__iexact=job_no,
+            process_des__iexact=description,
+        )
+        if top_bottom:
+            top_bottom_filter = Q(tb_name__iexact=top_bottom)
+            if str(top_bottom).strip().isdigit():
+                top_bottom_filter |= Q(tb_id=int(str(top_bottom).strip()))
+            dependency_query = dependency_query.filter(top_bottom_filter)
+        process_dependency = dependency_query.order_by('-id').first()
+        statuses.append({
+            "process": description,
+            "verified": bool(process_dependency and process_dependency.verify),
+        })
+    return statuses
+
+
 class GetUnitDataAPIView(APIView):
     def get(self, request):
         unit = request.query_params.get('unit')
@@ -676,6 +696,9 @@ class GetUnitDataAPIView(APIView):
                         {"error": "top_bottom is required to load assembly bundles"},
                         status=status.HTTP_400_BAD_REQUEST
                     )
+                dependency_statuses = get_assembly_dependency_statuses(
+                    job_no, process_des, top_bottom
+                )
                 allowed, eligible_bundle_ids, error_message = get_eligible_assembly_bundle_ids_for_processes(
                     job_no, process_des, top_bottom, unit
                 )
@@ -722,7 +745,11 @@ class GetUnitDataAPIView(APIView):
                         if row['bundle_id'] not in existing_bundle_ids:
                             results.append(row)
                             existing_bundle_ids.add(row['bundle_id'])
-                return Response({"status": True, "data": results})
+                return Response({
+                    "status": True,
+                    "data": results,
+                    "dependency_statuses": dependency_statuses,
+                })
             else:
                 verified_tb_ids = dependency.objects.filter(
                     job_no__iexact=job_no,
@@ -1008,23 +1035,23 @@ class GetUnitAssemply(APIView):
         if all_dates:
             data = Assembly_data.objects.filter(
                 unit=unit, line=line,
-            ).order_by('-entry_date')
+            ).order_by('-date')
         elif selected_date:
             date_obj = datetime.strptime(selected_date, '%Y-%m-%d')
             data = Assembly_data.objects.filter(
                 unit=unit,
                 line=line,
-                entry_date__date=date_obj,
-            ).order_by('-entry_date')
+                date__date=date_obj,
+            ).order_by('-date')
         else:
             data = Assembly_data.objects.filter(
                 unit=unit,
                 line=line,
-                entry_date__gte=date.today(),
-            ).order_by('-entry_date')
+                date__gte=date.today(),
+            ).order_by('-date')
 
         results = list(data.values(
-            'bundle_id', 'bdl_no', 'job_no', 'seq', 'pc', 'color', 'entry_date'
+            'bundle_id', 'bdl_no', 'job_no', 'seq', 'pc', 'color', 'date'
         ))
         return Response({"status": True, "data": results})
     

@@ -9,7 +9,7 @@ from rest_framework.views import APIView
 from zoneinfo import ZoneInfo
 from rest_framework.response import Response
 from rest_framework import status, permissions
-from .models import QcAdminMistake,MeasurementMas,ViewPlandetailsWithratio,ViewCuttingMeasurmentpending,MmstAssign,MeasurementData,MeasurementEntry,cut_sample_data_final,Cont_employee,sequency_data,cut_sample_data,cut_sample_data_final,VueUser,Unit,Needle_change,Line,roving_qc_mistake,qc_piece_final, MachineAllocation, machine_details, emp_allocate, Empwisesal, VueProcessSequence,qc_hourly_approval,VueUloginRole,QcHourlyApproval 
+from .models import QcAdminMistake,MeasurementMas,MasContract,ViewPlandetailsWithratio,ViewCuttingMeasurmentpending,MmstAssign,MeasurementData,MeasurementEntry,cut_sample_data_final,Cont_employee,sequency_data,cut_sample_data,cut_sample_data_final,VueUser,Unit,Needle_change,Line,roving_qc_mistake,qc_piece_final, MachineAllocation, machine_details, emp_allocate, Empwisesal, VueProcessSequence,qc_hourly_approval,VueUloginRole,QcHourlyApproval 
 from .serializers import QcAdminMistakeSerializer,UnitSerializer,MachineTrasnsferSerializer,MachineSerializer,LineSerializer, MachineAllocationSerializer, VueProcessSequenceSerializer
 from collections import defaultdict
 from django.utils.timezone import now
@@ -569,6 +569,18 @@ class LineListAPIView(APIView):
 
 from django.db.models import Max
 
+
+def latest_online_allocations_by_employee(allocations):
+    latest_by_employee = {}
+    for allocation in allocations:
+        latest_by_employee.setdefault(str(allocation.emp_code), allocation)
+    return {
+        emp_code: allocation
+        for emp_code, allocation in latest_by_employee.items()
+        if allocation.status
+    }
+
+
 class MachineAllocationAPIView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
@@ -647,6 +659,80 @@ class MachineAllocationDetailAPIView(APIView):
 
 
 
+# class EmployeeAPIView(APIView):
+#     def get(self, request):
+#         include_online = request.query_params.get("include_online") == "true"
+#         selected_date = parse_date(request.query_params.get("date", "") or "")
+#         if request.query_params.get("date") and selected_date is None:
+#             return Response({"error": "date must use YYYY-MM-DD format"}, status=400)
+#         selected_date = selected_date or timezone.localdate()
+#         online_allocations = {}
+#         if include_online:
+#             allocations = emp_allocate.objects.filter(
+#                 date__date=selected_date,
+#             ).select_related("machine").order_by("-date", "-id")
+#             for emp_code, allocation in latest_online_allocations_by_employee(allocations).items():
+#                 online_allocations[emp_code] = {
+#                     "allocation_id": allocation.id,
+#                     "machine_id": allocation.machine_id,
+#                     "machine_identity": allocation.machine.Identity,
+#                     "unit": allocation.unit,
+#                     "line": allocation.line,
+#                 }
+#         else:
+#             today = timezone.now().date()
+#             online_emp_codes = emp_allocate.objects.filter(
+#                 date__date=today,
+#                 status=True
+#             ).values_list("emp_code", flat=True)
+
+#         employees = Empwisesal.objects.using('main').filter(status='working')
+#         contractors = Cont_employee.objects.select_related('con_id')
+#         if not include_online:
+#             employees = employees.exclude(code__in=online_emp_codes)
+#             contractors = contractors.exclude(code__in=online_emp_codes)
+#         employees = employees.values('code', 'name', 'photo', 'dept')
+
+#         staff_url = settings.STAFF_IMAGES_URL.rstrip('/')
+
+#         data = []
+
+#         # Empwisesal data
+#         for emp in employees:
+#             photo_url = None
+#             if emp.get('photo'):
+#                 filename = emp['photo'].split('\\')[-1]
+#                 photo_url = f"https://hfapi.herofashion.com/{staff_url}/{filename}"
+
+#             employee_data = {
+#                 "code": emp['code'],
+#                 "name": emp['name'],
+#                 "dept": emp['dept'],   # already string in this table
+#                 "photo": photo_url,
+#                 "source": "empwisesal"
+#             }
+#             if include_online:
+#                 employee_data["online_allocation"] = online_allocations.get(str(emp["code"]))
+#             data.append(employee_data)
+
+#         # 2. Contractor employees (Cont_employee + Mas_contractor)
+#         # contractors = Cont_employee.objects.select_related('con_id').all()
+#         for emp in contractors:
+#             contractor_name = emp.con_id.contract_des if emp.con_id else ""
+#             employee_data = {
+#                 "code": emp.code,
+#                 "name": f"{emp.name} ({contractor_name})",
+#                 "dept": emp.con_id.contract_des if emp.con_id else None,  # Mas_contractor name
+#                 "photo": None,
+#                 "source": "contract_employee"
+#             }
+#             if include_online:
+#                 employee_data["online_allocation"] = online_allocations.get(str(emp.code))
+#             data.append(employee_data)
+
+#         return Response(data)
+
+
 class EmployeeAPIView(APIView):
     def get(self, request):
         include_online = request.query_params.get("include_online") == "true"
@@ -654,39 +740,43 @@ class EmployeeAPIView(APIView):
         if request.query_params.get("date") and selected_date is None:
             return Response({"error": "date must use YYYY-MM-DD format"}, status=400)
         selected_date = selected_date or timezone.localdate()
+        
         online_allocations = {}
         if include_online:
             allocations = emp_allocate.objects.filter(
                 date__date=selected_date,
-                status=True
-            ).select_related("machine").order_by("-id")
-            for allocation in allocations:
-                online_allocations.setdefault(str(allocation.emp_code), {
+            ).select_related("machine").order_by("-date", "-id")
+            for emp_code, allocation in latest_online_allocations_by_employee(allocations).items():
+                online_allocations[emp_code] = {
                     "allocation_id": allocation.id,
                     "machine_id": allocation.machine_id,
                     "machine_identity": allocation.machine.Identity,
                     "unit": allocation.unit,
                     "line": allocation.line,
-                })
+                }
         else:
             today = timezone.now().date()
-            online_emp_codes = emp_allocate.objects.filter(
-                date__date=today,
-                status=True
-            ).values_list("emp_code", flat=True)
+            online_emp_codes = list(
+                emp_allocate.objects.filter(
+                    date__date=today,
+                    status=True
+                ).values_list("emp_code", flat=True)
+            )
 
         employees = Empwisesal.objects.using('main').filter(status='working')
-        contractors = Cont_employee.objects.select_related('con_id')
+        contractors = Cont_employee.objects.using("default").all()
+        
         if not include_online:
             employees = employees.exclude(code__in=online_emp_codes)
             contractors = contractors.exclude(code__in=online_emp_codes)
+            
         employees = employees.values('code', 'name', 'photo', 'dept')
 
         staff_url = settings.STAFF_IMAGES_URL.rstrip('/')
 
         data = []
 
-        # Empwisesal data
+        # 1. Empwisesal data
         for emp in employees:
             photo_url = None
             if emp.get('photo'):
@@ -696,7 +786,7 @@ class EmployeeAPIView(APIView):
             employee_data = {
                 "code": emp['code'],
                 "name": emp['name'],
-                "dept": emp['dept'],   # already string in this table
+                "dept": emp['dept'],  # already string in this table
                 "photo": photo_url,
                 "source": "empwisesal"
             }
@@ -704,14 +794,23 @@ class EmployeeAPIView(APIView):
                 employee_data["online_allocation"] = online_allocations.get(str(emp["code"]))
             data.append(employee_data)
 
-        # 2. Contractor employees (Cont_employee + Mas_contractor)
-        # contractors = Cont_employee.objects.select_related('con_id').all()
+        # 2. Contractor employees (Cont_employee + MasContract)
+        # Prefetch contractors from the 'main' database into a dictionary for fast lookup
+        contract_ids = list(
+            contractors.values_list('con_id', flat=True).distinct()
+        )
+        contract_map = {
+            c.contract_id: c for c in MasContract.objects.using('main').filter(contract_id__in=contract_ids)
+        }
+
         for emp in contractors:
-            contractor_name = emp.con_id.name if emp.con_id else ""
+            contractor_obj = contract_map.get(emp.con_id)
+            contractor_name = contractor_obj.contract_des if contractor_obj else ""
+            
             employee_data = {
                 "code": emp.code,
-                "name": f"{emp.name} ({contractor_name})",
-                "dept": emp.con_id.name if emp.con_id else None,  # Mas_contractor name
+                "name": f"{emp.name} ({contractor_name})" if contractor_name else emp.name,
+                "dept": contractor_name,  # Mas_contract contractor description/name
                 "photo": None,
                 "source": "contract_employee"
             }
@@ -720,7 +819,6 @@ class EmployeeAPIView(APIView):
             data.append(employee_data)
 
         return Response(data)
-
 
 class Employee_and_staffAPIView(APIView):
     def get(self, request):
@@ -983,8 +1081,11 @@ class EmpAllocateAPIView(APIView):
         # -------------------------
         latest_employee = emp_allocate.objects.filter(
             emp_code=emp_code,
+            unit=unit,
+            line=line,
             date__date=selected_date
-        ).order_by("-id").first()
+        ).order_by("-date", "-id").first()
+        print("Selected date:", selected_date, unit, line)
 
         if latest_employee and latest_employee.status:
             return Response(
@@ -999,8 +1100,10 @@ class EmpAllocateAPIView(APIView):
         # -------------------------
         latest_machine = emp_allocate.objects.filter(
             machine_id=machine_id,
+            unit=unit,
+            line=line,
             date__date=selected_date
-        ).order_by("-id").first()
+        ).order_by("-date", "-id").first()
 
         if latest_machine and latest_machine.status:
             return Response(

@@ -443,9 +443,59 @@ class Mas_contractor(models.Model):
         super().save(*args, **kwargs)
 
 
+# class Cont_employee(models.Model):
+#     name = models.CharField(max_length=100)
+#     con_id = models.ForeignKey(Mas_contractor, on_delete=models.CASCADE)
+#     code = models.CharField(max_length=4, unique=True, blank=True)
+
+#     def __str__(self):
+#         return f"{self.name} ({self.code})"
+
+#     def save(self, *args, **kwargs):
+#         if not self.code:
+#             contractor_code = self.con_id.code  # e.g. 1234
+
+#             prefix = contractor_code[-2:]  # last 2 digits -> "34"
+
+#             last = Cont_employee.objects.filter(
+#                 con_id=self.con_id
+#             ).order_by('-id').first()
+
+#             if last and last.code:
+#                 last_seq = int(last.code[-2:])  # last 2 digits sequence
+#                 new_seq = last_seq + 1
+#             else:
+#                 new_seq = 1
+
+#             self.code = f"{prefix}{new_seq:02d}"  # 3401, 3402...
+
+#         super().save(*args, **kwargs)
+
+class MasContract(models.Model):
+    contract_des = models.CharField(max_length=50, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)
+    contract_id = models.IntegerField(primary_key=True)  # Field name made lowercase.
+    act = models.CharField(max_length=1, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)
+    cat = models.CharField(max_length=50, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)
+    address = models.CharField(db_column='Address', max_length=1550, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)  # Field name made lowercase.
+    panno = models.CharField(db_column='PANNo', max_length=25, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)  # Field name made lowercase.
+    bill_name = models.CharField(db_column='Bill_Name', max_length=50, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)  # Field name made lowercase.
+    ded = models.CharField(max_length=1, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)
+    ty = models.CharField(max_length=1, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)
+    ph3 = models.CharField(max_length=10, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)
+    ph2 = models.CharField(max_length=10, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)
+    ph1 = models.CharField(max_length=10, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)
+    cid = models.IntegerField(db_column='CID', blank=True, null=True)  # Field name made lowercase.
+    dedper = models.DecimalField(max_digits=18, decimal_places=2, blank=True, null=True)
+
+    class Meta:
+        managed = False
+        db_table = 'Mas_contract'
+
+
 class Cont_employee(models.Model):
     name = models.CharField(max_length=100)
-    con_id = models.ForeignKey(Mas_contractor, on_delete=models.CASCADE)
+    # db_column='con_id' kudutha dhaan Django 'con_id_id' nu thedaathu
+    con_id = models.IntegerField(db_column='con_id') 
     code = models.CharField(max_length=4, unique=True, blank=True)
 
     def __str__(self):
@@ -453,23 +503,35 @@ class Cont_employee(models.Model):
 
     def save(self, *args, **kwargs):
         if not self.code:
-            contractor_code = self.con_id.code  # e.g. 1234
+            try:
+                contractor = MasContract.objects.using('main').get(contract_id=self.con_id)
+                contractor_code_str = str(contractor.contract_id)
+            except MasContract.DoesNotExist:
+                raise ValueError(f"Contract with ID {self.con_id} does not exist in the 'main' database.")
 
-            prefix = contractor_code[-2:]  # last 2 digits -> "34"
-
+            prefix = contractor_code_str[-2:] if len(contractor_code_str) >= 2 else contractor_code_str.zfill(2)
+            
             last = Cont_employee.objects.filter(
                 con_id=self.con_id
             ).order_by('-id').first()
 
             if last and last.code:
-                last_seq = int(last.code[-2:])  # last 2 digits sequence
-                new_seq = last_seq + 1
+                try:
+                    last_seq = int(last.code[-2:])
+                    new_seq = last_seq + 1
+                except ValueError:
+                    new_seq = 1
             else:
                 new_seq = 1
 
-            self.code = f"{prefix}{new_seq:02d}"  # 3401, 3402...
+            self.code = f"{prefix}{new_seq:02d}"
 
+        kwargs['using'] = 'main'
         super().save(*args, **kwargs)
+
+    class Meta:
+        managed = False
+        db_table = 'qcapp_cont_employee'
 
 
 class Needle_change(models.Model):
@@ -675,3 +737,4 @@ class ViewPlandetailsWithratio(models.Model):
     class Meta:
         managed = False
         db_table = 'view_plandetails_withratio'
+
