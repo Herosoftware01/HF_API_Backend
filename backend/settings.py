@@ -104,8 +104,9 @@ INSTALLED_APPS = [
     'fashionr',
     'software_cost',
     'Salary_Confirmation',
-    'finance'
-    
+    'GateInward',
+    'finance',
+
 ]
 
 DATA_UPLOAD_MAX_MEMORY_SIZE = 1024 * 1024 * 200

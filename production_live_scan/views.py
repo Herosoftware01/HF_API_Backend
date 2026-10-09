@@ -1008,23 +1008,23 @@ class GetUnitAssemply(APIView):
         if all_dates:
             data = Assembly_data.objects.filter(
                 unit=unit, line=line,
-            ).order_by('-entry_date')
+            ).order_by('-date')
         elif selected_date:
             date_obj = datetime.strptime(selected_date, '%Y-%m-%d')
             data = Assembly_data.objects.filter(
                 unit=unit,
                 line=line,
-                entry_date__date=date_obj,
-            ).order_by('-entry_date')
+                date__date=date_obj,
+            ).order_by('-date')
         else:
             data = Assembly_data.objects.filter(
                 unit=unit,
                 line=line,
-                entry_date__gte=date.today(),
-            ).order_by('-entry_date')
+                date__gte=date.today(),
+            ).order_by('-date')
 
         results = list(data.values(
-            'bundle_id', 'bdl_no', 'job_no', 'seq', 'pc', 'color', 'entry_date'
+            'bundle_id', 'bdl_no', 'job_no', 'seq', 'pc', 'color', 'date'
         ))
         return Response({"status": True, "data": results})
     
@@ -2205,9 +2205,20 @@ class UserUnitPermissionListView(View):
 
 ##################### Bundle Transfer API ########################
 
+# class GetJobsView(APIView):
+#     def get(self, request):
+#         jobs = Assembly_data.objects.values_list('job_no',flat=True).distinct().order_by('job_no')
+#         return Response(list(jobs))
+
 class GetJobsView(APIView):
     def get(self, request):
-        jobs = Assembly_data.objects.values_list('job_no',flat=True).distinct().order_by('job_no')
+        unit = request.GET.get('unit')
+        print(f"Received unit parameter: {unit}")  # Debugging line
+        queryset = Assembly_data.objects.all()
+        if unit:
+            queryset = queryset.filter(unit=unit)
+            
+        jobs = queryset.values_list('job_no', flat=True).distinct().order_by('job_no')
         return Response(list(jobs))
 
 class GetTbNamesView(APIView):
@@ -2266,7 +2277,7 @@ class GetSequencesView(APIView):
             color__in=color_list,
             size__in=size_list,
             unit_transfer=False
-        ).values('id', 'seq', 'bundle_id', 'bdl_no', 'size', 'color', 'pc', 'scan').order_by('seq')
+        ).values('id', 'seq', 'bundle_id', 'bdl_no', 'size', 'color', 'pc', 'scan','job_no','tb_name').order_by('seq')
         
         return Response(list(sequences))
 
