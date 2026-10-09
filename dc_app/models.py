@@ -461,6 +461,33 @@ class ViewGeneralDeiveryType1(models.Model):
         managed = False
         db_table = 'view_general_deivery_type1'
 
+class ViewGenStockIssue(models.Model):
+    qrdetails = models.CharField(db_column='QRDetails', max_length=30, blank=True, null=True)  # Field name made lowercase.
+    companyname = models.CharField(max_length=12)
+    address1 = models.CharField(db_column='Address1', max_length=50, blank=True, null=True)  # Field name made lowercase.
+    address2 = models.CharField(db_column='Address2', max_length=50, blank=True, null=True)  # Field name made lowercase.
+    address3 = models.CharField(db_column='Address3', max_length=50, blank=True, null=True)  # Field name made lowercase.
+    place = models.CharField(max_length=66, blank=True, null=True)
+    regno = models.CharField(db_column='RegNo', max_length=20, blank=True, null=True)  # Field name made lowercase.
+    ph = models.CharField(max_length=17)
+    to_dept = models.CharField(max_length=35)
+    no = models.IntegerField(db_column='No')  # Field name made lowercase.
+    date = models.DateTimeField(db_column='Date')  # Field name made lowercase.
+    frm_dept = models.CharField(max_length=35)
+    itemgrp = models.CharField(max_length=35)
+    itemname = models.CharField(max_length=35)
+    quantity = models.DecimalField(db_column='Quantity', max_digits=18, decimal_places=4)  # Field name made lowercase.
+    name = models.CharField(db_column='Name', max_length=25)  # Field name made lowercase.
+    altquantity = models.DecimalField(db_column='AltQuantity', max_digits=18, decimal_places=4, blank=True, null=True)  # Field name made lowercase.
+    altuom = models.CharField(max_length=25, blank=True, null=True)
+    companyid = models.SmallIntegerField(db_column='CompanyID')  # Field name made lowercase.
+    year = models.SmallIntegerField(db_column='Year')  # Field name made lowercase.
+    reqno = models.IntegerField(db_column='reqNo', blank=True, null=True)  # Field name made lowercase.
+    reqdate = models.DateTimeField(blank=True, null=True)
+
+    class Meta:
+        managed = False
+        db_table = 'view_gen_stock_Issue'
 
 
 
@@ -554,21 +581,57 @@ class Holiday(models.Model):
         db_table = 'Holiday'
 
 
+class ModuleMaster(models.Model):
+    module_id = models.CharField(max_length=100, primary_key=True)
+    module_name = models.CharField(max_length=255)
+    description = models.TextField(blank=True, default="")
+    path = models.CharField(max_length=255, blank=True, default="")
+    display_order = models.PositiveIntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "dc_module_master"
+        ordering = ("display_order", "module_name")
+        indexes = [
+            models.Index(
+                fields=("is_active", "display_order"),
+                name="module_active_order_idx",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.module_name} ({self.module_id})"
+
+
 class RoleModulePermission(models.Model):
     role = models.CharField(max_length=100, db_index=True)
-    module_id = models.CharField(max_length=100)
-    module_name = models.CharField(max_length=255)
+
+    module = models.ForeignKey(
+        ModuleMaster,
+        to_field="module_id",
+        db_column="module_id",
+        on_delete=models.PROTECT,
+        related_name="role_permissions",
+    )
+
     is_enabled = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        db_table = 'role_module_permissions'
-        # Prevent duplicate role + module combinations
-        unique_together = ('role', 'module_id')
+        db_table = "role_module_permissions"
+        constraints = [
+            models.UniqueConstraint(
+                fields=("role", "module"),
+                name="unique_role_module_permission",
+            )
+        ]
 
     def __str__(self):
-        return f"{self.role} - {self.module_name} ({'ON' if self.is_enabled else 'OFF'})"
+        status = "ON" if self.is_enabled else "OFF"
+        return f"{self.role} - {self.module.module_name} ({status})"
 
 
 

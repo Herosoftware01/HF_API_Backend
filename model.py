@@ -8,35 +8,30 @@
 from django.db import models
 
 
-class ViewActshift(models.Model):
-    rowno = models.BigIntegerField(db_column='RowNo', blank=True, null=True)  # Field name made lowercase.
-    unitname = models.CharField(db_column='Unitname', max_length=50)  # Field name made lowercase.
-    id = models.IntegerField()
-    actshift = models.DecimalField(db_column='Actshift', max_digits=38, decimal_places=2, blank=True, null=True)  # Field name made lowercase.
-    code = models.IntegerField()
-    name = models.CharField(max_length=100, blank=True, null=True)
-    status = models.CharField(max_length=25, blank=True, null=True)
-    mno = models.IntegerField(blank=True, null=True)
-    yr = models.IntegerField(blank=True, null=True)
-    monthname = models.CharField(db_column='MonthName', max_length=30, blank=True, null=True)  # Field name made lowercase.
-    category = models.CharField(db_column='Category', max_length=50, blank=True, null=True)  # Field name made lowercase.
+class ViewGenStockIssue(models.Model):
+    qrdetails = models.CharField(db_column='QRDetails', max_length=30, blank=True, null=True)  # Field name made lowercase.
+    companyname = models.CharField(max_length=12)
+    address1 = models.CharField(db_column='Address1', max_length=50, blank=True, null=True)  # Field name made lowercase.
+    address2 = models.CharField(db_column='Address2', max_length=50, blank=True, null=True)  # Field name made lowercase.
+    address3 = models.CharField(db_column='Address3', max_length=50, blank=True, null=True)  # Field name made lowercase.
+    place = models.CharField(max_length=66, blank=True, null=True)
+    regno = models.CharField(db_column='RegNo', max_length=20, blank=True, null=True)  # Field name made lowercase.
+    ph = models.CharField(max_length=17)
+    to_dept = models.CharField(max_length=35)
+    no = models.IntegerField(db_column='No')  # Field name made lowercase.
+    date = models.DateTimeField(db_column='Date')  # Field name made lowercase.
+    frm_dept = models.CharField(max_length=35)
+    itemgrp = models.CharField(max_length=35)
+    itemname = models.CharField(max_length=35)
+    quantity = models.DecimalField(db_column='Quantity', max_digits=18, decimal_places=4)  # Field name made lowercase.
+    name = models.CharField(db_column='Name', max_length=25)  # Field name made lowercase.
+    altquantity = models.DecimalField(db_column='AltQuantity', max_digits=18, decimal_places=4, blank=True, null=True)  # Field name made lowercase.
+    altuom = models.CharField(max_length=25, blank=True, null=True)
+    companyid = models.SmallIntegerField(db_column='CompanyID')  # Field name made lowercase.
+    year = models.SmallIntegerField(db_column='Year')  # Field name made lowercase.
+    reqno = models.IntegerField(db_column='reqNo', blank=True, null=True)  # Field name made lowercase.
+    reqdate = models.DateTimeField(blank=True, null=True)
 
     class Meta:
         managed = False
-        db_table = 'view_actshift'
-
-
-class ViewActshiftDay(models.Model):
-    rowno = models.BigIntegerField(db_column='RowNo', blank=True, null=True)  # Field name made lowercase.
-    unitname = models.CharField(db_column='Unitname', max_length=50)  # Field name made lowercase.
-    id = models.IntegerField()
-    dt = models.DateTimeField()
-    actshift = models.DecimalField(db_column='Actshift', max_digits=18, decimal_places=2)  # Field name made lowercase.
-    code = models.IntegerField()
-    name = models.CharField(max_length=100, blank=True, null=True)
-    status = models.CharField(max_length=25, blank=True, null=True)
-    category = models.CharField(db_column='Category', max_length=50, blank=True, null=True)  # Field name made lowercase.
-
-    class Meta:
-        managed = False
-        db_table = 'view_actshift_day'
+        db_table = 'view_gen_stock_Issue'

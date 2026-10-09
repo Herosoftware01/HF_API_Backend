@@ -1,7 +1,7 @@
 from collections import Counter
 from datetime import datetime,date
 from django.http import JsonResponse
-from .models import TrsCdelPcs21,TrsCdelPcs1,MasUnit,Bundlereport,TrsMcutstickerprod,Unituser,MasTopbottom
+from .models import TrsCdelPcs21,TrsCdelPcs1,MasUnit,Bundlereport,TrsMcutstickerprod,MasTopbottom,Msizes
 from django.views.decorators.csrf import csrf_exempt
 from django.utils import timezone
 import json
@@ -155,46 +155,6 @@ def bundle_home(request):
         "data": response_data
     })
 
-@csrf_exempt
-def unit_login_api(request):
-
-    if request.method != "POST":
-        return JsonResponse({
-            "status": "error",
-            "message": "POST required"
-        }, status=405)
-
-    try:
-        data = json.loads(request.body)
-
-        unit = data.get("unit")
-        user_id = data.get("user_id")
-        password = data.get("password")
-
-        user = Unituser.objects.using("app").filter(
-            unit_name=unit,
-            user_id=user_id,
-            password=password
-        ).first()
-
-        if user:
-            return JsonResponse({
-                "status": "success",
-                "message": "Login successful"
-            })
-
-        return JsonResponse({
-            "status": "failed",
-            "message": "Invalid credentials"
-        })
-
-    except Exception as e:
-        print("ERROR:", str(e))
-
-        return JsonResponse({
-            "status": "error",
-            "message": str(e)
-        }, status=500)
 
 
 @csrf_exempt
@@ -552,7 +512,6 @@ def fetch_bundle_details(request):
 
         # 3️⃣ GET PCS3 ROWS
         pcs3_qs = TrsMcutstickerprod.objects.using("demo").filter(mbud=pcs21.mbundid)
-       
 
         if not pcs3_qs.exists():
             return JsonResponse({
@@ -568,13 +527,24 @@ def fetch_bundle_details(request):
             "pc",
             "comboclr",
             "bundid",
-            "scan"
+            "scan",
         ))
+
+        # Fetch IDs first, then query Msizes on its own database.
+        size_ids = {row["sizid"] for row in data if row["sizid"] is not None}
+        size_names = dict(
+            Msizes.objects.using("test")
+            .filter(id__in=size_ids)
+            .values_list("id", "name")
+        )
+
+        for row in data:
+            row["sizname"] = size_names.get(row["sizid"])
 
         return JsonResponse({
             "status": "success",
             "mbundid": mbundid,
-            "rows": data
+            "rows": data,
         })
 
     return JsonResponse({"status": "error", "message": "Invalid request"})

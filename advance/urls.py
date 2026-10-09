@@ -7,7 +7,7 @@ urlpatterns = [
     path('empwisesal/', views.empwisesal, name='empwisesal'),
     path('ad_approve/', views.ad_approve, name='ad_approve'),
     path('state/', views.state, name='state'),
-    # path('send-advance-mail/', views.send_advance_mail, name='send_advance_mail'),
+    path('send-advance-mail/', views.send_advance_mail, name='send_advance_mail'),
     path('approve_mail/', views.send_approval_mail, name='approve_mail'),
     path("monthlysaltime/", views.monthlysaltime_api),
     path("monthlysaltime/<int:id>/", views.monthlysaltime_api),
