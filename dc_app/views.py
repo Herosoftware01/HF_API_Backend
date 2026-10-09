@@ -1,5 +1,13 @@
 from django.http import JsonResponse
-from .models import ViewCuttingDelPrint,ViewKnitDelivery,ViewCutsecFabricdelivery,VueAccInhTransfer,VueAccProdDel,TrsGatemodule, CuttingPrintembdel, ViewYarnProcessDelivery,VueAccProcDel,ViewAccinwardVerification,ViewFabricDeliveryProcess,ViewMistakeqtyPrint,ViewUnitPcdelivery,VueRibDeliveryDetails,ViewGdwnFabricDeliveryPlan,TrsApidtls,ViewFabricDeliveryRepl,HerofashionUser,Holiday,RoleModulePermission,Dc_Incharge_Verify,Dc_Reciver_Verify,ViewGeneralDeiveryType1
+from .models import (ViewCuttingDelPrint,
+ViewKnitDelivery,ViewCutsecFabricdelivery,
+VueAccInhTransfer,VueAccProdDel,
+TrsGatemodule, CuttingPrintembdel,
+ViewYarnProcessDelivery,VueAccProcDel,
+ViewAccinwardVerification,ViewFabricDeliveryProcess,
+ViewMistakeqtyPrint,ViewUnitPcdelivery,VueRibDeliveryDetails,ViewGdwnFabricDeliveryPlan,
+TrsApidtls,ViewFabricDeliveryRepl,HerofashionUser,Holiday,RoleModulePermission,
+Dc_Incharge_Verify,Dc_Reciver_Verify,ViewGeneralDeiveryType1,ViewGenStockIssue,ModuleMaster)
 import json
 from django.views.decorators.csrf import csrf_exempt
 from django.forms.models import model_to_dict
@@ -7,10 +15,14 @@ from django.utils.dateparse import parse_datetime
 from django.utils import timezone
 from django.core.exceptions import ValidationError
 from decimal import Decimal, InvalidOperation
+from django.db import IntegrityError, transaction
 from django.db import transaction
 from django.http.multipartparser import MultiPartParser, MultiPartParserError
 from django.utils import timezone
 from datetime import date
+from django.views.decorators.http import require_http_methods
+import re
+
 
 
 def cutting_del_print(request):
@@ -276,6 +288,25 @@ def general_delivery_type1(request):
         "data": data
     })
 
+def gen_stock_issue(request):
+    dcno = request.GET.get("no")
+
+    queryset = ViewGenStockIssue.objects.using("test").filter(
+        date__year=timezone.now().year
+    )
+
+    if dcno:
+        queryset = queryset.filter(no=dcno)
+
+    data = list(queryset.values())
+
+    return JsonResponse({
+        "status": True,
+        "message": "Success",
+        "count": len(data),
+        "data": data
+    })
+
 
 
 # --- VIEW ---
@@ -475,147 +506,463 @@ def get_holidays(request):
     })
 
 
-# Hardcoded single source of truth for all modules
-AVAILABLE_MODULES = [
-    {"module_id": "cut_to_unit", "module_name": "Cut to Unit Delivery"},
-    {"module_id": "cutting_sec_fabric", "module_name": "Cutting Section Fabric"},
-    {"module_id": "knitting_delivery", "module_name": "Knitting Delivery"},
-    {"module_id": "bit_delivery", "module_name": "Bit Delivery Challan"},
-    {"module_id": "yarn_process", "module_name": "Yarn Process Challan"},
-    {"module_id": "acc_production", "module_name": "Accessory Production"},
-    {"module_id": "acc_process", "module_name": "Accessory Process"},
-    {"module_id": "acc_inhouse", "module_name": "Accessory Inhouse Delivery"},
-    {"module_id": "fabric_process", "module_name": "Fabric Process Delivery"},
-    {"module_id": "mistake_cut", "module_name": "Mistake Cut Delivery"},
-    {"module_id": "rib_cut", "module_name": "Rib Cut Delivery"},
-    {"module_id": "godown_fabric", "module_name": "Godown Fabric Delivery"},
-    {"module_id": "replacement_del", "module_name": "Replacement Delivery"},
-    {"module_id": "unit_pcs", "module_name": "Unit Pcs Delivery"},
-    {"module_id": "general_transaction_delivery", "module_name": "General Delivery Type 1"},
-]
 
-AVAILABLE_MODULE_MAP = {
-    module["module_id"]: module["module_name"] for module in AVAILABLE_MODULES
-}
 
-# Older clients/database rows may still use one of these IDs.
+MODULE_ID_PATTERN = re.compile(r"^[a-z][a-z0-9_]*$")
+
 LEGACY_MODULE_IDS = {
+    "general": "general_transaction_delivery",
     "general_delivery": "general_transaction_delivery",
     "general_delivery_type1": "general_transaction_delivery",
 }
 
 
+def error_response(message, status=400, **extra):
+    response = {
+        "status": False,
+        "message": message,
+    }
+    response.update(extra)
+    return JsonResponse(response, status=status)
+
+
+def read_json(request, allow_empty=False):
+    if not request.body:
+        if allow_empty:
+            return {}, None
+        return None, error_response("Request body is required")
+
+    try:
+        data = json.loads(request.body.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        return None, error_response("Invalid JSON format")
+
+    if not isinstance(data, dict):
+        return None, error_response("JSON body must be an object")
+
+    return data, None
+
+
+def normalize_module_id(module_id):
+    if not isinstance(module_id, str):
+        return None
+
+    module_id = module_id.strip()
+
+    if not module_id:
+        return None
+
+    return LEGACY_MODULE_IDS.get(module_id, module_id)
+
+
+def serialize_module(module):
+    return {
+        "module_id": module.module_id,
+        "module_name": module.module_name,
+        "description": module.description,
+        "path": module.path,
+        "display_order": module.display_order,
+        "is_active": module.is_active,
+    }
+
+
+def validate_module_payload(data, partial=False):
+    values = {}
+    errors = {}
+
+    if not partial or "module_name" in data:
+        module_name = data.get("module_name")
+
+        if not isinstance(module_name, str) or not module_name.strip():
+            errors["module_name"] = "Module name is required"
+        elif len(module_name.strip()) > 255:
+            errors["module_name"] = "Maximum length is 255"
+        else:
+            values["module_name"] = module_name.strip()
+
+    if not partial or "description" in data:
+        description = data.get("description", "")
+
+        if not isinstance(description, str):
+            errors["description"] = "Description must be a string"
+        else:
+            values["description"] = description.strip()
+
+    if not partial or "path" in data:
+        path = data.get("path", "")
+
+        if not isinstance(path, str):
+            errors["path"] = "Path must be a string"
+        elif len(path.strip()) > 255:
+            errors["path"] = "Maximum length is 255"
+        else:
+            values["path"] = path.strip()
+
+    if not partial or "display_order" in data:
+        display_order = data.get("display_order", 0)
+
+        if (
+            isinstance(display_order, bool)
+            or not isinstance(display_order, int)
+            or display_order < 0
+        ):
+            errors["display_order"] = (
+                "Display order must be a non-negative integer"
+            )
+        else:
+            values["display_order"] = display_order
+
+    if not partial or "is_active" in data:
+        is_active = data.get("is_active", True)
+
+        if not isinstance(is_active, bool):
+            errors["is_active"] = "is_active must be true or false"
+        else:
+            values["is_active"] = is_active
+
+    return values, errors
+
+
+# Keep csrf_exempt only when this endpoint is protected using token/JWT
+# authentication. With Django session authentication, use CSRF protection.
 @csrf_exempt
+@require_http_methods(["GET", "POST"])
+def module_collection(request):
+    """
+    GET  /dcapp/dc_modules/
+    POST /dcapp/dc_modules/
+    """
+
+    if request.method == "GET":
+        include_inactive = (
+            request.GET.get("include_inactive", "false").lower()
+            in {"true", "1", "yes"}
+        )
+
+        modules = ModuleMaster.objects.all()
+
+        if not include_inactive:
+            modules = modules.filter(is_active=True)
+
+        modules = modules.order_by("display_order", "module_name")
+
+        return JsonResponse(
+            [serialize_module(module) for module in modules],
+            safe=False,
+        )
+
+    data, error = read_json(request)
+
+    if error:
+        return error
+
+    module_id = data.get("module_id")
+
+    if not isinstance(module_id, str):
+        return error_response("module_id is required")
+
+    module_id = module_id.strip()
+
+    if not MODULE_ID_PATTERN.fullmatch(module_id):
+        return error_response(
+            "module_id must start with a lowercase letter and contain "
+            "only lowercase letters, numbers, and underscores"
+        )
+
+    if module_id in LEGACY_MODULE_IDS:
+        return error_response(
+            "This module_id is a legacy alias",
+            canonical_module_id=LEGACY_MODULE_IDS[module_id],
+        )
+
+    values, validation_errors = validate_module_payload(data)
+
+    if validation_errors:
+        return error_response(
+            "Validation failed",
+            errors=validation_errors,
+        )
+
+    try:
+        module = ModuleMaster(module_id=module_id, **values)
+        module.full_clean()
+        module.save(force_insert=True)
+    except ValidationError as exception:
+        return error_response(
+            "Validation failed",
+            errors=getattr(
+                exception,
+                "message_dict",
+                {"non_field_errors": exception.messages},
+            ),
+        )
+    except IntegrityError:
+        return error_response(
+            "A module with this module_id already exists",
+            status=409,
+        )
+
+    return JsonResponse(
+        {
+            "status": True,
+            "message": "Module created successfully",
+            "module": serialize_module(module),
+        },
+        status=201,
+    )
+
+
+@csrf_exempt
+@require_http_methods(["GET", "PATCH", "DELETE"])
+def module_detail(request, module_id):
+    """
+    GET    /dcapp/dc_modules/<module_id>/
+    PATCH  /dcapp/dc_modules/<module_id>/
+    DELETE /dcapp/dc_modules/<module_id>/
+    """
+
+    try:
+        module = ModuleMaster.objects.get(module_id=module_id)
+    except ModuleMaster.DoesNotExist:
+        return error_response("Module not found", status=404)
+
+    if request.method == "GET":
+        return JsonResponse(serialize_module(module))
+
+    if request.method == "DELETE":
+        module.is_active = False
+        module.save(update_fields=("is_active", "updated_at"))
+
+        return JsonResponse({
+            "status": True,
+            "message": "Module deactivated successfully",
+            "module": serialize_module(module),
+        })
+
+    data, error = read_json(request)
+
+    if error:
+        return error
+
+    if "module_id" in data and data["module_id"] != module.module_id:
+        return error_response("module_id cannot be changed")
+
+    values, validation_errors = validate_module_payload(
+        data,
+        partial=True,
+    )
+
+    if validation_errors:
+        return error_response(
+            "Validation failed",
+            errors=validation_errors,
+        )
+
+    try:
+        with transaction.atomic():
+            module = ModuleMaster.objects.select_for_update().get(
+                module_id=module_id
+            )
+
+            for field, value in values.items():
+                setattr(module, field, value)
+
+            module.full_clean()
+            module.save()
+    except ValidationError as exception:
+        return error_response(
+            "Validation failed",
+            errors=getattr(
+                exception,
+                "message_dict",
+                {"non_field_errors": exception.messages},
+            ),
+        )
+
+    return JsonResponse({
+        "status": True,
+        "message": "Module updated successfully",
+        "module": serialize_module(module),
+    })
+
+
+@csrf_exempt
+@require_http_methods(["GET", "POST", "DELETE"])
 def manage_role_permissions(request, role_param=None):
     """
-    Single function handling CRUD for Role Permissions.
-    GET: Reads permissions for a role.
-    POST: Creates or Updates permissions.
-    DELETE: Deletes/Resets permissions for a role.
+    GET    /dcapp/dc_permissions/<role>/
+    POST   /dcapp/dc_permissions/save/
+    DELETE /dcapp/dc_permissions/<role>/
     """
-    
-    # ------------------ READ (GET) ------------------
-    if request.method == 'GET':
-        # Depending on url routing, role might come from URL param or query string
-        role = role_param or request.GET.get('role')
-        
-        if not role:
-            return JsonResponse({"error": "Role is required"}, status=400)
-            
-        # Fetch existing DB permissions for this role
-        db_permissions = RoleModulePermission.objects.filter(role=role)
-        db_perm_dict = {
-            LEGACY_MODULE_IDS.get(p.module_id, p.module_id): p.is_enabled
-            for p in db_permissions
-        }
-        
-        # Build response based on single source of truth (AVAILABLE_MODULES)
-        response_data = []
-        for mod in AVAILABLE_MODULES:
-            response_data.append({
-                "module_id": mod["module_id"],
-                "module_name": mod["module_name"],
-                # Default to False if not found in DB
-                "is_enabled": db_perm_dict.get(mod["module_id"], False) 
-            })
-            
-        # Returning array directly to match your React component's expected data format
-        return JsonResponse(response_data, safe=False)
 
+    if request.method == "GET":
+        role = role_param or request.GET.get("role")
 
-    # ------------------ CREATE / UPDATE (POST) ------------------
-    elif request.method == 'POST':
+        if not isinstance(role, str) or not role.strip():
+            return error_response("Role is required")
+
+        role = role.strip()
+
+        modules = list(
+            ModuleMaster.objects.filter(is_active=True).order_by(
+                "display_order",
+                "module_name",
+            )
+        )
+
+        stored_permissions = dict(
+            RoleModulePermission.objects.filter(role=role).values_list(
+                "module_id",
+                "is_enabled",
+            )
+        )
+
+        response = []
+
+        for module in modules:
+            module_data = serialize_module(module)
+            module_data["is_enabled"] = stored_permissions.get(
+                module.module_id,
+                False,
+            )
+            response.append(module_data)
+
+        return JsonResponse(response, safe=False)
+
+    if request.method == "POST":
+        data, error = read_json(request)
+
+        if error:
+            return error
+
+        role = data.get("role")
+
+        if not isinstance(role, str) or not role.strip():
+            return error_response("Role is required")
+
+        role = role.strip()
+        permissions = data.get("permissions", [])
+
+        if not isinstance(permissions, list):
+            return error_response("permissions must be an array")
+
+        normalized_permissions = {}
+        invalid_items = []
+
+        for index, permission in enumerate(permissions):
+            if not isinstance(permission, dict):
+                invalid_items.append({
+                    "index": index,
+                    "message": "Permission must be an object",
+                })
+                continue
+
+            requested_id = permission.get("module_id")
+            module_id = normalize_module_id(requested_id)
+            is_enabled = permission.get("is_enabled", False)
+
+            if not module_id:
+                invalid_items.append({
+                    "index": index,
+                    "message": "module_id is required",
+                })
+                continue
+
+            if not isinstance(is_enabled, bool):
+                invalid_items.append({
+                    "index": index,
+                    "module_id": requested_id,
+                    "message": "is_enabled must be true or false",
+                })
+                continue
+
+            if module_id in normalized_permissions:
+                invalid_items.append({
+                    "index": index,
+                    "module_id": requested_id,
+                    "message": "Duplicate module_id",
+                })
+                continue
+
+            normalized_permissions[module_id] = is_enabled
+
+        if invalid_items:
+            return error_response(
+                "Invalid permissions",
+                errors=invalid_items,
+            )
+
+        module_ids = set(normalized_permissions)
+
+        modules = ModuleMaster.objects.in_bulk(module_ids)
+
+        unknown_module_ids = sorted(module_ids - set(modules))
+
+        if unknown_module_ids:
+            return error_response(
+                "Unknown module_id",
+                module_ids=unknown_module_ids,
+            )
+
+        inactive_module_ids = sorted(
+            module_id
+            for module_id, module in modules.items()
+            if not module.is_active
+        )
+
+        if inactive_module_ids:
+            return error_response(
+                "Inactive modules cannot receive permissions",
+                module_ids=inactive_module_ids,
+            )
+
         try:
-            data = json.loads(request.body)
-            role = data.get('role')
-            permissions = data.get('permissions', [])
-            
-            if not role:
-                return JsonResponse({"status": False, "message": "Role is required"}, status=400)
-                
-            normalized_permissions = []
-            unknown_module_ids = []
-
-            for perm in permissions:
-                requested_module_id = perm.get('module_id')
-                module_id = LEGACY_MODULE_IDS.get(requested_module_id, requested_module_id)
-                module_name = AVAILABLE_MODULE_MAP.get(module_id)
-
-                if not module_name:
-                    unknown_module_ids.append(requested_module_id)
-                    continue
-
-                normalized_permissions.append((
-                    module_id,
-                    module_name,
-                    perm.get('is_enabled', False),
-                ))
-
-            if unknown_module_ids:
-                return JsonResponse({
-                    "status": False,
-                    "message": "Unknown module_id",
-                    "module_ids": unknown_module_ids,
-                }, status=400)
-
-            # Save the complete permission list as one database transaction.
             with transaction.atomic():
-                for module_id, module_name, is_enabled in normalized_permissions:
+                for module_id, is_enabled in normalized_permissions.items():
                     RoleModulePermission.objects.update_or_create(
                         role=role,
                         module_id=module_id,
                         defaults={
-                            'module_name': module_name,
-                            'is_enabled': is_enabled
-                        }
+                            "is_enabled": is_enabled,
+                        },
                     )
-                    
-            return JsonResponse({"status": True, "message": "Permissions saved successfully"})
-            
-        except json.JSONDecodeError:
-            return JsonResponse({"status": False, "message": "Invalid JSON format"}, status=400)
-        except Exception as e:
-            return JsonResponse({"status": False, "message": str(e)}, status=500)
+        except IntegrityError:
+            return error_response(
+                "Permissions could not be saved because of a conflict",
+                status=409,
+            )
 
+        return JsonResponse({
+            "status": True,
+            "message": "Permissions saved successfully",
+            "saved_count": len(normalized_permissions),
+        })
 
-    # ------------------ DELETE (DELETE) ------------------
-    elif request.method == 'DELETE':
-        try:
-            data = json.loads(request.body)
-            role = data.get('role')
-            
-            if not role:
-                return JsonResponse({"status": False, "message": "Role is required for deletion"}, status=400)
-                
-            # Deletes all custom permissions for this role, effectively resetting them to default (OFF)
-            RoleModulePermission.objects.filter(role=role).delete()
-            return JsonResponse({"status": True, "message": f"Permissions for {role} reset successfully"})
-            
-        except Exception as e:
-            return JsonResponse({"status": False, "message": str(e)}, status=500)
+    # DELETE
+    body = {}
 
-    else:
-        return JsonResponse({"status": False, "message": "Method not allowed"}, status=405)
+    if request.body:
+        body, error = read_json(request, allow_empty=True)
+
+        if error:
+            return error
+
+    role = role_param or body.get("role") or request.GET.get("role")
+
+    if not isinstance(role, str) or not role.strip():
+        return error_response("Role is required")
+
+    role = role.strip()
+
+    deleted_count, _ = RoleModulePermission.objects.filter(
+        role=role
+    ).delete()
+
+    return JsonResponse({
+        "status": True,
+        "message": f"Permissions for {role} reset successfully",
+        "deleted_count": deleted_count,
+    })
 
 
 
