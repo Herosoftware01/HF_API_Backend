@@ -11,8 +11,11 @@ from .views import (
     UserUnitPermissionView,
     assembly_dependencies_satisfied,
     bundle_process_pairs,
+    get_already_assembled_bundle_ids,
+    get_eligible_assembly_bundle_ids,
     get_eligible_assembly_bundle_ids_for_processes,
     get_bundle_last_process,
+    GetUnitDataAPIView,
     delete_process_dependency,
     SaveAssemblySelectionView,
     save_process_dependency,
@@ -21,7 +24,7 @@ from .views import (
 )
 
 
-class AssemblyProcessSequenceTests(TestCase):
+class AssemblyProcessSequenceTests(SimpleTestCase):
     def test_and_dependency_and_one_or_dependency_are_both_required(self):
         and_dependencies = {"top 2nd shoulder attach"}
         or_dependencies = {
@@ -113,6 +116,213 @@ class AssemblyProcessSequenceTests(TestCase):
         )
 
         self.assertEqual(result, (True, None, None))
+
+    @patch("production_live_scan.views.get_eligible_assembly_bundle_ids")
+    def test_unverified_process_is_skipped_while_verified_process_is_validated(
+        self,
+        get_eligible,
+    ):
+        get_eligible.side_effect = [
+            (True, set(), None),
+            (True, {"bundle-verified"}, None),
+        ]
+
+        result = get_eligible_assembly_bundle_ids_for_processes(
+            "J7123A",
+            "Process without verified dependency, Verified process",
+            "Top",
+        )
+
+        self.assertEqual(result, (True, {"bundle-verified"}, None))
+
+    @patch("production_live_scan.views.dependency.objects.filter")
+    def test_process_without_dependency_does_not_raise_unverified_error(
+        self,
+        dependency_filter,
+    ):
+        dependency_filter.return_value.filter.return_value.order_by.return_value.first.return_value = None
+
+        result = get_eligible_assembly_bundle_ids(
+            "J7123A",
+            "Process without dependency",
+            "Top",
+        )
+
+        self.assertEqual(result, (True, set(), None))
+
+    @patch("production_live_scan.views.dependency.objects.filter")
+    def test_process_with_unverified_dependency_is_skipped(
+        self,
+        dependency_filter,
+    ):
+        dependency_filter.return_value.filter.return_value.order_by.return_value.first.return_value = (
+            SimpleNamespace(verify=False)
+        )
+
+        result = get_eligible_assembly_bundle_ids(
+            "J7123A",
+            "Unverified process",
+            "Top",
+        )
+
+        self.assertEqual(result, (True, set(), None))
+
+
+class AssemblyTransferFilteringTests(SimpleTestCase):
+    def test_bundle_listing_includes_destination_transfer_bundles(self):
+        request = APIRequestFactory().get(
+            "/get_input_scan_bundles/",
+            {
+                "unit": "1",
+                "line": "2",
+                "job_no": "J7123A",
+                "process_des": "Current process",
+                "top_bottom": "Shorts",
+            },
+        )
+        input_result = {
+            "bundle_id": "input-bundle",
+            "mbud": "input-mbud",
+            "job_no": "J7123A",
+            "color": "Black",
+            "bdl_no": "1",
+            "size": "M",
+            "tb_name": "Shorts",
+            "pc": "1",
+            "entry_date": None,
+        }
+        transferred_result = {
+            "bundle_id": "transferred-bundle",
+            "mbud": "transfer-mbud",
+            "job_no": "J7123A",
+            "color": "Black",
+            "bdl_no": "2",
+            "size": "M",
+            "tb_name": "Shorts",
+            "pc": "1",
+            "entry_date": None,
+        }
+        input_queryset = MagicMock()
+        input_queryset.values.return_value = [input_result]
+        transfer_queryset = MagicMock()
+        transfer_queryset.values.return_value = [transferred_result]
+
+        with (
+            patch("production_live_scan.views.unit_input.objects.filter") as input_filter,
+            patch(
+                "production_live_scan.views.get_eligible_assembly_bundle_ids_for_processes",
+                return_value=(True, None, None),
+            ),
+            patch("production_live_scan.views.get_transfer_unit_and_line", return_value=(11, 22)),
+            patch(
+                "production_live_scan.views.get_already_assembled_bundle_ids",
+                return_value=set(),
+            ),
+            patch("production_live_scan.views.bundle_transfer.objects.filter") as transfer_filter,
+        ):
+            input_filter.return_value.order_by.return_value.filter.return_value.filter.return_value.exclude.return_value = (
+                input_queryset
+            )
+            transfer_filter.return_value.filter.return_value.exclude.return_value = (
+                transfer_queryset
+            )
+            response = GetUnitDataAPIView.as_view()(request)
+
+        self.assertEqual(response.status_code, 200)
+        transfer_filter.assert_any_call(
+            unit=11,
+            line=22,
+            job_no__iexact="J7123A",
+        )
+        self.assertEqual(
+            [row['bundle_id'] for row in response.data['data']],
+            ["input-bundle", "transferred-bundle"],
+        )
+
+    @patch("production_live_scan.views.Assembly_data.objects.filter")
+    @patch("production_live_scan.views.dependency.objects.filter")
+    @patch("production_live_scan.views.bundle_transfer.objects.filter")
+    @patch("production_live_scan.views.get_transfer_unit_and_line", return_value=(11, None))
+    def test_transferred_sequence_is_used_for_dependency_eligibility(
+        self,
+        transfer_location,
+        transfer_filter,
+        dependency_filter,
+        assembly_filter,
+    ):
+        process_dependency = SimpleNamespace(
+            verify=True,
+            and_or=True,
+            or_only=False,
+            data_entries=MagicMock(),
+        )
+        process_dependency.data_entries.values_list.return_value = [
+            ("Previous process", True, False),
+            ("Transferred process", False, True),
+        ]
+        dependency_filter.return_value.filter.return_value.order_by.return_value.first.return_value = (
+            process_dependency
+        )
+        completed_query = MagicMock()
+        assembly_filter.return_value = completed_query
+        completed_query.filter.return_value.filter.return_value.values_list.return_value = [
+            ("bundle-1", "Previous process")
+        ]
+        transfer_query = MagicMock()
+        transfer_filter.return_value = transfer_query
+        transfer_query.filter.return_value.filter.return_value.values_list.return_value = [
+            ("bundle-1", "Transferred process")
+        ]
+
+        result = get_eligible_assembly_bundle_ids(
+            "J7123A",
+            "Current process",
+            "Shorts",
+            "1",
+        )
+
+        self.assertEqual(result, (True, {"bundle-1"}, None))
+        assembly_filter.assert_called_once_with(
+            job_no__iexact="J7123A",
+            unit_transfer=False,
+        )
+        completed_query.filter.assert_any_call(unit="1")
+        completed_query.filter.return_value.filter.assert_called_once_with(
+            tb_name__iexact="Shorts"
+        )
+        transfer_filter.assert_called_once_with(job_no__iexact="J7123A")
+        transfer_query.filter.assert_any_call(unit=11)
+
+    @patch("production_live_scan.views.Assembly_data.objects.filter")
+    @patch("production_live_scan.views.bundle_transfer.objects.filter")
+    @patch("production_live_scan.views.get_transfer_unit_and_line", return_value=(11, None))
+    def test_same_sequence_validation_reads_both_tables(
+        self,
+        transfer_location,
+        transfer_filter,
+        assembly_filter,
+    ):
+        assembly_rows = assembly_filter.return_value
+        assembly_rows.filter.return_value.values_list.return_value = ["assembly-bundle"]
+        transferred_rows = transfer_filter.return_value
+        transferred_rows.filter.return_value.values_list.return_value = ["transfer-bundle"]
+
+        bundle_ids = get_already_assembled_bundle_ids(
+            "J7123A",
+            "1",
+            "Current process",
+        )
+
+        self.assertEqual(bundle_ids, {"assembly-bundle", "transfer-bundle"})
+        assembly_filter.assert_called_once_with(
+            job_no__iexact="J7123A",
+            unit="1",
+            unit_transfer=False,
+        )
+        transfer_filter.assert_called_once_with(
+            job_no__iexact="J7123A",
+            unit=11,
+        )
 
 
 class BundleLastProcessTests(TestCase):

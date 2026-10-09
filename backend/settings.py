@@ -106,7 +106,9 @@ INSTALLED_APPS = [
     'Salary_Confirmation',
     'finance',
     'hr_module',
-    
+    'GateInward',
+
+
 ]
 
 DATA_UPLOAD_MAX_MEMORY_SIZE = 1024 * 1024 * 200

@@ -429,7 +429,20 @@ class EndUnitInputAPIView(APIView):
 from datetime import datetime, timedelta
 
 
-def get_eligible_assembly_bundle_ids(job_no, process_des, top_bottom=None):
+def get_transfer_unit_and_line(unit, line=None):
+    unit_obj = Unit.objects.filter(name__iexact=f"unit-{unit}").only('id').first()
+    if not unit_obj:
+        return None, None
+    if line is None:
+        return unit_obj.id, None
+    line_id = Line.objects.filter(
+        unit_id=unit_obj.id,
+        line_number=line,
+    ).values_list('id', flat=True).first()
+    return unit_obj.id, line_id
+
+
+def get_eligible_assembly_bundle_ids(job_no, process_des, top_bottom=None, unit=None):
     dependency_query = dependency.objects.filter(
         job_no__iexact=job_no,
         process_des__iexact=process_des,
@@ -442,7 +455,7 @@ def get_eligible_assembly_bundle_ids(job_no, process_des, top_bottom=None):
     process_dependency = dependency_query.order_by('-id').first()
 
     if not process_dependency or not process_dependency.verify:
-        return False, None, "This process dependency is not verified."
+        return True, set(), None
 
     if not process_dependency.and_or and not process_dependency.or_only:
         return True, None, None
@@ -488,10 +501,25 @@ def get_eligible_assembly_bundle_ids(job_no, process_des, top_bottom=None):
         return False, None, "Previous process dependency is not configured."
 
     completed_by_bundle = {}
-    completed_query = Assembly_data.objects.filter(job_no__iexact=job_no)
+    completed_query = Assembly_data.objects.filter(
+        job_no__iexact=job_no,
+        unit_transfer=False,
+    )
+    transfer_unit_id = None
+    if unit is not None:
+        completed_query = completed_query.filter(unit=unit)
+        transfer_unit_id, _ = get_transfer_unit_and_line(unit)
     if top_bottom:
         completed_query = completed_query.filter(tb_name__iexact=top_bottom)
-    completed_rows = completed_query.values_list('bundle_id', 'seq')
+    completed_rows = list(completed_query.values_list('bundle_id', 'seq'))
+    transferred_query = bundle_transfer.objects.filter(job_no__iexact=job_no)
+    if unit is None or transfer_unit_id is None:
+        transferred_query = transferred_query.none()
+    else:
+        transferred_query = transferred_query.filter(unit=transfer_unit_id)
+    if top_bottom:
+        transferred_query = transferred_query.filter(tb_name__iexact=top_bottom)
+    completed_rows.extend(transferred_query.values_list('bundle_id', 'seq'))
     for bundle_id, sequence in completed_rows:
         for completed_sequence in split_process_descriptions(sequence):
             normalized_sequence = completed_sequence.casefold()
@@ -555,7 +583,35 @@ def assembly_sequence_filter(process_des):
     return sequence_filter
 
 
-def get_eligible_assembly_bundle_ids_for_processes(job_no, process_des, top_bottom=None):
+def get_already_assembled_bundle_ids(job_no, unit, process_des, top_bottom=None):
+    assembly_rows = Assembly_data.objects.filter(
+        job_no__iexact=job_no,
+        unit=unit,
+        unit_transfer=False,
+    ).filter(assembly_sequence_filter(process_des))
+    if top_bottom:
+        assembly_rows = assembly_rows.filter(tb_name__iexact=top_bottom)
+    bundle_ids = set(assembly_rows.values_list('bundle_id', flat=True))
+
+    transfer_unit_id, _ = get_transfer_unit_and_line(unit)
+    if transfer_unit_id is None:
+        return bundle_ids
+    transferred_rows = bundle_transfer.objects.filter(
+        job_no__iexact=job_no,
+        unit=transfer_unit_id,
+    ).filter(assembly_sequence_filter(process_des))
+    if top_bottom:
+        transferred_rows = transferred_rows.filter(tb_name__iexact=top_bottom)
+    bundle_ids.update(transferred_rows.values_list('bundle_id', flat=True))
+    return bundle_ids
+
+
+def get_eligible_assembly_bundle_ids_for_processes(
+    job_no,
+    process_des,
+    top_bottom=None,
+    unit=None,
+):
     process_descriptions = split_process_descriptions(process_des)
     if not process_descriptions:
         return False, None, "Process sequence is required."
@@ -565,7 +621,7 @@ def get_eligible_assembly_bundle_ids_for_processes(job_no, process_des, top_bott
     errors = []
     for description in process_descriptions:
         allowed, bundle_ids, error_message = get_eligible_assembly_bundle_ids(
-            job_no, description, top_bottom
+            job_no, description, top_bottom, unit
         )
         if not allowed:
             if bundle_ids is None:
@@ -581,6 +637,8 @@ def get_eligible_assembly_bundle_ids_for_processes(job_no, process_des, top_bott
         return True, None, None
     if eligible_bundle_ids:
         return True, eligible_bundle_ids, None
+    if not errors:
+        return True, None, None
     return False, set(), " ".join(dict.fromkeys(errors))
 
 
@@ -619,22 +677,52 @@ class GetUnitDataAPIView(APIView):
                         status=status.HTTP_400_BAD_REQUEST
                     )
                 allowed, eligible_bundle_ids, error_message = get_eligible_assembly_bundle_ids_for_processes(
-                    job_no, process_des, top_bottom
+                    job_no, process_des, top_bottom, unit
                 )
                 if not allowed:
                     return Response(
                         {"error": error_message},
                         status=status.HTTP_409_CONFLICT
                     )
-                already_scanned_ids = Assembly_data.objects.filter(
-                    job_no__iexact=job_no,
-                ).filter(assembly_sequence_filter(process_des)).values_list('bundle_id', flat=True)
+                already_scanned_ids = get_already_assembled_bundle_ids(
+                    job_no,
+                    unit,
+                    process_des,
+                    top_bottom,
+                )
                 data = data.filter(job_no__iexact=job_no)
                 if top_bottom:
                     data = data.filter(tb_name__iexact=top_bottom)
                 data = data.exclude(bundle_id__in=already_scanned_ids)
                 if eligible_bundle_ids is not None:
                     data = data.filter(bundle_id__in=eligible_bundle_ids)
+                results = list(data.values(
+                    'bundle_id', 'mbud', 'job_no', 'color', 'bdl_no', 'size',
+                    'tb_name', 'pc', 'entry_date',
+                ))
+
+                transfer_unit_id, transfer_line_id = get_transfer_unit_and_line(unit, line)
+                if transfer_unit_id is not None and transfer_line_id is not None:
+                    transferred = bundle_transfer.objects.filter(
+                        unit=transfer_unit_id,
+                        line=transfer_line_id,
+                        job_no__iexact=job_no,
+                    )
+                    if top_bottom:
+                        transferred = transferred.filter(tb_name__iexact=top_bottom)
+                    transferred = transferred.exclude(bundle_id__in=already_scanned_ids)
+                    if eligible_bundle_ids is not None:
+                        transferred = transferred.filter(bundle_id__in=eligible_bundle_ids)
+
+                    existing_bundle_ids = {row['bundle_id'] for row in results}
+                    for row in transferred.values(
+                        'bundle_id', 'mbud', 'job_no', 'color', 'bdl_no', 'size',
+                        'tb_name', 'pc', 'entry_date',
+                    ):
+                        if row['bundle_id'] not in existing_bundle_ids:
+                            results.append(row)
+                            existing_bundle_ids.add(row['bundle_id'])
+                return Response({"status": True, "data": results})
             else:
                 verified_tb_ids = dependency.objects.filter(
                     job_no__iexact=job_no,
@@ -714,22 +802,51 @@ class GetUnitDataAPIViewsss(APIView):
                         status=status.HTTP_400_BAD_REQUEST
                     )
                 allowed, eligible_bundle_ids, error_message = get_eligible_assembly_bundle_ids_for_processes(
-                    job_no, process_des, top_bottom
+                    job_no, process_des, top_bottom, unit
                 )
                 if not allowed:
                     return Response(
                         {"error": error_message},
                         status=status.HTTP_409_CONFLICT
                     )
-                already_scanned_ids = Assembly_data.objects.filter(
-                    job_no__iexact=job_no,
-                ).filter(assembly_sequence_filter(process_des)).values_list('bundle_id', flat=True)
+                already_scanned_ids = get_already_assembled_bundle_ids(
+                    job_no,
+                    unit,
+                    process_des,
+                    top_bottom,
+                )
                 data = data.filter(job_no__iexact=job_no)
                 if top_bottom:
                     data = data.filter(tb_name__iexact=top_bottom)
                 data = data.exclude(bundle_id__in=already_scanned_ids)
                 if eligible_bundle_ids is not None:
                     data = data.filter(bundle_id__in=eligible_bundle_ids)
+                results = list(data.values(
+                    'bundle_id', 'mbud', 'job_no', 'color', 'bdl_no', 'size',
+                    'tb_name', 'pc', 'entry_date',
+                ))
+                transfer_unit_id, transfer_line_id = get_transfer_unit_and_line(unit, line)
+                if transfer_unit_id is not None and transfer_line_id is not None:
+                    transferred = bundle_transfer.objects.filter(
+                        unit=transfer_unit_id,
+                        # line=transfer_line_id,
+                        job_no__iexact=job_no,
+                    )
+                    if top_bottom:
+                        transferred = transferred.filter(tb_name__iexact=top_bottom)
+                    transferred = transferred.exclude(bundle_id__in=already_scanned_ids)
+                    if eligible_bundle_ids is not None:
+                        transferred = transferred.filter(bundle_id__in=eligible_bundle_ids)
+
+                    result_ids = {row['bundle_id'] for row in results}
+                    for row in transferred.values(
+                        'bundle_id', 'mbud', 'job_no', 'color', 'bdl_no', 'size',
+                        'tb_name', 'pc', 'entry_date',
+                    ):
+                        if row['bundle_id'] not in result_ids:
+                            results.append(row)
+                            result_ids.add(row['bundle_id'])
+                return Response({"status": True, "data": results})
             else:
                 verified_tb_ids = dependency.objects.filter(
                     job_no__iexact=job_no,
@@ -746,72 +863,72 @@ class GetUnitDataAPIViewsss(APIView):
         return Response({"status": True, "data": results})
 
 
-class GetUnitDataAPIViewsss(APIView):
-    def get(self, request):
-        unit = request.query_params.get('unit')
-        line = request.query_params.get('line')
-        job_no = request.query_params.get('job_no')
-        process_des = request.query_params.get('process_des')
-        top_bottom = str(request.query_params.get('top_bottom', '') or '').strip()
-        selected_date = request.query_params.get('date') 
+# class GetUnitDataAPIViewsss(APIView):
+#     def get(self, request):
+#         unit = request.query_params.get('unit')
+#         line = request.query_params.get('line')
+#         job_no = request.query_params.get('job_no')
+#         process_des = request.query_params.get('process_des')
+#         top_bottom = str(request.query_params.get('top_bottom', '') or '').strip()
+#         selected_date = request.query_params.get('date') 
 
-        if selected_date:
-            date_obj = datetime.strptime(selected_date, '%Y-%m-%d')
-            # data = unit_input.objects.filter(unit=unit, line=line, entry_date__date=date_obj).order_by('-entry_date')
-            data = unit_input.objects.filter(unit=unit, entry_date__date=date_obj).order_by('-entry_date')
-        else:
-            # four_days_ago = datetime.now() - timedelta(days=1)
-            today = date.today()
-            print("Today's date:", today)
-            # data = unit_input.objects.filter(unit=unit, line=line, entry_date__gte=today).order_by('-entry_date')
-            data = unit_input.objects.filter(unit=unit, entry_date__date=today).order_by('-entry_date')
+#         if selected_date:
+#             date_obj = datetime.strptime(selected_date, '%Y-%m-%d')
+#             # data = unit_input.objects.filter(unit=unit, line=line, entry_date__date=date_obj).order_by('-entry_date')
+#             data = unit_input.objects.filter(unit=unit, entry_date__date=date_obj).order_by('-entry_date')
+#         else:
+#             # four_days_ago = datetime.now() - timedelta(days=1)
+#             today = date.today()
+#             print("Today's date:", today)
+#             # data = unit_input.objects.filter(unit=unit, line=line, entry_date__gte=today).order_by('-entry_date')
+#             data = unit_input.objects.filter(unit=unit, entry_date__date=today).order_by('-entry_date')
 
-        if job_no is not None:
-            job_no = job_no.strip()
-            if not job_no:
-                return Response(
-                    {"error": "job_no is required to load assembly bundles"},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-            if process_des is not None:
-                process_des = process_des.strip()
-                if not top_bottom:
-                    return Response(
-                        {"error": "top_bottom is required to load assembly bundles"},
-                        status=status.HTTP_400_BAD_REQUEST
-                    )
-                allowed, eligible_bundle_ids, error_message = get_eligible_assembly_bundle_ids(
-                    job_no, process_des, top_bottom
-                )
-                if not allowed:
-                    return Response(
-                        {"error": error_message},
-                        status=status.HTTP_409_CONFLICT
-                    )
-                already_scanned_ids = Assembly_data.objects.filter(
-                    job_no__iexact=job_no,
-                    seq__iexact=process_des,
-                ).values_list('bundle_id', flat=True)
-                data = data.filter(job_no__iexact=job_no)
-                if top_bottom:
-                    data = data.filter(tb_name__iexact=top_bottom)
-                data = data.exclude(bundle_id__in=already_scanned_ids)
-                if eligible_bundle_ids is not None:
-                    data = data.filter(bundle_id__in=eligible_bundle_ids)
-            else:
-                verified_tb_ids = dependency.objects.filter(
-                    job_no__iexact=job_no,
-                    verify=True
-                ).values_list('tb_id', flat=True)
-                data = data.filter(
-                    job_no__iexact=job_no,
-                    tb_id__in=verified_tb_ids,
-                    scan=False,
-                )
+#         if job_no is not None:
+#             job_no = job_no.strip()
+#             if not job_no:
+#                 return Response(
+#                     {"error": "job_no is required to load assembly bundles"},
+#                     status=status.HTTP_400_BAD_REQUEST
+#                 )
+#             if process_des is not None:
+#                 process_des = process_des.strip()
+#                 if not top_bottom:
+#                     return Response(
+#                         {"error": "top_bottom is required to load assembly bundles"},
+#                         status=status.HTTP_400_BAD_REQUEST
+#                     )
+#                 allowed, eligible_bundle_ids, error_message = get_eligible_assembly_bundle_ids(
+#                     job_no, process_des, top_bottom
+#                 )
+#                 if not allowed:
+#                     return Response(
+#                         {"error": error_message},
+#                         status=status.HTTP_409_CONFLICT
+#                     )
+#                 already_scanned_ids = Assembly_data.objects.filter(
+#                     job_no__iexact=job_no,
+#                     seq__iexact=process_des,
+#                 ).values_list('bundle_id', flat=True)
+#                 data = data.filter(job_no__iexact=job_no)
+#                 if top_bottom:
+#                     data = data.filter(tb_name__iexact=top_bottom)
+#                 data = data.exclude(bundle_id__in=already_scanned_ids)
+#                 if eligible_bundle_ids is not None:
+#                     data = data.filter(bundle_id__in=eligible_bundle_ids)
+#             else:
+#                 verified_tb_ids = dependency.objects.filter(
+#                     job_no__iexact=job_no,
+#                     verify=True
+#                 ).values_list('tb_id', flat=True)
+#                 data = data.filter(
+#                     job_no__iexact=job_no,
+#                     tb_id__in=verified_tb_ids,
+#                     scan=False,
+#                 )
 
-        # JSON response
-        results = list(data.values('bundle_id','mbud', 'job_no','color','bdl_no','size','tb_name', 'pc', 'color', 'entry_date'))
-        return Response({"status": True, "data": results})
+#         # JSON response
+#         results = list(data.values('bundle_id','mbud', 'job_no','color','bdl_no','size','tb_name', 'pc', 'color', 'entry_date'))
+#         return Response({"status": True, "data": results})
 
 
 
@@ -973,7 +1090,6 @@ def assembly_emp(request):
         'name'
     )
 
-
     emp_name_dict = {
         str(emp['code']): emp['name']
         for emp in emp_names
@@ -1050,7 +1166,7 @@ class SaveAssemblyAPIView(APIView):
         process_des = str(allocation.seq or '').strip()
 
         allowed, eligible_bundle_ids, error_message = get_eligible_assembly_bundle_ids_for_processes(
-            job_no, process_des, selected_top_bottom
+            job_no, process_des, selected_top_bottom, unit
         )
         if not allowed:
             return Response(
@@ -1059,6 +1175,11 @@ class SaveAssemblyAPIView(APIView):
             )
 
         unique_ids = list(dict.fromkeys(str(value).strip() for value in bundle_ids if str(value).strip()))
+        if not unique_ids:
+            return Response(
+                {"error": "At least one valid bundle is required."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
         if eligible_bundle_ids is not None:
             ineligible_ids = [value for value in unique_ids if value not in eligible_bundle_ids]
             if ineligible_ids:
@@ -1068,20 +1189,39 @@ class SaveAssemblyAPIView(APIView):
                 )
 
         with transaction.atomic():
-            already_scanned_ids = Assembly_data.objects.filter(
-                job_no__iexact=job_no,
-            ).filter(assembly_sequence_filter(process_des)).values_list('bundle_id', flat=True)
-            bundle_queryset = unit_input.objects.select_for_update().filter(
+            already_scanned_ids = get_already_assembled_bundle_ids(
+                job_no,
+                unit,
+                process_des,
+                selected_top_bottom,
+            )
+            input_queryset = unit_input.objects.select_for_update().filter(
                 unit=unit,
-                # line=line,
                 job_no__iexact=job_no,
                 bundle_id__in=unique_ids,
             )
             if selected_top_bottom:
-                bundle_queryset = bundle_queryset.filter(tb_name__iexact=selected_top_bottom)
-            bundle_queryset = bundle_queryset.exclude(bundle_id__in=already_scanned_ids)
-            bundles = list(bundle_queryset)
-            found_ids = {bundle.bundle_id for bundle in bundles}
+                input_queryset = input_queryset.filter(tb_name__iexact=selected_top_bottom)
+            input_queryset = input_queryset.exclude(bundle_id__in=already_scanned_ids)
+            input_bundles = list(input_queryset)
+
+            transfer_unit_id, transfer_line_id = get_transfer_unit_and_line(unit, line)
+            transfer_bundles = []
+            if transfer_unit_id is not None and transfer_line_id is not None:
+                transfer_queryset = bundle_transfer.objects.select_for_update().filter(
+                    unit=transfer_unit_id,
+                    # line=transfer_line_id,
+                    job_no__iexact=job_no,
+                    bundle_id__in=unique_ids,
+                ).exclude(bundle_id__in=already_scanned_ids)
+                if selected_top_bottom:
+                    transfer_queryset = transfer_queryset.filter(tb_name__iexact=selected_top_bottom)
+                transfer_bundles = list(transfer_queryset.order_by('-entry_date'))
+
+            bundles_by_id = {bundle.bundle_id: bundle for bundle in transfer_bundles}
+            for bundle in input_bundles:
+                bundles_by_id.setdefault(bundle.bundle_id, bundle)
+            found_ids = set(bundles_by_id)
             missing_ids = [value for value in unique_ids if value not in found_ids]
             if missing_ids:
                 print("Some bundles are unavailable or already scanned:", missing_ids)
@@ -1114,9 +1254,17 @@ class SaveAssemblyAPIView(APIView):
                     emp_id=emp_code,
                     entry_mode=entry_mode
                 )
-                for bundle, description in bundle_process_pairs(bundles, process_des)
+                for bundle, description in bundle_process_pairs(
+                    [bundles_by_id[bundle_id] for bundle_id in unique_ids],
+                    process_des,
+                )
             ])
-            updated = bundle_queryset.update(scan=True)
+            input_bundle_ids = {
+                bundle.bundle_id
+                for bundle in input_bundles
+                if bundles_by_id[bundle.bundle_id] is bundle
+            }
+            updated = input_queryset.filter(bundle_id__in=input_bundle_ids).update(scan=True)
 
         return Response({"status": "success", "updated": updated}, status=status.HTTP_200_OK)
 
@@ -2057,46 +2205,79 @@ class UserUnitPermissionListView(View):
 
 ##################### Bundle Transfer API ########################
 
+# class GetJobsView(APIView):
+#     def get(self, request):
+#         jobs = Assembly_data.objects.values_list('job_no',flat=True).distinct().order_by('job_no')
+#         return Response(list(jobs))
+
 class GetJobsView(APIView):
     def get(self, request):
-        jobs = Assembly_data.objects.values_list('job_no',flat=True).distinct().order_by('job_no')
+        unit = request.GET.get('unit')
+        print(f"Received unit parameter: {unit}")  # Debugging line
+        queryset = Assembly_data.objects.all()
+        if unit:
+            queryset = queryset.filter(unit=unit)
+            
+        jobs = queryset.values_list('job_no', flat=True).distinct().order_by('job_no')
         return Response(list(jobs))
 
 class GetTbNamesView(APIView):
     def get(self, request):
-        job_no = request.GET.get('job_no')
-        tb_names = Assembly_data.objects.filter(job_no=job_no).values_list('tb_name', flat=True).distinct().order_by('tb_name')
+        job_nos = request.GET.get('job_no', '')
+        job_list = [j.strip() for j in job_nos.split(',') if j.strip()]
+        tb_names = Assembly_data.objects.filter(job_no__in=job_list).values_list('tb_name', flat=True).distinct().order_by('tb_name')
         return Response(list(tb_names))
 
 class GetColorsView(APIView):
     def get(self, request):
-        job_no = request.GET.get('job_no')
-        tb_name = request.GET.get('tb_name')
-        colors = Assembly_data.objects.filter(job_no=job_no, tb_name=tb_name).values_list('color', flat=True).distinct().order_by('color')
+        job_nos = request.GET.get('job_no', '')
+        tb_names = request.GET.get('tb_name', '')
+        
+        job_list = [j.strip() for j in job_nos.split(',') if j.strip()]
+        tb_list = [t.strip() for t in tb_names.split(',') if t.strip()]
+        
+        colors = Assembly_data.objects.filter(
+            job_no__in=job_list, 
+            tb_name__in=tb_list
+        ).values_list('color', flat=True).distinct().order_by('color')
         return Response(list(colors))
 
 class GetSizesView(APIView):
     def get(self, request):
-        job_no = request.GET.get('job_no')
-        tb_name = request.GET.get('tb_name')
-        color = request.GET.get('color')
-        sizes = Assembly_data.objects.filter(job_no=job_no, tb_name=tb_name, color=color).values_list('size', flat=True).distinct().order_by('size')
+        job_nos = request.GET.get('job_no', '')
+        tb_names = request.GET.get('tb_name', '')
+        colors = request.GET.get('color', '')
+        
+        job_list = [j.strip() for j in job_nos.split(',') if j.strip()]
+        tb_list = [t.strip() for t in tb_names.split(',') if t.strip()]
+        color_list = [c.strip() for c in colors.split(',') if c.strip()]
+        
+        sizes = Assembly_data.objects.filter(
+            job_no__in=job_list, 
+            tb_name__in=tb_list, 
+            color__in=color_list
+        ).values_list('size', flat=True).distinct().order_by('size')
         return Response(list(sizes))
 
 class GetSequencesView(APIView):
     def get(self, request):
-        job_no = request.GET.get('job_no')
-        tb_name = request.GET.get('tb_name')
-        color = request.GET.get('color')
-        size = request.GET.get('size')
+        job_nos = request.GET.get('job_no', '')
+        tb_names = request.GET.get('tb_name', '')
+        colors = request.GET.get('color', '')
+        sizes = request.GET.get('size', '')
+        
+        job_list = [j.strip() for j in job_nos.split(',') if j.strip()]
+        tb_list = [t.strip() for t in tb_names.split(',') if t.strip()]
+        color_list = [c.strip() for c in colors.split(',') if c.strip()]
+        size_list = [s.strip() for s in sizes.split(',') if s.strip()]
         
         sequences = Assembly_data.objects.filter(
-            job_no=job_no, 
-            tb_name=tb_name,
-            color=color,
-            size=size,
+            job_no__in=job_list, 
+            tb_name__in=tb_list,
+            color__in=color_list,
+            size__in=size_list,
             unit_transfer=False
-        ).values('id', 'seq', 'bundle_id', 'bdl_no', 'size', 'color', 'pc', 'scan').order_by('seq')
+        ).values('id', 'seq', 'bundle_id', 'bdl_no', 'size', 'color', 'pc', 'scan','job_no','tb_name').order_by('seq')
         
         return Response(list(sequences))
 
