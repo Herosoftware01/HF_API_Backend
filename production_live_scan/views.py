@@ -392,7 +392,8 @@ class EndUnitInputAPIView(APIView):
                             size_id=item.get('size_id'),
                             pc=item.get('pc'),
                             lot=item.get('lot'),
-                            date=final_date
+                            date=final_date,
+                            emp_id=item.get('emp_id', '')
                         )
                     )
 
@@ -1034,19 +1035,21 @@ class GetUnitAssemply(APIView):
 
         if all_dates:
             data = Assembly_data.objects.filter(
-                unit=unit, line=line,
+                unit=unit, line=line,scan=False
             ).order_by('-date')
         elif selected_date:
             date_obj = datetime.strptime(selected_date, '%Y-%m-%d')
             data = Assembly_data.objects.filter(
                 unit=unit,
                 line=line,
+                scan=False,
                 date__date=date_obj,
             ).order_by('-date')
         else:
             data = Assembly_data.objects.filter(
                 unit=unit,
                 line=line,
+                scan=False,
                 date__gte=date.today(),
             ).order_by('-date')
 

@@ -526,7 +526,7 @@ class Cont_employee(models.Model):
 
             self.code = f"{prefix}{new_seq:02d}"
 
-        kwargs['using'] = 'main'
+        kwargs['using'] = 'default'
         super().save(*args, **kwargs)
 
     class Meta:
@@ -737,4 +737,36 @@ class ViewPlandetailsWithratio(models.Model):
     class Meta:
         managed = False
         db_table = 'view_plandetails_withratio'
+
+
+
+class defect_code(models.Model):
+    code = models.CharField(max_length=50, unique=True)
+    name = models.CharField(max_length=100)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.code} - {self.name}"
+
+
+class defect_list(models.Model):
+  defect = models.ForeignKey(
+      defect_code, on_delete=models.CASCADE, related_name="categories"
+  )
+  category = models.CharField(max_length=10)
+  c_name = models.CharField(max_length=100)
+  top_bottom = models.CharField(max_length=100, blank=True, null=True)
+
+  class Meta:
+    constraints = [
+        models.UniqueConstraint(
+            # Inga top_bottom-um serthu unique constraint potrukom
+            fields=["defect", "category", "top_bottom"],
+            name="unique_defect_category_topbottom",
+        )
+    ]
+
+  def __str__(self):
+    return f"{self.defect.code} - {self.category} - {self.c_name}"
+   
 
