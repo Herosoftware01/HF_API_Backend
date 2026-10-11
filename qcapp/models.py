@@ -443,14 +443,33 @@ class Mas_contractor(models.Model):
         super().save(*args, **kwargs)
 
 
-# class MasContract(models.Model):
-#     contract_des = models.CharField(max_length=50, blank=True, null=True)
-#     contract_id = models.IntegerField(primary_key=True)
+# class Cont_employee(models.Model):
+#     name = models.CharField(max_length=100)
+#     con_id = models.ForeignKey(Mas_contractor, on_delete=models.CASCADE)
+#     code = models.CharField(max_length=4, unique=True, blank=True)
 
-#     class Meta:
-#         managed = False
-#         db_table = 'Mas_contract'
+#     def __str__(self):
+#         return f"{self.name} ({self.code})"
 
+#     def save(self, *args, **kwargs):
+#         if not self.code:
+#             contractor_code = self.con_id.code  # e.g. 1234
+
+#             prefix = contractor_code[-2:]  # last 2 digits -> "34"
+
+#             last = Cont_employee.objects.filter(
+#                 con_id=self.con_id
+#             ).order_by('-id').first()
+
+#             if last and last.code:
+#                 last_seq = int(last.code[-2:])  # last 2 digits sequence
+#                 new_seq = last_seq + 1
+#             else:
+#                 new_seq = 1
+
+#             self.code = f"{prefix}{new_seq:02d}"  # 3401, 3402...
+
+#         super().save(*args, **kwargs)
 
 class MasContract(models.Model):
     contract_des = models.CharField(max_length=50, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)
@@ -507,7 +526,7 @@ class Cont_employee(models.Model):
 
             self.code = f"{prefix}{new_seq:02d}"
 
-        kwargs['using'] = 'main'
+        kwargs['using'] = 'default'
         super().save(*args, **kwargs)
 
     class Meta:
@@ -718,3 +737,4 @@ class ViewPlandetailsWithratio(models.Model):
     class Meta:
         managed = False
         db_table = 'view_plandetails_withratio'
+

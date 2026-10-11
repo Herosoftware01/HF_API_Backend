@@ -34,12 +34,16 @@ urlpatterns = [
     path('fabric_delivery_repl/', views.fabric_delivery_repl, name='fabric_delivery_repl'),
     path('fabric_delivery_repl/<int:dcno>/', views.fabric_delivery_repl, name='fabric_delivery_repl'),
     path('general_delivery_type1/', views.general_delivery_type1, name='general_delivery_type1'),
+    path('gen_stock_issue/', views.gen_stock_issue, name='gen_stock_issue'),
 
-    path('dc_permissions/save/', views.manage_role_permissions, name='save_role_permissions'),
     
     # For GET by role name (e.g., /dcapp/dc_permissions/Admin/)
     path('dc_permissions/<str:role_param>/', views.manage_role_permissions, name='get_role_permissions'),
+    path('dc_permissions/save/', views.manage_role_permissions, name='save_role_permissions'),
     path('dc_verify_in/', views.dc_verify_incharge_crud, name='dc_verify_crud'),
     path('dc_receiver/', views.dc_receiver_crud_api, name='dc_receiver_list_create'),
     path('dc_receiver/<int:record_id>/', views.dc_receiver_crud_api, name='dc_receiver_detail'),
+    path("dc_modules/",views.module_collection,name="dc-module-collection",),
+    path("dc_modules/<str:module_id>/",views.module_detail,name="dc-module-detail"),
+
 ]

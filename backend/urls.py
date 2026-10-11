@@ -43,6 +43,7 @@ urlpatterns = [
     path('skill_app/', include('Salary_Confirmation.urls')) ,
     path('gateinward/', include('GateInward.urls')) ,
     path('finance/', include('finance.urls')) ,
+    path('hr_module/', include('hr_module.urls')) ,
 
 ] 
 

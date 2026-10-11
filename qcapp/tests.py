@@ -7,7 +7,10 @@ from django.test import RequestFactory, SimpleTestCase
 from rest_framework.test import APIRequestFactory, force_authenticate
 
 from .views import (
+<<<<<<< HEAD
     EmployeeAPIView,
+=======
+>>>>>>> 89b0350d12682b00285a29c73273b76ea195e9bc
     UnitListAPIView,
     get_shift,
     latest_online_allocations_by_employee,
@@ -92,6 +95,7 @@ class LatestEmployeeAllocationTests(SimpleTestCase):
         latest_online = latest_online_allocations_by_employee(allocations)
 
         self.assertEqual(set(latest_online), {"11111"})
+<<<<<<< HEAD
 
 
 class EmployeeAPIViewDatabaseRoutingTests(SimpleTestCase):
@@ -142,3 +146,5 @@ class EmployeeAPIViewDatabaseRoutingTests(SimpleTestCase):
                 }
             ],
         )
+=======
+>>>>>>> 89b0350d12682b00285a29c73273b76ea195e9bc

@@ -10,7 +10,7 @@ from imp_reports.models import UnitBundlereport
 from bundle_tracking.models import TrsMcutstickerprod,MasUnit,MasTopbottom
 from qcapp.models import Unit,Line,machine_details,emp_allocate,Empwisesal
 from .models import Assembly_data,bundle_transfer,end_line_data, unit_input, Msizes,dependency,dependency_data,PreporatoryEntry,ViewRibdelPreparatory,RibdelEntry
-from django.utils.dateparse import parse_datetime
+from django.utils.dateparse import parse_date, parse_datetime
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 import json
@@ -363,6 +363,7 @@ class EndUnitInputAPIView(APIView):
 
                     raw_date = item.get("date")
                     parsed_date = parse_datetime(raw_date)
+                    parsed_date_only = parse_date(raw_date) if not parsed_date else None
 
                     if parsed_date:
                         # Frontend date already IST (13:34)
@@ -370,6 +371,8 @@ class EndUnitInputAPIView(APIView):
                             final_date = parsed_date.replace(tzinfo=None)
                         else:
                             final_date = parsed_date
+                    elif parsed_date_only:
+                        final_date = datetime.combine(parsed_date_only, datetime.min.time())
                     else:
                         final_date = now_ist
 
@@ -392,6 +395,7 @@ class EndUnitInputAPIView(APIView):
                             size_id=item.get('size_id'),
                             pc=item.get('pc'),
                             lot=item.get('lot'),
+                            emp_id=item.get('emp_id'),
                             date=final_date
                         )
                     )
@@ -642,6 +646,26 @@ def get_eligible_assembly_bundle_ids_for_processes(
     return False, set(), " ".join(dict.fromkeys(errors))
 
 
+def get_assembly_dependency_statuses(job_no, process_des, top_bottom=None):
+    statuses = []
+    for description in split_process_descriptions(process_des):
+        dependency_query = dependency.objects.filter(
+            job_no__iexact=job_no,
+            process_des__iexact=description,
+        )
+        if top_bottom:
+            top_bottom_filter = Q(tb_name__iexact=top_bottom)
+            if str(top_bottom).strip().isdigit():
+                top_bottom_filter |= Q(tb_id=int(str(top_bottom).strip()))
+            dependency_query = dependency_query.filter(top_bottom_filter)
+        process_dependency = dependency_query.order_by('-id').first()
+        statuses.append({
+            "process": description,
+            "verified": bool(process_dependency and process_dependency.verify),
+        })
+    return statuses
+
+
 class GetUnitDataAPIView(APIView):
     def get(self, request):
         unit = request.query_params.get('unit')
@@ -676,6 +700,9 @@ class GetUnitDataAPIView(APIView):
                         {"error": "top_bottom is required to load assembly bundles"},
                         status=status.HTTP_400_BAD_REQUEST
                     )
+                dependency_statuses = get_assembly_dependency_statuses(
+                    job_no, process_des, top_bottom
+                )
                 allowed, eligible_bundle_ids, error_message = get_eligible_assembly_bundle_ids_for_processes(
                     job_no, process_des, top_bottom, unit
                 )
@@ -722,7 +749,11 @@ class GetUnitDataAPIView(APIView):
                         if row['bundle_id'] not in existing_bundle_ids:
                             results.append(row)
                             existing_bundle_ids.add(row['bundle_id'])
-                return Response({"status": True, "data": results})
+                return Response({
+                    "status": True,
+                    "data": results,
+                    "dependency_statuses": dependency_statuses,
+                })
             else:
                 verified_tb_ids = dependency.objects.filter(
                     job_no__iexact=job_no,
@@ -1007,19 +1038,21 @@ class GetUnitAssemply(APIView):
 
         if all_dates:
             data = Assembly_data.objects.filter(
-                unit=unit, line=line,
+                unit=unit, line=line,scan=False
             ).order_by('-date')
         elif selected_date:
             date_obj = datetime.strptime(selected_date, '%Y-%m-%d')
             data = Assembly_data.objects.filter(
                 unit=unit,
                 line=line,
+                scan=False,
                 date__date=date_obj,
             ).order_by('-date')
         else:
             data = Assembly_data.objects.filter(
                 unit=unit,
                 line=line,
+                scan=False,
                 date__gte=date.today(),
             ).order_by('-date')
 

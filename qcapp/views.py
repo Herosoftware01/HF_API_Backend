@@ -681,15 +681,13 @@ class MachineAllocationDetailAPIView(APIView):
 #                 }
 #         else:
 #             today = timezone.now().date()
-#             online_emp_codes = list(
-#                 emp_allocate.objects.filter(
-#                     date__date=today,
-#                     status=True
-#                 ).values_list("emp_code", flat=True)
-#             )
+#             online_emp_codes = emp_allocate.objects.filter(
+#                 date__date=today,
+#                 status=True
+#             ).values_list("emp_code", flat=True)
 
 #         employees = Empwisesal.objects.using('main').filter(status='working')
-#         contractors = Cont_employee.objects.using("default").all()
+#         contractors = Cont_employee.objects.select_related('con_id')
 #         if not include_online:
 #             employees = employees.exclude(code__in=online_emp_codes)
 #             contractors = contractors.exclude(code__in=online_emp_codes)
@@ -717,24 +715,14 @@ class MachineAllocationDetailAPIView(APIView):
 #                 employee_data["online_allocation"] = online_allocations.get(str(emp["code"]))
 #             data.append(employee_data)
 
-#         # Contractor employees and their master records live in separate databases.
-#         contract_ids = list(
-#             contractors.values_list('con_id_id', flat=True).distinct()
-#         )
-#         contract_map = {
-#             contract.contract_id: contract
-#             for contract in MasContract.objects.using("main").filter(
-#                 contract_id__in=contract_ids
-#             )
-#         }
-
+#         # 2. Contractor employees (Cont_employee + Mas_contractor)
+#         # contractors = Cont_employee.objects.select_related('con_id').all()
 #         for emp in contractors:
-#             contract = contract_map.get(emp.con_id_id)
-#             contractor_name = contract.contract_des if contract else ""
+#             contractor_name = emp.con_id.contract_des if emp.con_id else ""
 #             employee_data = {
 #                 "code": emp.code,
-#                 "name": f"{emp.name} ({contractor_name})" if contractor_name else emp.name,
-#                 "dept": contractor_name,
+#                 "name": f"{emp.name} ({contractor_name})",
+#                 "dept": emp.con_id.contract_des if emp.con_id else None,  # Mas_contractor name
 #                 "photo": None,
 #                 "source": "contract_employee"
 #             }
@@ -831,7 +819,6 @@ class EmployeeAPIView(APIView):
             data.append(employee_data)
 
         return Response(data)
-
 
 class Employee_and_staffAPIView(APIView):
     def get(self, request):
@@ -1058,36 +1045,7 @@ class EmpAllocateAPIView(APIView):
             date__date=selected_date,
             line=line,
             unit=unit
-        ).exists()
-
-        # if same_allocation:
-            
-        #     return Response(
-        #         {
-        #             "error": "Already allocated today"
-        #         },
-        #         status=400
-        #     )
-
-        if same_allocation:
-            status_update = emp_allocate.objects.filter(
-                emp_code=emp_code,
-                machine_id=machine_id,
-                jobno=jobno,
-                top_bottom=top_bottom,
-                seq=sequence,
-                date__date=selected_date,
-                line=line,
-                unit=unit
-            ).update(status=True)
-
-            return Response(
-                {
-                    # "error": "Already allocated today",
-                    "message": "Already allocated today && Online process successfully",
-                },
-                # status=400
-            )
+        ).order_by("-date", "-id").first()
 
         # -------------------------
         # EMPLOYEE ALREADY ONLINE ?
@@ -1098,6 +1056,24 @@ class EmpAllocateAPIView(APIView):
             line=line,
             date__date=selected_date
         ).order_by("-date", "-id").first()
+        latest_machine = emp_allocate.objects.filter(
+            machine_id=machine_id,
+            unit=unit,
+            line=line,
+            date__date=selected_date
+        ).order_by("-date", "-id").first()
+        print("Selected date:", selected_date, unit, line)
+
+        if (
+            same_allocation
+            and same_allocation.status
+            and latest_employee
+            and latest_machine
+            and same_allocation.id == latest_employee.id == latest_machine.id
+        ):
+            return Response({
+                "message": "Already allocated today && Online process successfully",
+            })
 
         if latest_employee and latest_employee.status:
             return Response(
@@ -1110,13 +1086,6 @@ class EmpAllocateAPIView(APIView):
         # -------------------------
         # MACHINE ALREADY ONLINE ?
         # -------------------------
-        latest_machine = emp_allocate.objects.filter(
-            machine_id=machine_id,
-            unit=unit,
-            line=line,
-            date__date=selected_date
-        ).order_by("-date", "-id").first()
-
         if latest_machine and latest_machine.status:
             return Response(
                 {
@@ -1124,6 +1093,21 @@ class EmpAllocateAPIView(APIView):
                 },
                 status=400
             )
+
+        emp_allocate.objects.filter(
+            emp_code=emp_code,
+            date__date=selected_date,
+            line=line,
+            unit=unit,
+            status=True,
+        ).update(status=False)
+        emp_allocate.objects.filter(
+            machine_id=machine_id,
+            date__date=selected_date,
+            line=line,
+            unit=unit,
+            status=True,
+        ).update(status=False)
 
         # -------------------------
         # ALWAYS CREATE NEW ROW

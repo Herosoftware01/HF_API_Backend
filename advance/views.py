@@ -27,6 +27,39 @@ from datetime import datetime
 from decimal import Decimal
 
 
+class InlineImageEmail(EmailMultiAlternatives):
+    """Email with CID images nested under the HTML alternative."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.inline_images = []
+
+    def attach_inline_image(self, image, content_id):
+        self.inline_images.append((image, content_id))
+
+    def _add_attachments(self, msg):
+        super()._add_attachments(msg)
+
+        if not self.inline_images:
+            return
+
+        html_part = next(
+            (part for part in msg.walk() if part.get_content_type() == "text/html"),
+            None,
+        )
+        if html_part is None:
+            return
+
+        for image, content_id in self.inline_images:
+            html_part.add_related(
+                image.get_payload(decode=True),
+                maintype=image.get_content_maintype(),
+                subtype=image.get_content_subtype(),
+                cid=f"<{content_id}>",
+                disposition="inline",
+            )
+
+
 @csrf_exempt
 def request_advance(request):
 
@@ -179,11 +212,11 @@ def send_advance_mail(request):
             photo_name = emp.get("photo")
 
             #  EMAIL OBJECT
-            email = EmailMultiAlternatives(
+            email = InlineImageEmail(
                 "🧾 New Advance Request Submitted",
                 "",
                 settings.EMAIL_HOST_USER,
-                ["hfautomation2026@gmail.com", "design@herofashion.com"],
+                ["hfautomation2026@gmail.com","herosoftware@herofashion.com"],
             )
 
             # IMAGE ATTACH (optional)
@@ -197,8 +230,7 @@ def send_advance_mail(request):
                         with open(local_path, "rb") as f:
                             img = MIMEImage(f.read())
                             photo_cid = f"photo_{obj.empid}"
-                            img.add_header("Content-ID", f"<{photo_cid}>")
-                            email.attach(img)
+                            email.attach_inline_image(img, photo_cid)
                 except Exception as e:
                     print("⚠️ Image error:", str(e))
 
@@ -281,7 +313,7 @@ def send_approval_mail(request):
                 subject,
                 text_content,
                 settings.EMAIL_HOST_USER,
-                ["hfautomation2026@gmail.com", "design@herofashion.com"],
+                ["hfautomation2026@gmail.com"],
             )
 
             email.attach_alternative(html_content, "text/html")
