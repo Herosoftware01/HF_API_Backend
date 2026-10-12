@@ -1,33 +1,63 @@
 from django.http import JsonResponse
-from .models import ViewCuttingDelPrint,ViewKnitDelivery,ViewCutsecFabricdelivery,VueAccInhTransfer,VueAccProdDel,TrsGatemodule, CuttingPrintembdel, ViewYarnProcessDelivery,VueAccProcDel,ViewAccinwardVerification,ViewFabricDeliveryProcess,ViewMistakeqtyPrint,ViewUnitPcdelivery,VueRibDeliveryDetails,ViewGdwnFabricDeliveryPlan,TrsApidtls,ViewFabricDeliveryRepl,HerofashionUser,Holiday,RoleModulePermission,Dc_Incharge_Verify,Dc_Reciver_Verify,ViewGeneralDeiveryType1
+from .models import (ViewCuttingDelPrint,
+ViewKnitDelivery,ViewCutsecFabricdelivery,
+VueAccInhTransfer,VueAccProdDel,
+TrsGatemodule, CuttingPrintembdel,
+ViewYarnProcessDelivery,VueAccProcDel,
+ViewAccinwardVerification,ViewFabricDeliveryProcess,
+ViewMistakeqtyPrint,ViewUnitPcdelivery,VueRibDeliveryDetails,ViewGdwnFabricDeliveryPlan,
+TrsApidtls,ViewFabricDeliveryRepl,HerofashionUser,Holiday,RoleModulePermission,
+Dc_Reciver_Verify,ViewGeneralDeiveryType1,ViewGenStockIssue,ModuleMaster)
 import json
 from django.views.decorators.csrf import csrf_exempt
 from django.forms.models import model_to_dict
-from django.utils.dateparse import parse_datetime
+from django.utils.dateparse import parse_date, parse_datetime
 from django.utils import timezone
 from django.core.exceptions import ValidationError
 from decimal import Decimal, InvalidOperation
+from django.db import IntegrityError, transaction
 from django.db import transaction
 from django.http.multipartparser import MultiPartParser, MultiPartParserError
 from django.utils import timezone
 from datetime import date
+from django.views.decorators.http import require_http_methods
+import re
 
 
-def cutting_del_print(request):
-    id = request.GET.get("id")  # Example: ?id=101
 
+def cutting_del_print(request, id=None):
+    selected_id = id if id is not None else request.GET.get("id")
     queryset = ViewCuttingDelPrint.objects.using('demo').all()
 
-    if id:
-        queryset = queryset.filter(id=id)
+    if selected_id not in (None, ""):
+        try:
+            selected_id = int(selected_id)
+        except ValueError:
+            return JsonResponse({
+                "status": False,
+                "message": "id must be an integer.",
+            }, status=400)
 
-    data = list(queryset.values())
+        data = list(queryset.filter(id=selected_id).values())
+    else:
+        # Note: Add additional display fields from ViewCuttingDelPrint (e.g., 'orderno', 'supplier') as needed
+        options = (
+            queryset.values("id")
+            .distinct()
+            .order_by("id")
+        )
+        data = [
+            {
+                "id": option["id"],
+            }
+            for option in options
+        ]
 
     return JsonResponse({
         "status": True,
         "message": "Success",
         "count": len(data),
-        "data": data
+        "data": data,
     })
 
 def cutting_bit_print(request, id):
@@ -42,15 +72,26 @@ def yarn_process_delivery(request, dcno):
     return JsonResponse(data, safe=False)
 
 
-def knitting_del_print(request):
-    dcno = request.GET.get("dcno")  
+def knitting_del_print(request, dcno=None):
+    selected_dcno = dcno if dcno is not None else request.GET.get("dcno")
     queryset = ViewKnitDelivery.objects.using('test').all()
 
-    if dcno:
-        # FIX: Changed from dc=dcno to dcno=dcno
-        queryset = queryset.filter(dcno=dcno)
+    if selected_dcno not in (None, ""):
+        try:
+            selected_dcno = int(selected_dcno)
+        except ValueError:
+            return JsonResponse({
+                "status": False,
+                "message": "dcno must be an integer.",
+            }, status=400)
 
-    data = list(queryset.values())
+        data = list(queryset.filter(dcno=selected_dcno).values())
+    else:
+        dc_options = queryset.values("dcno", "knit_name").distinct().order_by("dcno")
+        data = [
+            {"dcno": option["dcno"], "supplier": option["knit_name"]}
+            for option in dc_options
+        ]
 
     return JsonResponse({
         "status": True,
@@ -59,57 +100,115 @@ def knitting_del_print(request):
         "data": data
     })
 
-def acc_prod_del_print(request):
-    no = request.GET.get("no")  
 
+def acc_prod_del_print(request, no=None):
+    selected_no = no if no is not None else request.GET.get("no")
     queryset = VueAccProdDel.objects.using('test').all()
 
-    if no:
-        # FIX: Changed from n=no to no=no
-        queryset = queryset.filter(no=no)
+    if selected_no not in (None, ""):
+        try:
+            selected_no = int(selected_no)
+        except ValueError:
+            return JsonResponse({
+                "status": False,
+                "message": "no must be an integer.",
+            }, status=400)
 
-    data = list(queryset.values())
+        data = list(queryset.filter(no=selected_no).values())
+    else:
+        prod_options = (
+            queryset.values("no", "supplier", "orderno")
+            .distinct()
+            .order_by("no")
+        )
+        data = [
+            {
+                "no": option["no"],
+                "supplier": option["supplier"],
+                "orderno": option["orderno"],
+            }
+            for option in prod_options
+        ]
 
     return JsonResponse({
         "status": True,
         "message": "Success",
         "count": len(data),
-        "data": data
+        "data": data,
     })
-
-def acc_proc_del_print(request):
-    no = request.GET.get("no")  # Example: ?id=101
-
+def acc_proc_del_print(request, no=None):
+    selected_no = no if no is not None else request.GET.get("no")
     queryset = VueAccProcDel.objects.using('test').all()
 
-    if no:
-        queryset = queryset.filter(no=no)
+    if selected_no not in (None, ""):
+        try:
+            selected_no = int(selected_no)
+        except ValueError:
+            return JsonResponse({
+                "status": False,
+                "message": "no must be an integer.",
+            }, status=400)
 
-    data = list(queryset.values())
+        data = list(queryset.filter(no=selected_no).values())
+    else:
+        proc_options = (
+            queryset.values("no", "supplier", "orderno")
+            .distinct()
+            .order_by("no")
+        )
+        data = [
+            {
+                "no": option["no"],
+                "supplier": option["supplier"],
+                "orderno": option["orderno"],
+            }
+            for option in proc_options
+        ]
 
     return JsonResponse({
         "status": True,
         "message": "Success",
         "count": len(data),
-        "data": data
+        "data": data,
     })
 
 
-def acc_inhouse_transfer(request):
-    no = request.GET.get("no")  # Example: ?id=101
 
+def acc_inhouse_transfer(request, no=None):
+    selected_no = no if no is not None else request.GET.get("no")
     queryset = VueAccInhTransfer.objects.using('test').all()
 
-    if no:
-        queryset = queryset.filter(no=no)
+    if selected_no not in (None, ""):
+        try:
+            selected_no = int(selected_no)
+        except ValueError:
+            return JsonResponse({
+                "status": False,
+                "message": "no must be an integer.",
+            }, status=400)
 
-    data = list(queryset.values())
+        data = list(queryset.filter(no=selected_no).values())
+    else:
+        transfer_options = (
+            queryset.values("no", "orderno", "frmdpt", "todept")
+            .distinct()
+            .order_by("no")
+        )
+        data = [
+            {
+                "no": option["no"],
+                "orderno": option["orderno"],
+                "from_department": option["frmdpt"],
+                "to_department": option["todept"],
+            }
+            for option in transfer_options
+        ]
 
     return JsonResponse({
         "status": True,
         "message": "Success",
         "count": len(data),
-        "data": data
+        "data": data,
     })
 
 def acc_inward_verification(request):
@@ -142,32 +241,84 @@ def acc_inward_verification(request):
     })
 
 
-def fabric_process_delivery(request):
-    no = request.GET.get("dcno")  # Example: ?dcno=101
-
+def fabric_process_delivery(request, no=None):
+    # Accept from URL param or either query param ('no' or 'dcno')
+    selected_no = (
+        no
+        if no is not None
+        else (request.GET.get("no") or request.GET.get("dcno"))
+    )
     queryset = ViewFabricDeliveryProcess.objects.using('test').all()
 
-    if no:
-        queryset = queryset.filter(dcno=no)
+    if selected_no not in (None, ""):
+        try:
+            selected_no = int(selected_no)
+        except ValueError:
+            return JsonResponse({
+                "status": False,
+                "message": "no must be an integer.",
+            }, status=400)
 
-    data = list(queryset.values())
-    return JsonResponse(data, safe=False)
-
-def mistake_qty_print(request):
-    dcno = request.GET.get("dcno")  # Example: ?id=101
-
-    queryset = ViewMistakeqtyPrint.objects.using('demo').all()
-
-    if dcno:
-        queryset = queryset.filter(dcno=dcno)
-
-    data = list(queryset.values())
+        # Filter by 'no' (matching the primary key on ViewFabricDeliveryProcess)
+        data = list(queryset.filter(no=selected_no).values())
+    else:
+        delivery_options = (
+            queryset.values("no", "su_name", "orderno", "del_unit")
+            .distinct()
+            .order_by("no")
+        )
+        data = [
+            {
+                "no": option["no"],
+                "supplier": option["su_name"],
+                "orderno": option["orderno"],
+                "delivery_unit": option["del_unit"],
+            }
+            for option in delivery_options
+        ]
 
     return JsonResponse({
         "status": True,
         "message": "Success",
         "count": len(data),
-        "data": data
+        "data": data,
+    })
+
+def mistake_qty_print(request, dcno=None):
+    selected_dcno = dcno if dcno is not None else request.GET.get("dcno")
+    queryset = ViewMistakeqtyPrint.objects.using('demo').all()
+
+    if selected_dcno not in (None, ""):
+        try:
+            selected_dcno = int(selected_dcno)
+        except ValueError:
+            return JsonResponse({
+                "status": False,
+                "message": "dcno must be an integer.",
+            }, status=400)
+
+        data = list(queryset.filter(dcno=selected_dcno).values())
+    else:
+        dc_options = (
+            queryset.values("dcno", "jobno", "toad", "frm")
+            .distinct()
+            .order_by("dcno")
+        )
+        data = [
+            {
+                "dcno": option["dcno"],
+                "jobno": option["jobno"],
+                "to_party": option["toad"],
+                "from_party": option["frm"],
+            }
+            for option in dc_options
+        ]
+
+    return JsonResponse({
+        "status": True,
+        "message": "Success",
+        "count": len(data),
+        "data": data,
     })
 
 def unit_pc_delivery(request, dcno):
@@ -181,69 +332,130 @@ def CuttingSecFabric(request, dcno):
     return JsonResponse(data, safe=False)
 
 
-def rib_delivery_print(request):
-    dcno = request.GET.get("dc")  
-
+def rib_delivery_print(request, dc=None):
+    # Accepts from URL param or query params ('dc' or 'dcno')
+    selected_dc = (
+        dc
+        if dc is not None
+        else (request.GET.get("dc") or request.GET.get("dcno"))
+    )
     queryset = VueRibDeliveryDetails.objects.using('demo').all()
 
-    if dcno:
-        # FIX: Changed from dcno=dcno to dc=dcno
-        queryset = queryset.filter(dc=dcno)
+    if selected_dc not in (None, ""):
+        try:
+            selected_dc = int(selected_dc)
+        except ValueError:
+            return JsonResponse({
+                "status": False,
+                "message": "dc must be an integer.",
+            }, status=400)
 
-    data = list(queryset.values())
+        data = list(queryset.filter(dc=selected_dc).values())
+    else:
+        dc_options = (
+            queryset.values("dc", "jobno", "deladd", "topbottom_des")
+            .distinct()
+            .order_by("dc")
+        )
+        data = [
+            {
+                "dc": option["dc"],
+                "jobno": option["jobno"],
+                "delivery_address": option["deladd"],
+                "description": option["topbottom_des"],
+            }
+            for option in dc_options
+        ]
 
     return JsonResponse({
         "status": True,
         "message": "Success",
         "count": len(data),
-        "data": data
+        "data": data,
     })
 
 
-def godown_fabric_delivery_plan(request):
-    dcno = request.GET.get("dcno")  # Example: ?id=101
-
+def godown_fabric_delivery_plan(request, dcno=None):
+    selected_dcno = dcno if dcno is not None else request.GET.get("dcno")
     queryset = ViewGdwnFabricDeliveryPlan.objects.using('demo').all()
 
-    if dcno:
-        queryset = queryset.filter(dcno=dcno)
+    if selected_dcno not in (None, ""):
+        try:
+            selected_dcno = int(selected_dcno)
+        except ValueError:
+            return JsonResponse({
+                "status": False,
+                "message": "dcno must be an integer.",
+            }, status=400)
 
-    data = list(queryset.values())
-
-    return JsonResponse({
-        "status": True,
-        "message": "Success",
-        "count": len(data),
-        "data": data
-    })
-
-
-def fabric_delivery_repl(request):
-    dcno = request.GET.get("dcno")
-
-    queryset = ViewFabricDeliveryRepl.objects.using("demo")
-
-    if dcno:
-        queryset = queryset.filter(dcno=dcno)
+        data = list(queryset.filter(dcno=selected_dcno).values())
     else:
-        return JsonResponse({
-            "status": False,
-            "message": "dcno is required",
-            "count": 0,
-            "data": []
-        })
-
-    data = list(queryset.values())
+        dc_options = (
+            queryset.values("dcno", "jobno", "frm", "todept")
+            .distinct()
+            .order_by("dcno")
+        )
+        data = [
+            {
+                "dcno": option["dcno"],
+                "jobno": option["jobno"],
+                "from_dept": option["frm"],
+                "to_dept": option["todept"],
+            }
+            for option in dc_options
+        ]
 
     return JsonResponse({
         "status": True,
         "message": "Success",
         "count": len(data),
-        "data": data
+        "data": data,
     })
 
-def general_delivery_type1(request):
-    dcno = request.GET.get("dcno")
+
+def fabric_delivery_repl(request, dcno=None):
+    selected_dcno = dcno if dcno is not None else request.GET.get("dcno")
+    queryset = ViewFabricDeliveryRepl.objects.using("demo").all()
+
+    if selected_dcno not in (None, ""):
+        try:
+            selected_dcno = int(selected_dcno)
+        except ValueError:
+            return JsonResponse({
+                "status": False,
+                "message": "dcno must be an integer.",
+            }, status=400)
+
+        data = list(queryset.filter(dcno=selected_dcno).values())
+    else:
+        dc_options = (
+            queryset.values("dcno", "jobno", "frm", "todept")
+            .distinct()
+            .order_by("dcno")
+        )
+        data = [
+            {
+                "dcno": option["dcno"],
+                "jobno": option["jobno"],
+                "from_dept": option["frm"],
+                "to_dept": option["todept"],
+            }
+            for option in dc_options
+        ]
+
+    return JsonResponse({
+        "status": True,
+        "message": "Success",
+        "count": len(data),
+        "data": data,
+    })
+
+def general_delivery_type1(request, dcno=None):
+    selected_dcno = (
+        dcno
+        if dcno is not None
+        else (request.GET.get("dcno") or request.GET.get("no"))
+    )
 
     today = date.today()
 
@@ -255,39 +467,105 @@ def general_delivery_type1(request):
         fy_start = date(today.year - 1, 4, 1)
         fy_end = date(today.year, 3, 31)
 
-    queryset = ViewGeneralDeiveryType1.objects.using('test').all()
-
-    # Current account/financial year
-    queryset = queryset.filter(
-        date__gte=fy_start,
-        date__lte=fy_end
+    queryset = (
+        ViewGeneralDeiveryType1.objects.using('test')
+        .filter(date__gte=fy_start, date__lte=fy_end)
     )
 
-    # DC number filter
-    if dcno:
-        queryset = queryset.filter(no=dcno)
+    if selected_dcno not in (None, ""):
+        try:
+            selected_dcno = int(selected_dcno)
+        except ValueError:
+            return JsonResponse({
+                "status": False,
+                "message": "dcno must be an integer.",
+            }, status=400)
 
-    data = list(queryset.values())
+        data = list(queryset.filter(no=selected_dcno).values())
+    else:
+        dc_options = (
+            queryset.values("no", "suppliername", "department")
+            .distinct()
+            .order_by("no")
+        )
+        data = [
+            {
+                "dcno": option["no"],
+                "supplier": option["suppliername"],
+                "department": option["department"],
+            }
+            for option in dc_options
+        ]
 
     return JsonResponse({
         "status": True,
         "message": "Success",
         "count": len(data),
-        "data": data
+        "data": data,
+    })
+
+def gen_stock_issue(request, no=None):
+    selected_no = (
+        no
+        if no is not None
+        else (request.GET.get("no") or request.GET.get("dcno"))
+    )
+
+    queryset = ViewGenStockIssue.objects.using("test").filter(
+        date__year=timezone.now().year
+    )
+
+    if selected_no not in (None, ""):
+        try:
+            selected_no = int(selected_no)
+        except ValueError:
+            return JsonResponse({
+                "status": False,
+                "message": "no must be an integer.",
+            }, status=400)
+
+        data = list(queryset.filter(no=selected_no).values())
+    else:
+        issue_options = (
+            queryset.values("no", "frm_dept", "to_dept", "reqno")
+            .distinct()
+            .order_by("no")
+        )
+        data = [
+            {
+                "no": option["no"],
+                "from_dept": option["frm_dept"],
+                "to_dept": option["to_dept"],
+                "reqno": option["reqno"],
+            }
+            for option in issue_options
+        ]
+
+    return JsonResponse({
+        "status": True,
+        "message": "Success",
+        "count": len(data),
+        "data": data,
     })
 
 
-
 # --- VIEW ---
-csrf_exempt
+@csrf_exempt
 def gate_module_api(request, pk=None):
+
+    # ---------------- CORS PREFLIGHT (OPTIONS) ----------------
+    if request.method == "OPTIONS":
+        response = JsonResponse({"status": True})
+        response["Access-Control-Allow-Origin"] = "*"
+        response["Access-Control-Allow-Methods"] = "GET, POST, PUT, PATCH, OPTIONS"
+        response["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-Requested-With"
+        return response
+
     # ---------------- GET ----------------
     if request.method == "GET":
-
-        # 1. Single Record by Primary Key
         if pk:
             try:
-                obj = TrsGatemodule.objects.using('demo').get(pk=pk)
+                obj = TrsGatemodule.objects.using("demo").get(pk=pk)
                 data = model_to_dict(obj)
                 if obj.date:
                     data["date"] = obj.date.strftime("%Y-%m-%d %H:%M:%S")
@@ -295,26 +573,18 @@ def gate_module_api(request, pk=None):
             except TrsGatemodule.DoesNotExist:
                 return JsonResponse({"status": False, "message": "Record not found"}, status=404)
 
-        # Base Queryset
-        queryset = TrsGatemodule.objects.using('demo').all().order_by("-date")
+        queryset = TrsGatemodule.objects.using("demo").all().order_by("-date")
 
-        # 2. Extract Filters from Frontend Request
         dc_no = request.GET.get("no")
-        filter_date = request.GET.get("date")  # <--- Capture the single date parameter
+        filter_date = request.GET.get("date")
 
-        # Apply Filters Dynamically
         if dc_no:
             queryset = queryset.filter(no=dc_no)
-        
         if filter_date:
-            # __date extracts the YYYY-MM-DD part from the database's DateTimeField
             queryset = queryset.filter(date__date=filter_date)
-
-        # Optional: If no filters are applied, limit to 50 to prevent crashing/slowdown
         if not dc_no and not filter_date:
-            queryset = queryset[:50] 
+            queryset = queryset[:50]
 
-        # Format Response
         data = []
         for obj in queryset:
             item = model_to_dict(obj)
@@ -322,36 +592,29 @@ def gate_module_api(request, pk=None):
                 item["date"] = obj.date.strftime("%Y-%m-%d %H:%M:%S")
             data.append(item)
 
-        return JsonResponse({
-            "status": True,
-            "count": len(data),
-            "data": data
-        })
+        return JsonResponse({"status": True, "count": len(data), "data": data})
 
     # ---------------- POST ----------------
     elif request.method == "POST":
         try:
             body = json.loads(request.body)
-
             module = body.get("module")
             qr_code_dtls = body.get("qr_code_dtls")
 
-            # Duplicate check
             if TrsGatemodule.objects.using("demo").filter(
-                module=module,
-                qr_code_dtls=qr_code_dtls
+                module=module, qr_code_dtls=qr_code_dtls
             ).exists():
                 return JsonResponse({
                     "status": False,
                     "message": "DcNo Already Saved"
                 }, status=409)
 
-            # Safely parse dates if they exist in the payload
             date_val = body.get("date")
             print_date_val = body.get("print_delivery_date")
             gate_date_val = body.get("gate_delivery_date")
+            inch_verify_date = body.get("inch_verify_date")
 
-            obj = TrsGatemodule.objects.using("demo").create(
+            TrsGatemodule.objects.using("demo").create(
                 module=module,
                 qr_code_dtls=qr_code_dtls,
                 companyid=body.get("companyid"),
@@ -368,64 +631,64 @@ def gate_module_api(request, pk=None):
                 print_delivery_date=parse_datetime(print_date_val) if print_date_val else None,
                 gate_delivery_date=parse_datetime(gate_date_val) if gate_date_val else None,
                 prepered=body.get("prepered"),
-                fhero=body.get("fhero")
+                fhero=body.get("fhero"),
+                inch_verify_date=parse_date(inch_verify_date) if inch_verify_date else None,
+                inch_verify_status=body.get("inch_verify_status"),
             )
 
-            return JsonResponse({
-                "status": True,
-                "message": "Dc Created Successfully",
-            }, status=201)
+            return JsonResponse({"status": True, "message": "Dc Created Successfully"}, status=201)
 
         except Exception as e:
-            return JsonResponse({
-                "status": False,
-                "message": str(e)
-            }, status=400)
+            return JsonResponse({"status": False, "message": str(e)}, status=400)
 
-    # ---------------- PUT (Handles React Verification Updates) ----------------
-    elif request.method == "PUT":
+    # ---------------- PUT / PATCH ----------------
+    # ---------------- PUT / PATCH ----------------
+    elif request.method in ["PUT", "PATCH"]:
         if not pk:
             return JsonResponse({
-                "status": False, 
+                "status": False,
                 "message": "Record ID is required for updates"
             }, status=400)
-            
+
         try:
             body = json.loads(request.body)
-            obj = TrsGatemodule.objects.using('demo').get(pk=pk)
-            
-            # If 'verify' is in the request payload, update the field
+            obj = TrsGatemodule.objects.using("demo").get(pk=pk)
+
+            # Original fields
             if "verify" in body:
                 obj.verify = body["verify"]
 
-            # 2. Update the 'gate_delivery_date' (THIS WAS MISSING)
             if "gate_delivery_date" in body:
                 date_str = body["gate_delivery_date"]
                 obj.gate_delivery_date = parse_datetime(date_str) if date_str else None
+
+            # ADD THESE LINES to capture the new frontend payload
+            if "fhero" in body:
+                obj.fhero = body["fhero"]
                 
-            # Save the updated record
-            obj.save(using='demo')
-            
+            if "inch_verify_date" in body:
+                date_str = body["inch_verify_date"]
+                obj.inch_verify_date = parse_date(date_str) if date_str else None
+                
+            if "inch_verify_status" in body:
+                obj.inch_verify_status = body["inch_verify_status"]
+
+            obj.save(using="demo")
+
             return JsonResponse({
                 "status": True,
                 "message": "Verification saved successfully"
             }, status=200)
 
         except TrsGatemodule.DoesNotExist:
-            return JsonResponse({
-                "status": False, 
-                "message": "Record not found"
-            }, status=404)
+            return JsonResponse({"status": False, "message": "Record not found"}, status=404)
         except Exception as e:
-            return JsonResponse({
-                "status": False, 
-                "message": str(e)
-            }, status=400)
+            return JsonResponse({"status": False, "message": str(e)}, status=400)
 
-    # ---------------- METHOD NOT ALLOWED ----------------
+    # ---------------- FALLBACK ----------------
     return JsonResponse({
         "status": False,
-        "message": "Method not allowed"
+        "message": f"Method '{request.method}' not allowed"
     }, status=405)
 
 
@@ -443,9 +706,10 @@ def gate_module_api_details(request):
     })
 
 
-def get_user_by_username(request):
-    
+def get_user_by_username(request, username=None):
     data = HerofashionUser.objects.all()
+    if username is not None:
+        data = data.filter(username=username)
 
     data1 = list(data.values('id', 'username', 'role__name'))
 
@@ -475,292 +739,463 @@ def get_holidays(request):
     })
 
 
-# Hardcoded single source of truth for all modules
-AVAILABLE_MODULES = [
-    {"module_id": "cut_to_unit", "module_name": "Cut to Unit Delivery"},
-    {"module_id": "cutting_sec_fabric", "module_name": "Cutting Section Fabric"},
-    {"module_id": "knitting_delivery", "module_name": "Knitting Delivery"},
-    {"module_id": "bit_delivery", "module_name": "Bit Delivery Challan"},
-    {"module_id": "yarn_process", "module_name": "Yarn Process Challan"},
-    {"module_id": "acc_production", "module_name": "Accessory Production"},
-    {"module_id": "acc_process", "module_name": "Accessory Process"},
-    {"module_id": "acc_inhouse", "module_name": "Accessory Inhouse Delivery"},
-    {"module_id": "fabric_process", "module_name": "Fabric Process Delivery"},
-    {"module_id": "mistake_cut", "module_name": "Mistake Cut Delivery"},
-    {"module_id": "rib_cut", "module_name": "Rib Cut Delivery"},
-    {"module_id": "godown_fabric", "module_name": "Godown Fabric Delivery"},
-    {"module_id": "replacement_del", "module_name": "Replacement Delivery"},
-    {"module_id": "unit_pcs", "module_name": "Unit Pcs Delivery"},
-    {"module_id": "general_transaction_delivery", "module_name": "General Delivery Type 1"},
-]
 
-AVAILABLE_MODULE_MAP = {
-    module["module_id"]: module["module_name"] for module in AVAILABLE_MODULES
-}
 
-# Older clients/database rows may still use one of these IDs.
+MODULE_ID_PATTERN = re.compile(r"^[a-z][a-z0-9_]*$")
+
 LEGACY_MODULE_IDS = {
+    "general": "general_transaction_delivery",
     "general_delivery": "general_transaction_delivery",
     "general_delivery_type1": "general_transaction_delivery",
 }
 
 
+def error_response(message, status=400, **extra):
+    response = {
+        "status": False,
+        "message": message,
+    }
+    response.update(extra)
+    return JsonResponse(response, status=status)
+
+
+def read_json(request, allow_empty=False):
+    if not request.body:
+        if allow_empty:
+            return {}, None
+        return None, error_response("Request body is required")
+
+    try:
+        data = json.loads(request.body.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        return None, error_response("Invalid JSON format")
+
+    if not isinstance(data, dict):
+        return None, error_response("JSON body must be an object")
+
+    return data, None
+
+
+def normalize_module_id(module_id):
+    if not isinstance(module_id, str):
+        return None
+
+    module_id = module_id.strip()
+
+    if not module_id:
+        return None
+
+    return LEGACY_MODULE_IDS.get(module_id, module_id)
+
+
+def serialize_module(module):
+    return {
+        "module_id": module.module_id,
+        "module_name": module.module_name,
+        "description": module.description,
+        "path": module.path,
+        "display_order": module.display_order,
+        "is_active": module.is_active,
+    }
+
+
+def validate_module_payload(data, partial=False):
+    values = {}
+    errors = {}
+
+    if not partial or "module_name" in data:
+        module_name = data.get("module_name")
+
+        if not isinstance(module_name, str) or not module_name.strip():
+            errors["module_name"] = "Module name is required"
+        elif len(module_name.strip()) > 255:
+            errors["module_name"] = "Maximum length is 255"
+        else:
+            values["module_name"] = module_name.strip()
+
+    if not partial or "description" in data:
+        description = data.get("description", "")
+
+        if not isinstance(description, str):
+            errors["description"] = "Description must be a string"
+        else:
+            values["description"] = description.strip()
+
+    if not partial or "path" in data:
+        path = data.get("path", "")
+
+        if not isinstance(path, str):
+            errors["path"] = "Path must be a string"
+        elif len(path.strip()) > 255:
+            errors["path"] = "Maximum length is 255"
+        else:
+            values["path"] = path.strip()
+
+    if not partial or "display_order" in data:
+        display_order = data.get("display_order", 0)
+
+        if (
+            isinstance(display_order, bool)
+            or not isinstance(display_order, int)
+            or display_order < 0
+        ):
+            errors["display_order"] = (
+                "Display order must be a non-negative integer"
+            )
+        else:
+            values["display_order"] = display_order
+
+    if not partial or "is_active" in data:
+        is_active = data.get("is_active", True)
+
+        if not isinstance(is_active, bool):
+            errors["is_active"] = "is_active must be true or false"
+        else:
+            values["is_active"] = is_active
+
+    return values, errors
+
+
+# Keep csrf_exempt only when this endpoint is protected using token/JWT
+# authentication. With Django session authentication, use CSRF protection.
 @csrf_exempt
+@require_http_methods(["GET", "POST"])
+def module_collection(request):
+    """
+    GET  /dcapp/dc_modules/
+    POST /dcapp/dc_modules/
+    """
+
+    if request.method == "GET":
+        include_inactive = (
+            request.GET.get("include_inactive", "false").lower()
+            in {"true", "1", "yes"}
+        )
+
+        modules = ModuleMaster.objects.all()
+
+        if not include_inactive:
+            modules = modules.filter(is_active=True)
+
+        modules = modules.order_by("display_order", "module_name")
+
+        return JsonResponse(
+            [serialize_module(module) for module in modules],
+            safe=False,
+        )
+
+    data, error = read_json(request)
+
+    if error:
+        return error
+
+    module_id = data.get("module_id")
+
+    if not isinstance(module_id, str):
+        return error_response("module_id is required")
+
+    module_id = module_id.strip()
+
+    if not MODULE_ID_PATTERN.fullmatch(module_id):
+        return error_response(
+            "module_id must start with a lowercase letter and contain "
+            "only lowercase letters, numbers, and underscores"
+        )
+
+    if module_id in LEGACY_MODULE_IDS:
+        return error_response(
+            "This module_id is a legacy alias",
+            canonical_module_id=LEGACY_MODULE_IDS[module_id],
+        )
+
+    values, validation_errors = validate_module_payload(data)
+
+    if validation_errors:
+        return error_response(
+            "Validation failed",
+            errors=validation_errors,
+        )
+
+    try:
+        module = ModuleMaster(module_id=module_id, **values)
+        module.full_clean()
+        module.save(force_insert=True)
+    except ValidationError as exception:
+        return error_response(
+            "Validation failed",
+            errors=getattr(
+                exception,
+                "message_dict",
+                {"non_field_errors": exception.messages},
+            ),
+        )
+    except IntegrityError:
+        return error_response(
+            "A module with this module_id already exists",
+            status=409,
+        )
+
+    return JsonResponse(
+        {
+            "status": True,
+            "message": "Module created successfully",
+            "module": serialize_module(module),
+        },
+        status=201,
+    )
+
+
+@csrf_exempt
+@require_http_methods(["GET", "PATCH", "DELETE"])
+def module_detail(request, module_id):
+    """
+    GET    /dcapp/dc_modules/<module_id>/
+    PATCH  /dcapp/dc_modules/<module_id>/
+    DELETE /dcapp/dc_modules/<module_id>/
+    """
+
+    try:
+        module = ModuleMaster.objects.get(module_id=module_id)
+    except ModuleMaster.DoesNotExist:
+        return error_response("Module not found", status=404)
+
+    if request.method == "GET":
+        return JsonResponse(serialize_module(module))
+
+    if request.method == "DELETE":
+        module.is_active = False
+        module.save(update_fields=("is_active", "updated_at"))
+
+        return JsonResponse({
+            "status": True,
+            "message": "Module deactivated successfully",
+            "module": serialize_module(module),
+        })
+
+    data, error = read_json(request)
+
+    if error:
+        return error
+
+    if "module_id" in data and data["module_id"] != module.module_id:
+        return error_response("module_id cannot be changed")
+
+    values, validation_errors = validate_module_payload(
+        data,
+        partial=True,
+    )
+
+    if validation_errors:
+        return error_response(
+            "Validation failed",
+            errors=validation_errors,
+        )
+
+    try:
+        with transaction.atomic():
+            module = ModuleMaster.objects.select_for_update().get(
+                module_id=module_id
+            )
+
+            for field, value in values.items():
+                setattr(module, field, value)
+
+            module.full_clean()
+            module.save()
+    except ValidationError as exception:
+        return error_response(
+            "Validation failed",
+            errors=getattr(
+                exception,
+                "message_dict",
+                {"non_field_errors": exception.messages},
+            ),
+        )
+
+    return JsonResponse({
+        "status": True,
+        "message": "Module updated successfully",
+        "module": serialize_module(module),
+    })
+
+
+@csrf_exempt
+@require_http_methods(["GET", "POST", "DELETE"])
 def manage_role_permissions(request, role_param=None):
     """
-    Single function handling CRUD for Role Permissions.
-    GET: Reads permissions for a role.
-    POST: Creates or Updates permissions.
-    DELETE: Deletes/Resets permissions for a role.
+    GET    /dcapp/dc_permissions/<role>/
+    POST   /dcapp/dc_permissions/save/
+    DELETE /dcapp/dc_permissions/<role>/
     """
-    
-    # ------------------ READ (GET) ------------------
-    if request.method == 'GET':
-        # Depending on url routing, role might come from URL param or query string
-        role = role_param or request.GET.get('role')
-        
-        if not role:
-            return JsonResponse({"error": "Role is required"}, status=400)
-            
-        # Fetch existing DB permissions for this role
-        db_permissions = RoleModulePermission.objects.filter(role=role)
-        db_perm_dict = {
-            LEGACY_MODULE_IDS.get(p.module_id, p.module_id): p.is_enabled
-            for p in db_permissions
-        }
-        
-        # Build response based on single source of truth (AVAILABLE_MODULES)
-        response_data = []
-        for mod in AVAILABLE_MODULES:
-            response_data.append({
-                "module_id": mod["module_id"],
-                "module_name": mod["module_name"],
-                # Default to False if not found in DB
-                "is_enabled": db_perm_dict.get(mod["module_id"], False) 
-            })
-            
-        # Returning array directly to match your React component's expected data format
-        return JsonResponse(response_data, safe=False)
 
+    if request.method == "GET":
+        role = role_param or request.GET.get("role")
 
-    # ------------------ CREATE / UPDATE (POST) ------------------
-    elif request.method == 'POST':
+        if not isinstance(role, str) or not role.strip():
+            return error_response("Role is required")
+
+        role = role.strip()
+
+        modules = list(
+            ModuleMaster.objects.filter(is_active=True).order_by(
+                "display_order",
+                "module_name",
+            )
+        )
+
+        stored_permissions = dict(
+            RoleModulePermission.objects.filter(role=role).values_list(
+                "module_id",
+                "is_enabled",
+            )
+        )
+
+        response = []
+
+        for module in modules:
+            module_data = serialize_module(module)
+            module_data["is_enabled"] = stored_permissions.get(
+                module.module_id,
+                False,
+            )
+            response.append(module_data)
+
+        return JsonResponse(response, safe=False)
+
+    if request.method == "POST":
+        data, error = read_json(request)
+
+        if error:
+            return error
+
+        role = data.get("role")
+
+        if not isinstance(role, str) or not role.strip():
+            return error_response("Role is required")
+
+        role = role.strip()
+        permissions = data.get("permissions", [])
+
+        if not isinstance(permissions, list):
+            return error_response("permissions must be an array")
+
+        normalized_permissions = {}
+        invalid_items = []
+
+        for index, permission in enumerate(permissions):
+            if not isinstance(permission, dict):
+                invalid_items.append({
+                    "index": index,
+                    "message": "Permission must be an object",
+                })
+                continue
+
+            requested_id = permission.get("module_id")
+            module_id = normalize_module_id(requested_id)
+            is_enabled = permission.get("is_enabled", False)
+
+            if not module_id:
+                invalid_items.append({
+                    "index": index,
+                    "message": "module_id is required",
+                })
+                continue
+
+            if not isinstance(is_enabled, bool):
+                invalid_items.append({
+                    "index": index,
+                    "module_id": requested_id,
+                    "message": "is_enabled must be true or false",
+                })
+                continue
+
+            if module_id in normalized_permissions:
+                invalid_items.append({
+                    "index": index,
+                    "module_id": requested_id,
+                    "message": "Duplicate module_id",
+                })
+                continue
+
+            normalized_permissions[module_id] = is_enabled
+
+        if invalid_items:
+            return error_response(
+                "Invalid permissions",
+                errors=invalid_items,
+            )
+
+        module_ids = set(normalized_permissions)
+
+        modules = ModuleMaster.objects.in_bulk(module_ids)
+
+        unknown_module_ids = sorted(module_ids - set(modules))
+
+        if unknown_module_ids:
+            return error_response(
+                "Unknown module_id",
+                module_ids=unknown_module_ids,
+            )
+
+        inactive_module_ids = sorted(
+            module_id
+            for module_id, module in modules.items()
+            if not module.is_active
+        )
+
+        if inactive_module_ids:
+            return error_response(
+                "Inactive modules cannot receive permissions",
+                module_ids=inactive_module_ids,
+            )
+
         try:
-            data = json.loads(request.body)
-            role = data.get('role')
-            permissions = data.get('permissions', [])
-            
-            if not role:
-                return JsonResponse({"status": False, "message": "Role is required"}, status=400)
-                
-            normalized_permissions = []
-            unknown_module_ids = []
-
-            for perm in permissions:
-                requested_module_id = perm.get('module_id')
-                module_id = LEGACY_MODULE_IDS.get(requested_module_id, requested_module_id)
-                module_name = AVAILABLE_MODULE_MAP.get(module_id)
-
-                if not module_name:
-                    unknown_module_ids.append(requested_module_id)
-                    continue
-
-                normalized_permissions.append((
-                    module_id,
-                    module_name,
-                    perm.get('is_enabled', False),
-                ))
-
-            if unknown_module_ids:
-                return JsonResponse({
-                    "status": False,
-                    "message": "Unknown module_id",
-                    "module_ids": unknown_module_ids,
-                }, status=400)
-
-            # Save the complete permission list as one database transaction.
             with transaction.atomic():
-                for module_id, module_name, is_enabled in normalized_permissions:
+                for module_id, is_enabled in normalized_permissions.items():
                     RoleModulePermission.objects.update_or_create(
                         role=role,
                         module_id=module_id,
                         defaults={
-                            'module_name': module_name,
-                            'is_enabled': is_enabled
-                        }
+                            "is_enabled": is_enabled,
+                        },
                     )
-                    
-            return JsonResponse({"status": True, "message": "Permissions saved successfully"})
-            
-        except json.JSONDecodeError:
-            return JsonResponse({"status": False, "message": "Invalid JSON format"}, status=400)
-        except Exception as e:
-            return JsonResponse({"status": False, "message": str(e)}, status=500)
+        except IntegrityError:
+            return error_response(
+                "Permissions could not be saved because of a conflict",
+                status=409,
+            )
 
-
-    # ------------------ DELETE (DELETE) ------------------
-    elif request.method == 'DELETE':
-        try:
-            data = json.loads(request.body)
-            role = data.get('role')
-            
-            if not role:
-                return JsonResponse({"status": False, "message": "Role is required for deletion"}, status=400)
-                
-            # Deletes all custom permissions for this role, effectively resetting them to default (OFF)
-            RoleModulePermission.objects.filter(role=role).delete()
-            return JsonResponse({"status": True, "message": f"Permissions for {role} reset successfully"})
-            
-        except Exception as e:
-            return JsonResponse({"status": False, "message": str(e)}, status=500)
-
-    else:
-        return JsonResponse({"status": False, "message": "Method not allowed"}, status=405)
-
-
-
-@csrf_exempt
-def dc_verify_incharge_crud(request):
-    """
-    All-in-one CRUD API endpoint using standard Django JsonResponse:
-      - GET:    Filter by ?id=... or ?dcno=... or fetch all.
-      - POST:   Create a new record (JSON body).
-      - PUT:    Update an existing record via ?id=... or JSON body id.
-      - DELETE: Delete record via ?id=... or JSON body id.
-    """
-    method = request.method
-
-    # ----------------------------------------------------
-    # READ (GET)
-    # ----------------------------------------------------
-    if method == "GET":
-        record_id = request.GET.get("id") or request.GET.get("slno")
-        dcno = request.GET.get("dcno") or request.GET.get("DCNo")
-
-        queryset = Dc_Incharge_Verify.objects.all()
-
-        if record_id:
-            queryset = queryset.filter(id=record_id)
-        if dcno:
-            queryset = queryset.filter(DCNo=dcno)
-
-        data = list(queryset.values())
         return JsonResponse({
             "status": True,
-            "message": "Records fetched successfully.",
-            "count": len(data),
-            "data": data
-        }, status=200)
+            "message": "Permissions saved successfully",
+            "saved_count": len(normalized_permissions),
+        })
 
-    # ----------------------------------------------------
-    # Parse JSON body for mutation requests (POST, PUT, DELETE)
-    # ----------------------------------------------------
+    # DELETE
     body = {}
-    if method in ["POST", "PUT", "DELETE"]:
-        if request.body:
-            try:
-                body = json.loads(request.body.decode("utf-8"))
-            except json.JSONDecodeError:
-                return JsonResponse({"status": False, "message": "Invalid JSON payload."}, status=400)
 
-    # Helper to extract valid model fields from payload
-    def get_cleaned_data(payload):
-        valid_fields = ['date', 'DCNo', 'jobno', 'trstype', 'wgt', 'mtr', 'rolls', 'bags', 'username', 'status']
-        return {k: v for k, v in payload.items() if k in valid_fields}
+    if request.body:
+        body, error = read_json(request, allow_empty=True)
 
-    # ----------------------------------------------------
-    # CREATE (POST)
-    # ----------------------------------------------------
-    if method == "POST":
-        cleaned_data = get_cleaned_data(body)
-        if not cleaned_data:
-            return JsonResponse({"status": False, "message": "No valid fields provided."}, status=400)
+        if error:
+            return error
 
-        # Default to verified unless explicitly stated otherwise
-        cleaned_data.setdefault("status", True)
+    role = role_param or body.get("role") or request.GET.get("role")
 
-        # Block re-verifying a DC that already has a verified row for this trstype
-        existing = Dc_Incharge_Verify.objects.filter(
-            DCNo=cleaned_data.get("DCNo"),
-            trstype=cleaned_data.get("trstype"),
-            status=True,
-        ).first()
+    if not isinstance(role, str) or not role.strip():
+        return error_response("Role is required")
 
-        if existing:
-            return JsonResponse({
-                "status": False,
-                "message": "This DC has already been verified for this transaction type!",
-                "data": list(Dc_Incharge_Verify.objects.filter(id=existing.id).values())[0],
-            }, status=409)
+    role = role.strip()
 
-        try:
-            instance = Dc_Incharge_Verify.objects.create(**cleaned_data)
-            return JsonResponse({
-                "status": True,
-                "message": "Record created successfully.",
-                "data": list(Dc_Incharge_Verify.objects.filter(id=instance.id).values())[0]
-            }, status=201)
-        except ValidationError as e:
-            return JsonResponse({"status": False, "message": str(e)}, status=400)
-        except Exception as e:
-            return JsonResponse({"status": False, "message": f"Database error: {str(e)}"}, status=500)
+    deleted_count, _ = RoleModulePermission.objects.filter(
+        role=role
+    ).delete()
 
-    # ----------------------------------------------------
-    # UPDATE (PUT)
-    # ----------------------------------------------------
-    elif method == "PUT":
-        record_id = request.GET.get("id") or request.GET.get("slno") or body.get("id")
-        
-        if not record_id:
-            return JsonResponse({"status": False, "message": "'id' parameter is required for updating."}, status=400)
-
-        cleaned_data = get_cleaned_data(body)
-        if not cleaned_data:
-            return JsonResponse({"status": False, "message": "No valid fields provided to update."}, status=400)
-
-        try:
-            instance = Dc_Incharge_Verify.objects.get(id=record_id)
-            for key, value in cleaned_data.items():
-                setattr(instance, key, value)
-            instance.save()
-
-            return JsonResponse({
-                "status": True,
-                "message": "Record updated successfully.",
-                "data": list(Dc_Incharge_Verify.objects.filter(id=instance.id).values())[0]
-            }, status=200)
-        except Dc_Incharge_Verify.DoesNotExist:
-            return JsonResponse({"status": False, "message": f"Record with id '{record_id}' not found."}, status=404)
-        except ValidationError as e:
-            return JsonResponse({"status": False, "message": str(e)}, status=400)
-        except Exception as e:
-            return JsonResponse({"status": False, "message": f"Database error: {str(e)}"}, status=500)
-
-    # ----------------------------------------------------
-    # DELETE (DELETE)
-    # ----------------------------------------------------
-    elif method == "DELETE":
-        record_id = request.GET.get("id") or request.GET.get("slno") or body.get("id")
-
-        if not record_id:
-            return JsonResponse({"status": False, "message": "'id' parameter is required for deletion."}, status=400)
-
-        try:
-            instance = Dc_Incharge_Verify.objects.get(id=record_id)
-            instance.delete()
-            return JsonResponse({
-                "status": True,
-                "message": f"Record with id '{record_id}' deleted successfully."
-            }, status=200)
-        except Dc_Incharge_Verify.DoesNotExist:
-            return JsonResponse({"status": False, "message": f"Record with id '{record_id}' not found."}, status=404)
-        except Exception as e:
-            return JsonResponse({"status": False, "message": f"Database error: {str(e)}"}, status=500)
-
-    # ----------------------------------------------------
-    # Unsupported HTTP Methods
-    # ----------------------------------------------------
-    return JsonResponse({"status": False, "message": f"Method {method} not allowed."}, status=405)
+    return JsonResponse({
+        "status": True,
+        "message": f"Permissions for {role} reset successfully",
+        "deleted_count": deleted_count,
+    })
 
 
 def _serialize_record(obj, request=None):

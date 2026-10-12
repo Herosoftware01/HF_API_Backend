@@ -44,6 +44,7 @@ urlpatterns = [
     path('gateinward/', include('GateInward.urls')) ,
     path('finance/', include('finance.urls')) ,
     path('rollchecking/', include('RollChecking.urls')) ,
+    path('hr_module/', include('hr_module.urls')) ,
 
 ] 
 

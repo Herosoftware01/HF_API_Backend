@@ -87,7 +87,7 @@ class MachineAllocationSerializer(serializers.ModelSerializer):
                 unit=obj.unit.id,     # 👈 important
                 line=obj.line.id      # 👈 important
             )
-            .order_by('-id')
+            .order_by('-date', '-id')
             .first()
         )
 
@@ -135,7 +135,7 @@ class MachineAllocationSerializer(serializers.ModelSerializer):
                 unit=obj.unit.id,
                 line=obj.line.id
             )
-            .order_by('-id')
+            .order_by('-date', '-id')
             .first()
         )
 

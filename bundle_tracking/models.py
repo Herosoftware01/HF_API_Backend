@@ -153,6 +153,20 @@ class Unituser(models.Model):
         db_table = 'unit_unituser'
 
 
+    
+
+class Msizes(models.Model):
+    id = models.AutoField(db_column='ID', primary_key=True)  # Field name made lowercase.
+    name = models.CharField(db_column='Name', unique=True, max_length=35, db_collation='SQL_Latin1_General_CP1_CI_AS')  # Field name made lowercase.
+    sizegroup = models.IntegerField(db_column='SizeGroup', blank=True, null=True)  # Field name made lowercase.
+    sorter = models.IntegerField(db_column='Sorter')  # Field name made lowercase.
+    description = models.CharField(db_column='Description', max_length=255, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)  # Field name made lowercase.
+
+    class Meta:
+        managed = False
+        db_table = 'mSizes'
+
+
 class TrsMcutstickerprod(models.Model):
     dt = models.DateTimeField(db_column='Dt')  # Field name made lowercase.
     empid = models.IntegerField(db_column='EmpID')  # Field name made lowercase.
