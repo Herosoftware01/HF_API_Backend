@@ -471,7 +471,7 @@ class ViewGenStockIssue(models.Model):
     regno = models.CharField(db_column='RegNo', max_length=20, blank=True, null=True)  # Field name made lowercase.
     ph = models.CharField(max_length=17)
     to_dept = models.CharField(max_length=35)
-    no = models.IntegerField(db_column='No')  # Field name made lowercase.
+    no = models.IntegerField(db_column='No', primary_key=True)  # Field name made lowercase.
     date = models.DateTimeField(db_column='Date')  # Field name made lowercase.
     frm_dept = models.CharField(max_length=35)
     itemgrp = models.CharField(max_length=35)
@@ -498,7 +498,7 @@ class TrsGatemodule(models.Model):
     year = models.IntegerField(db_column='Year')  # Field name made lowercase.
     no = models.IntegerField(db_column='No')  # Field name made lowercase.
     date = models.DateTimeField(db_column='Date')  # Field name made lowercase.
-    jobno = models.CharField(db_column='Jobno', max_length=50, db_collation='SQL_Latin1_General_CP1_CI_AS')  # Field name made lowercase.
+    jobno = models.CharField(db_column='Jobno', max_length=50, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)  # Field name made lowercase.
     suppliername = models.CharField(db_column='SupplierName', max_length=200, db_collation='SQL_Latin1_General_CP1_CI_AS')  # Field name made lowercase.
     descr = models.CharField(db_column='Descr', max_length=500, db_collation='SQL_Latin1_General_CP1_CI_AS')  # Field name made lowercase.
     rls_bdls = models.IntegerField()
@@ -509,6 +509,8 @@ class TrsGatemodule(models.Model):
     verify = models.CharField(db_column='Verify', max_length=50, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)  # Field name made lowercase.
     prepered = models.CharField(max_length=50, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)
     fhero = models.CharField(max_length=50, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)
+    inch_verify_date = models.DateField(blank=True, null=True)
+    inch_verify_status = models.BooleanField(blank=True, null=True, default=False)
 
     class Meta:
         managed = False
@@ -635,24 +637,6 @@ class RoleModulePermission(models.Model):
 
 
 
-class Dc_Incharge_Verify(models.Model):
-    id = models.AutoField(primary_key=True)
-    date = models.DateTimeField(db_column='Date')  # Field name made lowercase.
-    DCNo = models.IntegerField(db_column='DCNo')  # Field name made lowercase.
-    jobno = models.CharField(db_column='JobNo', max_length=50)  # Field name made lowercase. # Field name made lowercase.
-    trstype = models.CharField(db_column='TrsType', max_length=50)  # Field name made lowercase.
-    wgt = models.DecimalField(db_column='Wgt', max_digits=18, decimal_places=3,blank=True, null=True)  # Field name made lowercase.
-    mtr = models.DecimalField(db_column='Mtr', max_digits=18, decimal_places=2,blank=True, null=True)  # Field name made lowercase.
-    rolls = models.IntegerField(db_column='Rolls',blank=True, null=True)  # Field name made lowercase.
-    bags = models.CharField(db_column='Bags', max_length=50,blank=True, null=True)  # Field name made lowercase.
-    username = models.IntegerField(db_column='Username')  # Field name made lowercase.
-    status = models.BooleanField(db_column='Status' ,default=False)
-
-    class Meta:
-        db_table = 'dc_incharge_verify'
-
-    def __str__(self):
-        return f"DCNo: {self.DCNo}, JobNo: {self.jobno}, Date: {self.date}, TrsType: {self.trstype}"
     
 
 class Dc_Reciver_Verify(models.Model):
@@ -681,3 +665,4 @@ class Dc_Reciver_Verify(models.Model):
 
     def __str__(self):
         return (f"DCNo: {self.DCNo},"f"JobNo: {self.jobno},"f"Date: {self.date},"f"TrsType: {self.trstype}")
+
