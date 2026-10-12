@@ -5,7 +5,12 @@ from unittest.mock import patch
 from django.test import RequestFactory, SimpleTestCase
 from rest_framework.test import APIRequestFactory, force_authenticate
 
-from .views import UnitListAPIView, get_shift, qc_hourly_signature
+from .views import (
+    UnitListAPIView,
+    get_shift,
+    latest_online_allocations_by_employee,
+    qc_hourly_signature,
+)
 
 
 class GetShiftTests(SimpleTestCase):
@@ -72,3 +77,16 @@ class EmployeeAllocationUnitPermissionTests(SimpleTestCase):
         self.assertEqual(response.data, [{"id": 3}, {"id": 5}])
         permissions.assert_called_once_with(user_id=42, app="employee_allocation")
         units.assert_called_once_with(id__in=permitted_unit_ids)
+
+
+class LatestEmployeeAllocationTests(SimpleTestCase):
+    def test_latest_offline_allocation_overrides_earlier_online_status(self):
+        allocations = [
+            type("Allocation", (), {"emp_code": "21617", "status": False})(),
+            type("Allocation", (), {"emp_code": "21617", "status": True})(),
+            type("Allocation", (), {"emp_code": "11111", "status": True})(),
+        ]
+
+        latest_online = latest_online_allocations_by_employee(allocations)
+
+        self.assertEqual(set(latest_online), {"11111"})

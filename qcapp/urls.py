@@ -109,7 +109,12 @@ urlpatterns = [
         "measurement-details/",
         views.get_measurement_details
     ),
-
+    path("defects/", views.defect_api, name="defect_api"),
+    path(
+        "defects/<int:defect_id>/categories/",
+        views.category_api,
+        name="category_api"
+    ),
 
 
 ]
