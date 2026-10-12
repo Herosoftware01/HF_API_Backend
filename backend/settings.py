@@ -106,6 +106,7 @@ INSTALLED_APPS = [
     'Salary_Confirmation',
     'GateInward',
     'finance',
+    'RollChecking',
 
 ]
 
@@ -122,8 +123,8 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # else:
 #     SECURE_CROSS_ORIGIN_OPENER_POLICY = "same-origin"
 
-DEBUG = False
-# DEBUG = True
+# DEBUG = False
+DEBUG = True
 
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
@@ -338,6 +339,9 @@ WORKENTRY_IMAGES_ROOT = r'\\10.1.21.11\d\Workentry_Images'
 
 DC_RECEIVER_IMAGES_URL = '/dc_receiver_images/'
 DC_RECEIVER_IMAGES_ROOT = r'\\10.1.21.11\d\DC_Reciver_image'
+
+ROLL_CHECKING_IMAGES_URL = '/roll_checking_images/'
+ROLL_CHECKING_IMAGES_ROOT = r'\\10.1.21.11\d\Roll_Checking_Images'
 
 PDF_STORAGE_PATH = r"\\adminserver\File Sharing\AAAA Hero\Syncfusion Pdf Reports"
 
