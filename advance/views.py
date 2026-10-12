@@ -472,9 +472,9 @@ def generate_bank_txt(obj):
     base_path = r"F:\txt"
     os.makedirs(base_path, exist_ok=True)
 
-    # Date formatted as YYYYMMDD (e.g., 20261002)
-    date_str = now.strftime("%Y%m%d")
-    filename = f"HEROF_{date_str}_{SL}.TXT"
+    # Date formatted as DDMMYYYY (e.g., 02102026)
+    date_str = now.strftime("%d%m%Y")
+    filename = f"HEROFSAL_{date_str}_{SL}.TXT"
 
     file_path = os.path.join(base_path, filename)
 
