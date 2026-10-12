@@ -9,7 +9,7 @@ from rest_framework.views import APIView
 from zoneinfo import ZoneInfo
 from rest_framework.response import Response
 from rest_framework import status, permissions
-from .models import QcAdminMistake,MeasurementMas,MasContract,ViewPlandetailsWithratio,ViewCuttingMeasurmentpending,MmstAssign,MeasurementData,MeasurementEntry,cut_sample_data_final,Cont_employee,sequency_data,cut_sample_data,cut_sample_data_final,VueUser,Unit,Needle_change,Line,roving_qc_mistake,qc_piece_final, MachineAllocation, machine_details, emp_allocate, Empwisesal, VueProcessSequence,qc_hourly_approval,VueUloginRole,QcHourlyApproval 
+from .models import QcAdminMistake,MeasurementMas,defect_code, defect_list,MasContract,ViewPlandetailsWithratio,ViewCuttingMeasurmentpending,MmstAssign,MeasurementData,MeasurementEntry,cut_sample_data_final,Cont_employee,sequency_data,cut_sample_data,cut_sample_data_final,VueUser,Unit,Needle_change,Line,roving_qc_mistake,qc_piece_final, MachineAllocation, machine_details, emp_allocate, Empwisesal, VueProcessSequence,qc_hourly_approval,VueUloginRole,QcHourlyApproval 
 from .serializers import QcAdminMistakeSerializer,UnitSerializer,MachineTrasnsferSerializer,MachineSerializer,LineSerializer, MachineAllocationSerializer, VueProcessSequenceSerializer
 from collections import defaultdict
 from django.utils.timezone import now
@@ -33,6 +33,9 @@ from datetime import time as time_cls, datetime as datetime_cls, timedelta
 from collections import defaultdict
 from herofashion.models import User
 from datetime import date
+
+from django.db import transaction, IntegrityError
+from django.db.models import Max
 
 
 from django.contrib.auth import get_user_model
@@ -4466,3 +4469,152 @@ def get_measurement_details(request):
 
   except Exception as e:
     return JsonResponse({'error': str(e)}, status=500)
+
+
+############## defect create #######################
+
+def get_category_code(number):
+    result = ""
+
+    while number >= 0:
+        result = chr((number % 26) + 65) + result
+        number = (number // 26) - 1
+
+    return result
+
+
+def defect_data(defect):
+    categories = defect.categories.all().order_by("id")
+
+    return {
+        "id": defect.id,
+        "code": defect.code,
+        "name": defect.name,
+        "categories": [
+            {
+                "id": item.id,
+                "category": item.category,
+                "c_name": item.c_name,
+                "top_bottom": item.top_bottom or "",
+            }
+            for item in categories
+        ],
+    }
+
+
+@csrf_exempt
+def defect_api(request):
+    if request.method == "GET":
+        defects = defect_code.objects.all().order_by("id")
+
+        return JsonResponse(
+            [defect_data(item) for item in defects],
+            safe=False
+        )
+
+    if request.method == "POST":
+        try:
+            data = json.loads(request.body)
+
+            code = data.get("code", "").strip()
+            name = data.get("name", "").strip()
+
+            if not code or not name:
+                return JsonResponse(
+                    {"error": "Code and name are required"},
+                    status=400
+                )
+
+            defect = defect_code.objects.create(
+                code=code,
+                name=name
+            )
+
+            return JsonResponse(
+                defect_data(defect),
+                status=201
+            )
+
+        except json.JSONDecodeError:
+            return JsonResponse(
+                {"error": "Invalid JSON"},
+                status=400
+            )
+        except IntegrityError:
+            return JsonResponse(
+                {"error": "Defect code already exists"},
+                status=400
+            )
+
+    return JsonResponse(
+        {"error": "Method not allowed"},
+        status=405
+    )
+
+
+@csrf_exempt
+def category_api(request, defect_id):
+  try:
+    defect = defect_code.objects.get(id=defect_id)
+  except defect_code.DoesNotExist:
+    return JsonResponse({"error": "Defect not found"}, status=404)
+
+  if request.method == "GET":
+    categories = defect.categories.all().order_by("id")
+    data = [
+        {
+            "id": item.id,
+            "category": item.category,
+            "c_name": item.c_name,
+            "top_bottom": item.top_bottom or "",
+        }
+        for item in categories
+    ]
+    return JsonResponse(data, safe=False)
+
+  if request.method == "POST":
+    try:
+      data = json.loads(request.body)
+      c_name = data.get("c_name", "").strip()
+      top_bottom_list = data.get("top_bottom", [])
+
+      if not c_name:
+        return JsonResponse(
+            {"error": "Category name is required"}, status=400
+        )
+
+      created_items = []
+
+      with transaction.atomic():
+        defect = defect_code.objects.select_for_update().get(id=defect_id)
+
+        if not top_bottom_list:
+          top_bottom_list = [None]
+
+        # 1. Orey oru category code-ah generate panrom (e.g., "B")
+        count = defect.categories.values("category").distinct().count()
+        shared_category_code = get_category_code(count)
+
+        for tb in top_bottom_list:
+          # 2. Ella row-kum same category code-ah assign panrom
+          item = defect_list.objects.create(
+              defect=defect,
+              category=shared_category_code,  # Same category code (e.g., B)
+              c_name=c_name,
+              top_bottom=tb if tb else None,
+          )
+          created_items.append({
+              "id": item.id,
+              "category": item.category,
+              "c_name": item.c_name,
+              "top_bottom": item.top_bottom or "",
+          })
+
+      return JsonResponse(created_items, safe=False, status=201)
+
+    except json.JSONDecodeError:
+      return JsonResponse({"error": "Invalid JSON"}, status=400)
+    except Exception as e:
+      return JsonResponse({"error": str(e)}, status=500)
+
+  return JsonResponse({"error": "Method not allowed"}, status=405)
