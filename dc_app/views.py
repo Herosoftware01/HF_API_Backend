@@ -549,7 +549,6 @@ def gen_stock_issue(request, no=None):
     })
 
 
-
 # --- VIEW ---
 @csrf_exempt
 def gate_module_api(request, pk=None):

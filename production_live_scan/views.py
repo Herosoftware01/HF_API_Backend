@@ -10,7 +10,7 @@ from imp_reports.models import UnitBundlereport
 from bundle_tracking.models import TrsMcutstickerprod,MasUnit,MasTopbottom
 from qcapp.models import Unit,Line,machine_details,emp_allocate,Empwisesal
 from .models import Assembly_data,bundle_transfer,end_line_data, unit_input, Msizes,dependency,dependency_data,PreporatoryEntry,ViewRibdelPreparatory,RibdelEntry
-from django.utils.dateparse import parse_datetime
+from django.utils.dateparse import parse_date, parse_datetime
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 import json
@@ -363,6 +363,7 @@ class EndUnitInputAPIView(APIView):
 
                     raw_date = item.get("date")
                     parsed_date = parse_datetime(raw_date)
+                    parsed_date_only = parse_date(raw_date) if not parsed_date else None
 
                     if parsed_date:
                         # Frontend date already IST (13:34)
@@ -370,6 +371,8 @@ class EndUnitInputAPIView(APIView):
                             final_date = parsed_date.replace(tzinfo=None)
                         else:
                             final_date = parsed_date
+                    elif parsed_date_only:
+                        final_date = datetime.combine(parsed_date_only, datetime.min.time())
                     else:
                         final_date = now_ist
 

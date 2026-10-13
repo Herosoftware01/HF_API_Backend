@@ -18,7 +18,10 @@ from .views import (
     get_bundle_last_process,
     GetUnitDataAPIView,
     delete_process_dependency,
+<<<<<<< HEAD
+=======
     SaveAssemblySelectionView,
+>>>>>>> 8ef5bddca09e3508651803b2158f11b24a4273b9
     save_process_dependency,
     split_process_descriptions,
     verify_process_dependency,
@@ -605,6 +608,8 @@ class DependencyMutationPasswordTests(SimpleTestCase):
         self.assertEqual(response.status_code, 403)
         self.assertEqual(json.loads(response.content)["error"], "Invalid password")
         dependency_objects.select_for_update.assert_not_called()
+<<<<<<< HEAD
+=======
 
 
 class UserUnitPermissionTests(SimpleTestCase):
@@ -643,3 +648,4 @@ class UserUnitPermissionTests(SimpleTestCase):
             for permission in bulk_create.call_args.args[0]
         ))
         existing_permissions.assert_called_once_with(user_id=7, app="machine_transfer")
+>>>>>>> 8ef5bddca09e3508651803b2158f11b24a4273b9

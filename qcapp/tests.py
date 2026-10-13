@@ -1,11 +1,16 @@
 import json
 from datetime import date, datetime
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from django.test import RequestFactory, SimpleTestCase
 from rest_framework.test import APIRequestFactory, force_authenticate
 
 from .views import (
+<<<<<<< HEAD
+    EmployeeAPIView,
+=======
+>>>>>>> 89b0350d12682b00285a29c73273b76ea195e9bc
     UnitListAPIView,
     get_shift,
     latest_online_allocations_by_employee,
@@ -90,3 +95,56 @@ class LatestEmployeeAllocationTests(SimpleTestCase):
         latest_online = latest_online_allocations_by_employee(allocations)
 
         self.assertEqual(set(latest_online), {"11111"})
+<<<<<<< HEAD
+
+
+class EmployeeAPIViewDatabaseRoutingTests(SimpleTestCase):
+    def test_contractor_records_and_master_are_read_from_separate_databases(self):
+        request = APIRequestFactory().get(
+            "/qcapp/api/employees/",
+            {"include_online": "true", "date": "2026-10-09"},
+        )
+        contractor = SimpleNamespace(
+            code="1234",
+            name="Contractor employee",
+            con_id_id=56,
+        )
+
+        with (
+            patch("qcapp.views.emp_allocate.objects.filter") as allocations,
+            patch("qcapp.views.Empwisesal.objects.using") as staff_source,
+            patch("qcapp.views.Cont_employee.objects.using") as contractor_source,
+            patch("qcapp.views.MasContract.objects.using") as contract_source,
+        ):
+            allocations.return_value.select_related.return_value.order_by.return_value = []
+            staff_source.return_value.filter.return_value.values.return_value = []
+
+            contractor_queryset = contractor_source.return_value.all.return_value
+            contractor_queryset.values_list.return_value.distinct.return_value = [56]
+            contractor_queryset.__iter__.return_value = iter([contractor])
+            contract_source.return_value.filter.return_value = [
+                SimpleNamespace(contract_id=56, contract_des="Contract A")
+            ]
+
+            response = EmployeeAPIView.as_view()(request)
+
+        contractor_source.assert_called_once_with("default")
+        contract_source.assert_called_once_with("main")
+        contract_source.return_value.filter.assert_called_once_with(
+            contract_id__in=[56]
+        )
+        self.assertEqual(
+            response.data,
+            [
+                {
+                    "code": "1234",
+                    "name": "Contractor employee (Contract A)",
+                    "dept": "Contract A",
+                    "photo": None,
+                    "source": "contract_employee",
+                    "online_allocation": None,
+                }
+            ],
+        )
+=======
+>>>>>>> 89b0350d12682b00285a29c73273b76ea195e9bc
