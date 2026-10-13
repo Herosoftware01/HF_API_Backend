@@ -108,6 +108,7 @@ INSTALLED_APPS = [
     'RollChecking',
     'hr_module',
     'GateInward',
+    'incentive_debit',
 
 
 ]
