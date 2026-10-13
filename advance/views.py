@@ -2,6 +2,8 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.db.models import Max
 import json
+
+from twisted.test import obj
 from .models import (
     Adreq,
     Empwisesal,
@@ -69,7 +71,7 @@ def request_advance(request):
         smon = request.GET.get("smon")
         syear = request.GET.get("syear")
 
-        qs = Adreq.objects.using("mssql1").all().order_by("-entryno")
+        qs = Adreq.objects.using("demo").all().order_by("-entryno")
 
         if empid:
             qs = qs.filter(empid=empid)
@@ -92,11 +94,11 @@ def request_advance(request):
             # The validation check that blocked multiple submissions has been removed here.
 
             last = (
-                Adreq.objects.using("mssql1").aggregate(Max("entryno"))["entryno__max"]
+                Adreq.objects.using("demo").aggregate(Max("entryno"))["entryno__max"]
                 or 0
             )
 
-            obj = Adreq.objects.using("mssql1").create(
+            obj = Adreq.objects.using("demo").create(
                 entryno=last + 1,
                 dt=data.get("dt"),
                 empid=empid,
@@ -131,7 +133,7 @@ def request_advance(request):
             data = json.loads(request.body)
             obj_id = data.get("id")
 
-            obj = Adreq.objects.using("mssql1").get(entryno=obj_id)  # ✅ FIXED
+            obj = Adreq.objects.using("demo").get(entryno=obj_id)  # ✅ FIXED
             obj.delete()
 
             return JsonResponse({"message": "Deleted"}, status=200)
@@ -196,7 +198,7 @@ def send_advance_mail(request):
 
             # OPTIMIZED DB QUERY
             obj = (
-                Adreq.objects.using("mssql1")
+                Adreq.objects.using("demo")
                 .only("empid", "amt", "remarks")
                 .get(entryno=entryno)
             )
@@ -216,7 +218,7 @@ def send_advance_mail(request):
                 "🧾 New Advance Request Submitted",
                 "",
                 settings.EMAIL_HOST_USER,
-                ["hfautomation2026@gmail.com","herosoftware@herofashion.com"],
+                ["hfautomation2026@gmail.com","hr@herofashion.com","hrm@herofashion.com"],
             )
 
             # IMAGE ATTACH (optional)
@@ -276,13 +278,13 @@ def send_approval_mail(request):
 
             # FAST DB
             obj = (
-                Adreq.objects.using("mssql1")
+                Adreq.objects.using("demo")
                 .only("empid", "amt", "remarks")
                 .get(entryno=entryno)
             )
 
             # CACHE API
-            api_url = "https://app.herofashion.com/incentive/api/emp/"
+            api_url = "https://hfapi.herofashion.com/incentive/api/emp/"
             employees = get_employee_data(api_url)
             emp_map = get_employee_map(employees)
 
@@ -313,7 +315,7 @@ def send_approval_mail(request):
                 subject,
                 text_content,
                 settings.EMAIL_HOST_USER,
-                ["hfautomation2026@gmail.com"],
+                ["hfautomation2026@gmail.com","hr@herofashion.com","hrm@herofashion.com"],
             )
 
             email.attach_alternative(html_content, "text/html")
@@ -354,14 +356,14 @@ def ad_approve(request):
         # ==========================================================
         # 2. Get advance request
         # ==========================================================
-        obj = Adreq.objects.using("mssql1").get(entryno=obj_id)
+        obj = Adreq.objects.using("demo").get(entryno=obj_id)
 
         # ==========================================================
         # 3. Update approval status
         # ==========================================================
         obj.status = status
         obj.status_dt = status_dt
-        obj.save(using="mssql1")
+        obj.save(using="demo")
 
         # ==========================================================
         # 4. Generate Bank TXT only when APPROVED
@@ -388,23 +390,24 @@ def ad_approve(request):
         return JsonResponse({"error": str(e)}, status=500)
 
 
-def get_next_bank_serial():
-
+def get_next_bank_serial(starting_serial=3097):
     counter_file = r"F:\txt\bank_serial.txt"
-
     os.makedirs(r"F:\txt", exist_ok=True)
 
     if not os.path.exists(counter_file):
-        next_serial = 1
+        next_serial = starting_serial
     else:
         try:
             with open(counter_file, "r", encoding="utf-8") as f:
                 content = f.read().strip()
 
-            last_serial = int(content) if content else 0
-            next_serial = last_serial + 1
+            if content:
+                last_serial = int(content)
+                next_serial = last_serial + 1
+            else:
+                next_serial = starting_serial
         except (ValueError, OSError):
-            next_serial = 1
+            next_serial = starting_serial
 
     with open(counter_file, "w", encoding="utf-8") as f:
         f.write(str(next_serial))
@@ -412,7 +415,7 @@ def get_next_bank_serial():
     return next_serial
 
 
-def generate_bank_txt(obj):
+def generate_bank_txt(obj, line_serial=1):
 
     # ==========================================================
     # Employee
@@ -448,43 +451,33 @@ def generate_bank_txt(obj):
     # ==========================================================
     N = str(obj.entryno)
 
-    n1 = (
-        now.strftime("%d%m")
-        + now.strftime("%I")
-        + now.strftime("%M")
-        + now.strftime("%S")
-        + N
-    )
+    n1 = now.strftime("%d%m%H%M%S") + N
 
     # ==========================================================
-    # SL
+    # SL & File Serial (Tracks 3096, 3097, etc.)
     # ==========================================================
     SL = str(obj.entryno)
+    file_serial = get_next_bank_serial(starting_serial=3097)
 
     # ==========================================================
-    # AUTO BANK SERIAL
-    # ==========================================================
-    bank_serial = get_next_bank_serial()
-
-    # ==========================================================
-    # Folder & File Path (Directly in F:\txt with HEROF_date_SL format)
+    # Folder & File Path (Filename uses file_serial)
     # ==========================================================
     base_path = r"F:\txt"
     os.makedirs(base_path, exist_ok=True)
 
-    # Date formatted as DDMMYYYY (e.g., 02102026)
     date_str = now.strftime("%d%m%Y")
-    filename = f"HEROFSAL_{date_str}_{SL}.TXT"
+    time_str = now.strftime("%H%M")
 
+    filename = f"HEROFSAL_{date_str}_{time_str}_{file_serial}.TXT"
     file_path = os.path.join(base_path, filename)
 
     # ==========================================================
     # Transaction type
     # ==========================================================
-    transaction_type = "FT"
+    transaction_type = "NE"
 
     # ==========================================================
-    # VB6-compatible bank line
+    # VB6-compatible bank line (Uses line_serial: 1 to 10)
     # ==========================================================
     line = (
         f"P^{transaction_type}^HEROFSAL^"
@@ -496,7 +489,7 @@ def generate_bank_txt(obj):
         f"{name}^"
         f"{code}^"
         f"{accountdetails}^"
-        f"{bank_serial}^^^^^^^^"
+        f"{line_serial}^^^^^^^^"
         f"{ifscno}"
         f"^^^^^^^^^^^^^^^^^^^"
         f"SLRY"
@@ -516,9 +509,8 @@ def generate_bank_txt(obj):
         "filename": filename,
         "employee": code,
         "amount": amount_text,
-        "bank_serial": bank_serial,
+        "bank_serial": file_serial,
     }
-
 
 @csrf_exempt
 def get_eligibleamt(request):
@@ -606,7 +598,7 @@ def empwisesal(request):
 @csrf_exempt
 def state(request):
     if request.method == "GET":
-        data = Adreq.objects.using("mssql1").all().order_by("-entryno")
+        data = Adreq.objects.using("demo").all().order_by("-entryno")
 
         # 🔍 Get query params
         empid = request.GET.get("empid")
