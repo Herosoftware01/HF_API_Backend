@@ -582,8 +582,8 @@ def gate_module_api(request, pk=None):
             queryset = queryset.filter(no=dc_no)
         if filter_date:
             queryset = queryset.filter(date__date=filter_date)
-        if not dc_no and not filter_date:
-            queryset = queryset[:50]
+        # if not dc_no and not filter_date:
+        #     queryset = queryset[:50]
 
         data = []
         for obj in queryset:
