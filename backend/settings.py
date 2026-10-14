@@ -105,8 +105,10 @@ INSTALLED_APPS = [
     'software_cost',
     'Salary_Confirmation',
     'finance',
+    'RollChecking',
     'hr_module',
     'GateInward',
+    'incentive_debit',
 
 
 ]
@@ -310,17 +312,18 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LANGUAGE_CODE = 'en-us'
 
-
+#### dont change the timezone.
 TIME_ZONE = 'Asia/Kolkata'
-
 USE_I18N = True
-
 USE_TZ = False
+#### dont change the timezone.
+
 
 STATIC_URL = '/static/'
-
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
-
+STATICFILES_DIRS = [
+    os.path.join(BASE_DIR, 'static'),
+]
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
@@ -336,6 +339,9 @@ WORKENTRY_IMAGES_ROOT = r'\\10.1.21.11\d\Workentry_Images'
 
 DC_RECEIVER_IMAGES_URL = '/dc_receiver_images/'
 DC_RECEIVER_IMAGES_ROOT = r'\\10.1.21.11\d\DC_Reciver_image'
+
+ROLL_CHECKING_IMAGES_URL = '/roll_checking_images/'
+ROLL_CHECKING_IMAGES_ROOT = r'\\10.1.21.11\d\Roll_Checking_Images'
 
 PDF_STORAGE_PATH = r"\\adminserver\File Sharing\AAAA Hero\Syncfusion Pdf Reports"
 

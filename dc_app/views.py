@@ -7,11 +7,11 @@ ViewYarnProcessDelivery,VueAccProcDel,
 ViewAccinwardVerification,ViewFabricDeliveryProcess,
 ViewMistakeqtyPrint,ViewUnitPcdelivery,VueRibDeliveryDetails,ViewGdwnFabricDeliveryPlan,
 TrsApidtls,ViewFabricDeliveryRepl,HerofashionUser,Holiday,RoleModulePermission,
-Dc_Incharge_Verify,Dc_Reciver_Verify,ViewGeneralDeiveryType1,ViewGenStockIssue,ModuleMaster)
+Dc_Reciver_Verify,ViewGeneralDeiveryType1,ViewGenStockIssue,ModuleMaster)
 import json
 from django.views.decorators.csrf import csrf_exempt
 from django.forms.models import model_to_dict
-from django.utils.dateparse import parse_datetime
+from django.utils.dateparse import parse_date, parse_datetime
 from django.utils import timezone
 from django.core.exceptions import ValidationError
 from decimal import Decimal, InvalidOperation
@@ -25,21 +25,39 @@ import re
 
 
 
-def cutting_del_print(request):
-    id = request.GET.get("id")  # Example: ?id=101
-
+def cutting_del_print(request, id=None):
+    selected_id = id if id is not None else request.GET.get("id")
     queryset = ViewCuttingDelPrint.objects.using('demo').all()
 
-    if id:
-        queryset = queryset.filter(id=id)
+    if selected_id not in (None, ""):
+        try:
+            selected_id = int(selected_id)
+        except ValueError:
+            return JsonResponse({
+                "status": False,
+                "message": "id must be an integer.",
+            }, status=400)
 
-    data = list(queryset.values())
+        data = list(queryset.filter(id=selected_id).values())
+    else:
+        # Note: Add additional display fields from ViewCuttingDelPrint (e.g., 'orderno', 'supplier') as needed
+        options = (
+            queryset.values("id")
+            .distinct()
+            .order_by("id")
+        )
+        data = [
+            {
+                "id": option["id"],
+            }
+            for option in options
+        ]
 
     return JsonResponse({
         "status": True,
         "message": "Success",
         "count": len(data),
-        "data": data
+        "data": data,
     })
 
 def cutting_bit_print(request, id):
@@ -54,15 +72,26 @@ def yarn_process_delivery(request, dcno):
     return JsonResponse(data, safe=False)
 
 
-def knitting_del_print(request):
-    dcno = request.GET.get("dcno")  
+def knitting_del_print(request, dcno=None):
+    selected_dcno = dcno if dcno is not None else request.GET.get("dcno")
     queryset = ViewKnitDelivery.objects.using('test').all()
 
-    if dcno:
-        # FIX: Changed from dc=dcno to dcno=dcno
-        queryset = queryset.filter(dcno=dcno)
+    if selected_dcno not in (None, ""):
+        try:
+            selected_dcno = int(selected_dcno)
+        except ValueError:
+            return JsonResponse({
+                "status": False,
+                "message": "dcno must be an integer.",
+            }, status=400)
 
-    data = list(queryset.values())
+        data = list(queryset.filter(dcno=selected_dcno).values())
+    else:
+        dc_options = queryset.values("dcno", "knit_name").distinct().order_by("dcno")
+        data = [
+            {"dcno": option["dcno"], "supplier": option["knit_name"]}
+            for option in dc_options
+        ]
 
     return JsonResponse({
         "status": True,
@@ -71,57 +100,115 @@ def knitting_del_print(request):
         "data": data
     })
 
-def acc_prod_del_print(request):
-    no = request.GET.get("no")  
 
+def acc_prod_del_print(request, no=None):
+    selected_no = no if no is not None else request.GET.get("no")
     queryset = VueAccProdDel.objects.using('test').all()
 
-    if no:
-        # FIX: Changed from n=no to no=no
-        queryset = queryset.filter(no=no)
+    if selected_no not in (None, ""):
+        try:
+            selected_no = int(selected_no)
+        except ValueError:
+            return JsonResponse({
+                "status": False,
+                "message": "no must be an integer.",
+            }, status=400)
 
-    data = list(queryset.values())
+        data = list(queryset.filter(no=selected_no).values())
+    else:
+        prod_options = (
+            queryset.values("no", "supplier", "orderno")
+            .distinct()
+            .order_by("no")
+        )
+        data = [
+            {
+                "no": option["no"],
+                "supplier": option["supplier"],
+                "orderno": option["orderno"],
+            }
+            for option in prod_options
+        ]
 
     return JsonResponse({
         "status": True,
         "message": "Success",
         "count": len(data),
-        "data": data
+        "data": data,
     })
-
-def acc_proc_del_print(request):
-    no = request.GET.get("no")  # Example: ?id=101
-
+def acc_proc_del_print(request, no=None):
+    selected_no = no if no is not None else request.GET.get("no")
     queryset = VueAccProcDel.objects.using('test').all()
 
-    if no:
-        queryset = queryset.filter(no=no)
+    if selected_no not in (None, ""):
+        try:
+            selected_no = int(selected_no)
+        except ValueError:
+            return JsonResponse({
+                "status": False,
+                "message": "no must be an integer.",
+            }, status=400)
 
-    data = list(queryset.values())
+        data = list(queryset.filter(no=selected_no).values())
+    else:
+        proc_options = (
+            queryset.values("no", "supplier", "orderno")
+            .distinct()
+            .order_by("no")
+        )
+        data = [
+            {
+                "no": option["no"],
+                "supplier": option["supplier"],
+                "orderno": option["orderno"],
+            }
+            for option in proc_options
+        ]
 
     return JsonResponse({
         "status": True,
         "message": "Success",
         "count": len(data),
-        "data": data
+        "data": data,
     })
 
 
-def acc_inhouse_transfer(request):
-    no = request.GET.get("no")  # Example: ?id=101
 
+def acc_inhouse_transfer(request, no=None):
+    selected_no = no if no is not None else request.GET.get("no")
     queryset = VueAccInhTransfer.objects.using('test').all()
 
-    if no:
-        queryset = queryset.filter(no=no)
+    if selected_no not in (None, ""):
+        try:
+            selected_no = int(selected_no)
+        except ValueError:
+            return JsonResponse({
+                "status": False,
+                "message": "no must be an integer.",
+            }, status=400)
 
-    data = list(queryset.values())
+        data = list(queryset.filter(no=selected_no).values())
+    else:
+        transfer_options = (
+            queryset.values("no", "orderno", "frmdpt", "todept")
+            .distinct()
+            .order_by("no")
+        )
+        data = [
+            {
+                "no": option["no"],
+                "orderno": option["orderno"],
+                "from_department": option["frmdpt"],
+                "to_department": option["todept"],
+            }
+            for option in transfer_options
+        ]
 
     return JsonResponse({
         "status": True,
         "message": "Success",
         "count": len(data),
-        "data": data
+        "data": data,
     })
 
 def acc_inward_verification(request):
@@ -154,32 +241,84 @@ def acc_inward_verification(request):
     })
 
 
-def fabric_process_delivery(request):
-    no = request.GET.get("dcno")  # Example: ?dcno=101
-
+def fabric_process_delivery(request, no=None):
+    # Accept from URL param or either query param ('no' or 'dcno')
+    selected_no = (
+        no
+        if no is not None
+        else (request.GET.get("no") or request.GET.get("dcno"))
+    )
     queryset = ViewFabricDeliveryProcess.objects.using('test').all()
 
-    if no:
-        queryset = queryset.filter(dcno=no)
+    if selected_no not in (None, ""):
+        try:
+            selected_no = int(selected_no)
+        except ValueError:
+            return JsonResponse({
+                "status": False,
+                "message": "no must be an integer.",
+            }, status=400)
 
-    data = list(queryset.values())
-    return JsonResponse(data, safe=False)
-
-def mistake_qty_print(request):
-    dcno = request.GET.get("dcno")  # Example: ?id=101
-
-    queryset = ViewMistakeqtyPrint.objects.using('demo').all()
-
-    if dcno:
-        queryset = queryset.filter(dcno=dcno)
-
-    data = list(queryset.values())
+        # Filter by 'no' (matching the primary key on ViewFabricDeliveryProcess)
+        data = list(queryset.filter(no=selected_no).values())
+    else:
+        delivery_options = (
+            queryset.values("no", "su_name", "orderno", "del_unit")
+            .distinct()
+            .order_by("no")
+        )
+        data = [
+            {
+                "no": option["no"],
+                "supplier": option["su_name"],
+                "orderno": option["orderno"],
+                "delivery_unit": option["del_unit"],
+            }
+            for option in delivery_options
+        ]
 
     return JsonResponse({
         "status": True,
         "message": "Success",
         "count": len(data),
-        "data": data
+        "data": data,
+    })
+
+def mistake_qty_print(request, dcno=None):
+    selected_dcno = dcno if dcno is not None else request.GET.get("dcno")
+    queryset = ViewMistakeqtyPrint.objects.using('demo').all()
+
+    if selected_dcno not in (None, ""):
+        try:
+            selected_dcno = int(selected_dcno)
+        except ValueError:
+            return JsonResponse({
+                "status": False,
+                "message": "dcno must be an integer.",
+            }, status=400)
+
+        data = list(queryset.filter(dcno=selected_dcno).values())
+    else:
+        dc_options = (
+            queryset.values("dcno", "jobno", "toad", "frm")
+            .distinct()
+            .order_by("dcno")
+        )
+        data = [
+            {
+                "dcno": option["dcno"],
+                "jobno": option["jobno"],
+                "to_party": option["toad"],
+                "from_party": option["frm"],
+            }
+            for option in dc_options
+        ]
+
+    return JsonResponse({
+        "status": True,
+        "message": "Success",
+        "count": len(data),
+        "data": data,
     })
 
 def unit_pc_delivery(request, dcno):
@@ -193,69 +332,130 @@ def CuttingSecFabric(request, dcno):
     return JsonResponse(data, safe=False)
 
 
-def rib_delivery_print(request):
-    dcno = request.GET.get("dc")  
-
+def rib_delivery_print(request, dc=None):
+    # Accepts from URL param or query params ('dc' or 'dcno')
+    selected_dc = (
+        dc
+        if dc is not None
+        else (request.GET.get("dc") or request.GET.get("dcno"))
+    )
     queryset = VueRibDeliveryDetails.objects.using('demo').all()
 
-    if dcno:
-        # FIX: Changed from dcno=dcno to dc=dcno
-        queryset = queryset.filter(dc=dcno)
+    if selected_dc not in (None, ""):
+        try:
+            selected_dc = int(selected_dc)
+        except ValueError:
+            return JsonResponse({
+                "status": False,
+                "message": "dc must be an integer.",
+            }, status=400)
 
-    data = list(queryset.values())
+        data = list(queryset.filter(dc=selected_dc).values())
+    else:
+        dc_options = (
+            queryset.values("dc", "jobno", "deladd", "topbottom_des")
+            .distinct()
+            .order_by("dc")
+        )
+        data = [
+            {
+                "dc": option["dc"],
+                "jobno": option["jobno"],
+                "delivery_address": option["deladd"],
+                "description": option["topbottom_des"],
+            }
+            for option in dc_options
+        ]
 
     return JsonResponse({
         "status": True,
         "message": "Success",
         "count": len(data),
-        "data": data
+        "data": data,
     })
 
 
-def godown_fabric_delivery_plan(request):
-    dcno = request.GET.get("dcno")  # Example: ?id=101
-
+def godown_fabric_delivery_plan(request, dcno=None):
+    selected_dcno = dcno if dcno is not None else request.GET.get("dcno")
     queryset = ViewGdwnFabricDeliveryPlan.objects.using('demo').all()
 
-    if dcno:
-        queryset = queryset.filter(dcno=dcno)
+    if selected_dcno not in (None, ""):
+        try:
+            selected_dcno = int(selected_dcno)
+        except ValueError:
+            return JsonResponse({
+                "status": False,
+                "message": "dcno must be an integer.",
+            }, status=400)
 
-    data = list(queryset.values())
-
-    return JsonResponse({
-        "status": True,
-        "message": "Success",
-        "count": len(data),
-        "data": data
-    })
-
-
-def fabric_delivery_repl(request):
-    dcno = request.GET.get("dcno")
-
-    queryset = ViewFabricDeliveryRepl.objects.using("demo")
-
-    if dcno:
-        queryset = queryset.filter(dcno=dcno)
+        data = list(queryset.filter(dcno=selected_dcno).values())
     else:
-        return JsonResponse({
-            "status": False,
-            "message": "dcno is required",
-            "count": 0,
-            "data": []
-        })
-
-    data = list(queryset.values())
+        dc_options = (
+            queryset.values("dcno", "jobno", "frm", "todept")
+            .distinct()
+            .order_by("dcno")
+        )
+        data = [
+            {
+                "dcno": option["dcno"],
+                "jobno": option["jobno"],
+                "from_dept": option["frm"],
+                "to_dept": option["todept"],
+            }
+            for option in dc_options
+        ]
 
     return JsonResponse({
         "status": True,
         "message": "Success",
         "count": len(data),
-        "data": data
+        "data": data,
     })
 
-def general_delivery_type1(request):
-    dcno = request.GET.get("dcno")
+
+def fabric_delivery_repl(request, dcno=None):
+    selected_dcno = dcno if dcno is not None else request.GET.get("dcno")
+    queryset = ViewFabricDeliveryRepl.objects.using("demo").all()
+
+    if selected_dcno not in (None, ""):
+        try:
+            selected_dcno = int(selected_dcno)
+        except ValueError:
+            return JsonResponse({
+                "status": False,
+                "message": "dcno must be an integer.",
+            }, status=400)
+
+        data = list(queryset.filter(dcno=selected_dcno).values())
+    else:
+        dc_options = (
+            queryset.values("dcno", "jobno", "frm", "todept")
+            .distinct()
+            .order_by("dcno")
+        )
+        data = [
+            {
+                "dcno": option["dcno"],
+                "jobno": option["jobno"],
+                "from_dept": option["frm"],
+                "to_dept": option["todept"],
+            }
+            for option in dc_options
+        ]
+
+    return JsonResponse({
+        "status": True,
+        "message": "Success",
+        "count": len(data),
+        "data": data,
+    })
+
+def general_delivery_type1(request, dcno=None):
+    selected_dcno = (
+        dcno
+        if dcno is not None
+        else (request.GET.get("dcno") or request.GET.get("no"))
+    )
 
     today = date.today()
 
@@ -267,58 +467,105 @@ def general_delivery_type1(request):
         fy_start = date(today.year - 1, 4, 1)
         fy_end = date(today.year, 3, 31)
 
-    queryset = ViewGeneralDeiveryType1.objects.using('test').all()
-
-    # Current account/financial year
-    queryset = queryset.filter(
-        date__gte=fy_start,
-        date__lte=fy_end
+    queryset = (
+        ViewGeneralDeiveryType1.objects.using('test')
+        .filter(date__gte=fy_start, date__lte=fy_end)
     )
 
-    # DC number filter
-    if dcno:
-        queryset = queryset.filter(no=dcno)
+    if selected_dcno not in (None, ""):
+        try:
+            selected_dcno = int(selected_dcno)
+        except ValueError:
+            return JsonResponse({
+                "status": False,
+                "message": "dcno must be an integer.",
+            }, status=400)
 
-    data = list(queryset.values())
+        data = list(queryset.filter(no=selected_dcno).values())
+    else:
+        dc_options = (
+            queryset.values("no", "suppliername", "department")
+            .distinct()
+            .order_by("no")
+        )
+        data = [
+            {
+                "dcno": option["no"],
+                "supplier": option["suppliername"],
+                "department": option["department"],
+            }
+            for option in dc_options
+        ]
 
     return JsonResponse({
         "status": True,
         "message": "Success",
         "count": len(data),
-        "data": data
+        "data": data,
     })
 
-def gen_stock_issue(request):
-    dcno = request.GET.get("no")
+def gen_stock_issue(request, no=None):
+    selected_no = (
+        no
+        if no is not None
+        else (request.GET.get("no") or request.GET.get("dcno"))
+    )
 
     queryset = ViewGenStockIssue.objects.using("test").filter(
         date__year=timezone.now().year
     )
 
-    if dcno:
-        queryset = queryset.filter(no=dcno)
+    if selected_no not in (None, ""):
+        try:
+            selected_no = int(selected_no)
+        except ValueError:
+            return JsonResponse({
+                "status": False,
+                "message": "no must be an integer.",
+            }, status=400)
 
-    data = list(queryset.values())
+        data = list(queryset.filter(no=selected_no).values())
+    else:
+        issue_options = (
+            queryset.values("no", "frm_dept", "to_dept", "reqno")
+            .distinct()
+            .order_by("no")
+        )
+        data = [
+            {
+                "no": option["no"],
+                "from_dept": option["frm_dept"],
+                "to_dept": option["to_dept"],
+                "reqno": option["reqno"],
+            }
+            for option in issue_options
+        ]
 
     return JsonResponse({
         "status": True,
         "message": "Success",
         "count": len(data),
-        "data": data
+        "data": data,
     })
 
 
-
 # --- VIEW ---
-csrf_exempt
+@csrf_exempt
 def gate_module_api(request, pk=None):
+
+    # ---------------- CORS PREFLIGHT (OPTIONS) ----------------
+    if request.method == "OPTIONS":
+        response = JsonResponse({"status": True})
+        response["Access-Control-Allow-Origin"] = "*"
+        response["Access-Control-Allow-Methods"] = "GET, POST, PUT, PATCH, OPTIONS"
+        response["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-Requested-With"
+        return response
+
     # ---------------- GET ----------------
     if request.method == "GET":
-
-        # 1. Single Record by Primary Key
         if pk:
             try:
-                obj = TrsGatemodule.objects.using('demo').get(pk=pk)
+                obj = TrsGatemodule.objects.using("demo").get(pk=pk)
                 data = model_to_dict(obj)
                 if obj.date:
                     data["date"] = obj.date.strftime("%Y-%m-%d %H:%M:%S")
@@ -326,26 +573,18 @@ def gate_module_api(request, pk=None):
             except TrsGatemodule.DoesNotExist:
                 return JsonResponse({"status": False, "message": "Record not found"}, status=404)
 
-        # Base Queryset
-        queryset = TrsGatemodule.objects.using('demo').all().order_by("-date")
+        queryset = TrsGatemodule.objects.using("demo").all().order_by("-date")
 
-        # 2. Extract Filters from Frontend Request
         dc_no = request.GET.get("no")
-        filter_date = request.GET.get("date")  # <--- Capture the single date parameter
+        filter_date = request.GET.get("date")
 
-        # Apply Filters Dynamically
         if dc_no:
             queryset = queryset.filter(no=dc_no)
-        
         if filter_date:
-            # __date extracts the YYYY-MM-DD part from the database's DateTimeField
             queryset = queryset.filter(date__date=filter_date)
-
-        # Optional: If no filters are applied, limit to 50 to prevent crashing/slowdown
         if not dc_no and not filter_date:
-            queryset = queryset[:50] 
+            queryset = queryset[:50]
 
-        # Format Response
         data = []
         for obj in queryset:
             item = model_to_dict(obj)
@@ -353,36 +592,29 @@ def gate_module_api(request, pk=None):
                 item["date"] = obj.date.strftime("%Y-%m-%d %H:%M:%S")
             data.append(item)
 
-        return JsonResponse({
-            "status": True,
-            "count": len(data),
-            "data": data
-        })
+        return JsonResponse({"status": True, "count": len(data), "data": data})
 
     # ---------------- POST ----------------
     elif request.method == "POST":
         try:
             body = json.loads(request.body)
-
             module = body.get("module")
             qr_code_dtls = body.get("qr_code_dtls")
 
-            # Duplicate check
             if TrsGatemodule.objects.using("demo").filter(
-                module=module,
-                qr_code_dtls=qr_code_dtls
+                module=module, qr_code_dtls=qr_code_dtls
             ).exists():
                 return JsonResponse({
                     "status": False,
                     "message": "DcNo Already Saved"
                 }, status=409)
 
-            # Safely parse dates if they exist in the payload
             date_val = body.get("date")
             print_date_val = body.get("print_delivery_date")
             gate_date_val = body.get("gate_delivery_date")
+            inch_verify_date = body.get("inch_verify_date")
 
-            obj = TrsGatemodule.objects.using("demo").create(
+            TrsGatemodule.objects.using("demo").create(
                 module=module,
                 qr_code_dtls=qr_code_dtls,
                 companyid=body.get("companyid"),
@@ -399,64 +631,64 @@ def gate_module_api(request, pk=None):
                 print_delivery_date=parse_datetime(print_date_val) if print_date_val else None,
                 gate_delivery_date=parse_datetime(gate_date_val) if gate_date_val else None,
                 prepered=body.get("prepered"),
-                fhero=body.get("fhero")
+                fhero=body.get("fhero"),
+                inch_verify_date=parse_date(inch_verify_date) if inch_verify_date else None,
+                inch_verify_status=body.get("inch_verify_status"),
             )
 
-            return JsonResponse({
-                "status": True,
-                "message": "Dc Created Successfully",
-            }, status=201)
+            return JsonResponse({"status": True, "message": "Dc Created Successfully"}, status=201)
 
         except Exception as e:
-            return JsonResponse({
-                "status": False,
-                "message": str(e)
-            }, status=400)
+            return JsonResponse({"status": False, "message": str(e)}, status=400)
 
-    # ---------------- PUT (Handles React Verification Updates) ----------------
-    elif request.method == "PUT":
+    # ---------------- PUT / PATCH ----------------
+    # ---------------- PUT / PATCH ----------------
+    elif request.method in ["PUT", "PATCH"]:
         if not pk:
             return JsonResponse({
-                "status": False, 
+                "status": False,
                 "message": "Record ID is required for updates"
             }, status=400)
-            
+
         try:
             body = json.loads(request.body)
-            obj = TrsGatemodule.objects.using('demo').get(pk=pk)
-            
-            # If 'verify' is in the request payload, update the field
+            obj = TrsGatemodule.objects.using("demo").get(pk=pk)
+
+            # Original fields
             if "verify" in body:
                 obj.verify = body["verify"]
 
-            # 2. Update the 'gate_delivery_date' (THIS WAS MISSING)
             if "gate_delivery_date" in body:
                 date_str = body["gate_delivery_date"]
                 obj.gate_delivery_date = parse_datetime(date_str) if date_str else None
+
+            # ADD THESE LINES to capture the new frontend payload
+            if "fhero" in body:
+                obj.fhero = body["fhero"]
                 
-            # Save the updated record
-            obj.save(using='demo')
-            
+            if "inch_verify_date" in body:
+                date_str = body["inch_verify_date"]
+                obj.inch_verify_date = parse_date(date_str) if date_str else None
+                
+            if "inch_verify_status" in body:
+                obj.inch_verify_status = body["inch_verify_status"]
+
+            obj.save(using="demo")
+
             return JsonResponse({
                 "status": True,
                 "message": "Verification saved successfully"
             }, status=200)
 
         except TrsGatemodule.DoesNotExist:
-            return JsonResponse({
-                "status": False, 
-                "message": "Record not found"
-            }, status=404)
+            return JsonResponse({"status": False, "message": "Record not found"}, status=404)
         except Exception as e:
-            return JsonResponse({
-                "status": False, 
-                "message": str(e)
-            }, status=400)
+            return JsonResponse({"status": False, "message": str(e)}, status=400)
 
-    # ---------------- METHOD NOT ALLOWED ----------------
+    # ---------------- FALLBACK ----------------
     return JsonResponse({
         "status": False,
-        "message": "Method not allowed"
+        "message": f"Method '{request.method}' not allowed"
     }, status=405)
 
 
@@ -474,9 +706,10 @@ def gate_module_api_details(request):
     })
 
 
-def get_user_by_username(request):
-    
+def get_user_by_username(request, username=None):
     data = HerofashionUser.objects.all()
+    if username is not None:
+        data = data.filter(username=username)
 
     data1 = list(data.values('id', 'username', 'role__name'))
 
@@ -963,151 +1196,6 @@ def manage_role_permissions(request, role_param=None):
         "message": f"Permissions for {role} reset successfully",
         "deleted_count": deleted_count,
     })
-
-
-
-@csrf_exempt
-def dc_verify_incharge_crud(request):
-    """
-    All-in-one CRUD API endpoint using standard Django JsonResponse:
-      - GET:    Filter by ?id=... or ?dcno=... or fetch all.
-      - POST:   Create a new record (JSON body).
-      - PUT:    Update an existing record via ?id=... or JSON body id.
-      - DELETE: Delete record via ?id=... or JSON body id.
-    """
-    method = request.method
-
-    # ----------------------------------------------------
-    # READ (GET)
-    # ----------------------------------------------------
-    if method == "GET":
-        record_id = request.GET.get("id") or request.GET.get("slno")
-        dcno = request.GET.get("dcno") or request.GET.get("DCNo")
-
-        queryset = Dc_Incharge_Verify.objects.all()
-
-        if record_id:
-            queryset = queryset.filter(id=record_id)
-        if dcno:
-            queryset = queryset.filter(DCNo=dcno)
-
-        data = list(queryset.values())
-        return JsonResponse({
-            "status": True,
-            "message": "Records fetched successfully.",
-            "count": len(data),
-            "data": data
-        }, status=200)
-
-    # ----------------------------------------------------
-    # Parse JSON body for mutation requests (POST, PUT, DELETE)
-    # ----------------------------------------------------
-    body = {}
-    if method in ["POST", "PUT", "DELETE"]:
-        if request.body:
-            try:
-                body = json.loads(request.body.decode("utf-8"))
-            except json.JSONDecodeError:
-                return JsonResponse({"status": False, "message": "Invalid JSON payload."}, status=400)
-
-    # Helper to extract valid model fields from payload
-    def get_cleaned_data(payload):
-        valid_fields = ['date', 'DCNo', 'jobno', 'trstype', 'wgt', 'mtr', 'rolls', 'bags', 'username', 'status']
-        return {k: v for k, v in payload.items() if k in valid_fields}
-
-    # ----------------------------------------------------
-    # CREATE (POST)
-    # ----------------------------------------------------
-    if method == "POST":
-        cleaned_data = get_cleaned_data(body)
-        if not cleaned_data:
-            return JsonResponse({"status": False, "message": "No valid fields provided."}, status=400)
-
-        # Default to verified unless explicitly stated otherwise
-        cleaned_data.setdefault("status", True)
-
-        # Block re-verifying a DC that already has a verified row for this trstype
-        existing = Dc_Incharge_Verify.objects.filter(
-            DCNo=cleaned_data.get("DCNo"),
-            trstype=cleaned_data.get("trstype"),
-            status=True,
-        ).first()
-
-        if existing:
-            return JsonResponse({
-                "status": False,
-                "message": "This DC has already been verified for this transaction type!",
-                "data": list(Dc_Incharge_Verify.objects.filter(id=existing.id).values())[0],
-            }, status=409)
-
-        try:
-            instance = Dc_Incharge_Verify.objects.create(**cleaned_data)
-            return JsonResponse({
-                "status": True,
-                "message": "Record created successfully.",
-                "data": list(Dc_Incharge_Verify.objects.filter(id=instance.id).values())[0]
-            }, status=201)
-        except ValidationError as e:
-            return JsonResponse({"status": False, "message": str(e)}, status=400)
-        except Exception as e:
-            return JsonResponse({"status": False, "message": f"Database error: {str(e)}"}, status=500)
-
-    # ----------------------------------------------------
-    # UPDATE (PUT)
-    # ----------------------------------------------------
-    elif method == "PUT":
-        record_id = request.GET.get("id") or request.GET.get("slno") or body.get("id")
-        
-        if not record_id:
-            return JsonResponse({"status": False, "message": "'id' parameter is required for updating."}, status=400)
-
-        cleaned_data = get_cleaned_data(body)
-        if not cleaned_data:
-            return JsonResponse({"status": False, "message": "No valid fields provided to update."}, status=400)
-
-        try:
-            instance = Dc_Incharge_Verify.objects.get(id=record_id)
-            for key, value in cleaned_data.items():
-                setattr(instance, key, value)
-            instance.save()
-
-            return JsonResponse({
-                "status": True,
-                "message": "Record updated successfully.",
-                "data": list(Dc_Incharge_Verify.objects.filter(id=instance.id).values())[0]
-            }, status=200)
-        except Dc_Incharge_Verify.DoesNotExist:
-            return JsonResponse({"status": False, "message": f"Record with id '{record_id}' not found."}, status=404)
-        except ValidationError as e:
-            return JsonResponse({"status": False, "message": str(e)}, status=400)
-        except Exception as e:
-            return JsonResponse({"status": False, "message": f"Database error: {str(e)}"}, status=500)
-
-    # ----------------------------------------------------
-    # DELETE (DELETE)
-    # ----------------------------------------------------
-    elif method == "DELETE":
-        record_id = request.GET.get("id") or request.GET.get("slno") or body.get("id")
-
-        if not record_id:
-            return JsonResponse({"status": False, "message": "'id' parameter is required for deletion."}, status=400)
-
-        try:
-            instance = Dc_Incharge_Verify.objects.get(id=record_id)
-            instance.delete()
-            return JsonResponse({
-                "status": True,
-                "message": f"Record with id '{record_id}' deleted successfully."
-            }, status=200)
-        except Dc_Incharge_Verify.DoesNotExist:
-            return JsonResponse({"status": False, "message": f"Record with id '{record_id}' not found."}, status=404)
-        except Exception as e:
-            return JsonResponse({"status": False, "message": f"Database error: {str(e)}"}, status=500)
-
-    # ----------------------------------------------------
-    # Unsupported HTTP Methods
-    # ----------------------------------------------------
-    return JsonResponse({"status": False, "message": f"Method {method} not allowed."}, status=405)
 
 
 def _serialize_record(obj, request=None):
