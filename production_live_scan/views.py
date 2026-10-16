@@ -703,6 +703,22 @@ class GetUnitDataAPIView(APIView):
                 dependency_statuses = get_assembly_dependency_statuses(
                     job_no, process_des, top_bottom
                 )
+                unverified_processes = [
+                    item["process"]
+                    for item in dependency_statuses
+                    if not item["verified"]
+                ]
+                if unverified_processes:
+                    return Response({
+                        "status": True,
+                        "data": [],
+                        "dependency_statuses": dependency_statuses,
+                        "message": (
+                            "Dependency not verified for: "
+                            + ", ".join(unverified_processes)
+                        ),
+                    })
+
                 allowed, eligible_bundle_ids, error_message = get_eligible_assembly_bundle_ids_for_processes(
                     job_no, process_des, top_bottom, unit
                 )
@@ -1400,10 +1416,10 @@ def get_process_details(request):
                 'sl': index,
                 'Process_des': dep.process_des,
                 'mc': dep.mc,
+                'Part': dep.part,
                 'thrd': dep.thrd,
 
-                # Stored Procedure-la irunthu Trn
-                'Trn': trn_map.get(
+                'Trn': dep.trn or trn_map.get(
                     dep.process_id,
                     ''
                 ),
@@ -1665,6 +1681,8 @@ def save_process_dependency(request):
 
                     dep.tb_name = row.get('tb_name')
                     dep.process_des = row.get('process_des')
+                    dep.part = row.get('part')
+                    dep.trn = row.get('trn')
                     dep.mc = row.get('mc')
                     # The procedure can return values such as "NIL", while the
                     # model stores Thread as an integer. Treat non-numeric

@@ -25,19 +25,18 @@ class RollEmpDetails(models.Model):
 class RollChecking(models.Model):
     rowno = models.BigIntegerField(db_column='RowNo', primary_key=True)
     dt = models.DateTimeField()
-    ty = models.CharField(max_length=8)
+    type = models.CharField(max_length=8, db_column='ty')
     dc = models.CharField(max_length=25, blank=True, null=True)
     rlno = models.CharField(max_length=50, blank=True, null=True)
-    name = models.CharField(db_column='Name', max_length=50, blank=True, null=True)
-    colour = models.IntegerField()
-    fabdescr = models.IntegerField()
+    colour = models.CharField(db_column='Name', max_length=50, blank=True, null=True)
     fab = models.CharField(max_length=35)
-    diaid = models.IntegerField()
     dia = models.CharField(max_length=35)
     weight = models.DecimalField(max_digits=18, decimal_places=3)
     mtr = models.DecimalField(max_digits=18, decimal_places=2)
     lotno = models.CharField(max_length=10, blank=True, null=True)
     jobno = models.CharField(max_length=50)
+    gsm = models.IntegerField()
+    img = models.CharField(max_length=94, blank=True, null=True, db_column='img1')
 
     class Meta:
         managed = False

@@ -95,6 +95,8 @@ class dependency(models.Model):
     or_only = models.BooleanField(default=False)
     verify_user = models.CharField(max_length=50, blank=True, null=True)
     verify_date = models.DateTimeField(blank=True, null=True)
+    part=models.CharField(max_length=50, blank=True, null=True)
+    trn = models.CharField(max_length=50, blank=True, null=True) 
     # assemply_scan = models.BooleanField(default=False)
 
 

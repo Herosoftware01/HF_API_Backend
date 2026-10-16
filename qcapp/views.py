@@ -660,82 +660,6 @@ class MachineAllocationDetailAPIView(APIView):
         return Response({"message": "Deleted successfully"}, status=204)
 
 
-
-
-# class EmployeeAPIView(APIView):
-#     def get(self, request):
-#         include_online = request.query_params.get("include_online") == "true"
-#         selected_date = parse_date(request.query_params.get("date", "") or "")
-#         if request.query_params.get("date") and selected_date is None:
-#             return Response({"error": "date must use YYYY-MM-DD format"}, status=400)
-#         selected_date = selected_date or timezone.localdate()
-#         online_allocations = {}
-#         if include_online:
-#             allocations = emp_allocate.objects.filter(
-#                 date__date=selected_date,
-#             ).select_related("machine").order_by("-date", "-id")
-#             for emp_code, allocation in latest_online_allocations_by_employee(allocations).items():
-#                 online_allocations[emp_code] = {
-#                     "allocation_id": allocation.id,
-#                     "machine_id": allocation.machine_id,
-#                     "machine_identity": allocation.machine.Identity,
-#                     "unit": allocation.unit,
-#                     "line": allocation.line,
-#                 }
-#         else:
-#             today = timezone.now().date()
-#             online_emp_codes = emp_allocate.objects.filter(
-#                 date__date=today,
-#                 status=True
-#             ).values_list("emp_code", flat=True)
-
-#         employees = Empwisesal.objects.using('main').filter(status='working')
-#         contractors = Cont_employee.objects.select_related('con_id')
-#         if not include_online:
-#             employees = employees.exclude(code__in=online_emp_codes)
-#             contractors = contractors.exclude(code__in=online_emp_codes)
-#         employees = employees.values('code', 'name', 'photo', 'dept')
-
-#         staff_url = settings.STAFF_IMAGES_URL.rstrip('/')
-
-#         data = []
-
-#         # Empwisesal data
-#         for emp in employees:
-#             photo_url = None
-#             if emp.get('photo'):
-#                 filename = emp['photo'].split('\\')[-1]
-#                 photo_url = f"https://hfapi.herofashion.com/{staff_url}/{filename}"
-
-#             employee_data = {
-#                 "code": emp['code'],
-#                 "name": emp['name'],
-#                 "dept": emp['dept'],   # already string in this table
-#                 "photo": photo_url,
-#                 "source": "empwisesal"
-#             }
-#             if include_online:
-#                 employee_data["online_allocation"] = online_allocations.get(str(emp["code"]))
-#             data.append(employee_data)
-
-#         # 2. Contractor employees (Cont_employee + Mas_contractor)
-#         # contractors = Cont_employee.objects.select_related('con_id').all()
-#         for emp in contractors:
-#             contractor_name = emp.con_id.contract_des if emp.con_id else ""
-#             employee_data = {
-#                 "code": emp.code,
-#                 "name": f"{emp.name} ({contractor_name})",
-#                 "dept": emp.con_id.contract_des if emp.con_id else None,  # Mas_contractor name
-#                 "photo": None,
-#                 "source": "contract_employee"
-#             }
-#             if include_online:
-#                 employee_data["online_allocation"] = online_allocations.get(str(emp.code))
-#             data.append(employee_data)
-
-#         return Response(data)
-
-
 class EmployeeAPIView(APIView):
     def get(self, request):
         include_online = request.query_params.get("include_online") == "true"
@@ -803,7 +727,7 @@ class EmployeeAPIView(APIView):
             contractors.values_list('con_id', flat=True).distinct()
         )
         contract_map = {
-            c.contract_id: c for c in MasContract.objects.using('main').filter(contract_id__in=contract_ids)
+            c.contract_id: c for c in MasContract.objects.using('main').filter(contract_id__in=contract_ids,act='Y')
         }
 
         for emp in contractors:
@@ -845,28 +769,31 @@ class Employee_and_staffAPIView(APIView):
 
         return Response(data)
 
+from .models import MasContract, Cont_employee
+from .serializers import MasContractSerializer, ContEmployeeSerializer
 
-# class Employee_and_staff_login_APIView(APIView):
-#     def get(self, request):
-#         employees = VueUser.objects.using('main').values('code', 'name', 'photo', 'wunit')
-        
-#         staff_url = settings.STAFF_IMAGES_URL.rstrip('/')
+@api_view(['GET'])
+def contract_list_api(request):
+    """Fetch all contracts from the 'main' database for dropdown"""
+    # contracts = MasContract.objects.using('main').all().order_by('contract_id')
+    contracts = MasContract.objects.using('main').filter(act='Y').order_by('contract_id')
+    serializer = MasContractSerializer(contracts, many=True)
+    return Response(serializer.data)
 
-#         data = []
-#         for emp in employees:
-#             photo_url = None
-#             if emp.get('photo'):
-#                 filename = emp['photo'].split('\\')[-1]
-#                 photo_url = f"https://hfapi.herofashion.com/{staff_url}/{filename}"
+@api_view(['GET', 'POST'])
+def employee_list_create_api(request):
+    """List all employees or create a new one using 'default' database"""
+    if request.method == 'GET':
+        employees = Cont_employee.objects.using('default').all().order_by('-id')
+        serializer = ContEmployeeSerializer(employees, many=True)
+        return Response(serializer.data)
 
-#             data.append({
-#                 "code": emp['code'],
-#                 "name": emp['name'],
-#                 "dept": emp['wunit'],
-#                 "photo": photo_url,
-#             })
-
-#         return Response(data)
+    elif request.method == 'POST':
+        serializer = ContEmployeeSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 from django.conf import settings
@@ -1751,8 +1678,6 @@ def get_allocate_report(request):
         })
 
     return JsonResponse(data, safe=False)
-
-
 
 
 

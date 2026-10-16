@@ -22,7 +22,7 @@ def Roll_Employee(request):
 
         if raw_path:
             filename = raw_path.replace('\\', '/').split('/')[-1]
-            obj['photo'] = f"https://app.herofashion.com/staff_images/{filename}"
+            obj['photo'] = f"https://hfapi.herofashion.com/staff_images/{filename}"
         else:
             obj['photo'] = ""
 
@@ -108,27 +108,51 @@ def Roll_Employee_Details(request):
 
 
 def Roll_Checking(request):
-
     rlno = request.GET.get('rlno')
+    dc = request.GET.get('dc')
+    colour = request.GET.get('colour')
+
     queryset = RollChecking.objects.using('demo').all()
 
-    if rlno:
+    if rlno and dc and colour:
+
+        # Check RollCheckingDetails table
+        detail = RollCheckingDetails.objects.using("default").filter(rlno=rlno.strip(), dcno=dc.strip(), colour=colour.strip()).first()
+
+        if detail:
+            if detail.submit == 1:
+                status = "Roll Already Scanning"
+            else:
+                status = "Roll Checking Progress"
+        else:
+            status = "Ready to Roll Checking"
+
+        queryset = queryset.filter(rlno=rlno.strip(), dc=dc.strip(), colour=colour.strip())
+        data = list(queryset.order_by("-dt").values())
+
+        return JsonResponse({
+            "status": status,
+            "data": data
+        })
+
+    elif rlno:
         queryset = queryset.filter(rlno=rlno.strip())
 
-    data = list(queryset.values())
+        if not queryset.exists():
+            return JsonResponse({
+                "status": "Roll Number Not Found",
+                "data": []
+            })
+        
+        data = list(queryset.order_by("-dt").values('rlno', 'dc', 'colour'))
 
-    for obj in data:
-        raw_path = obj.get('photo')
-
-        if raw_path:
-            filename = raw_path.replace('\\', '/').split('/')[-1]
-            obj['photo'] = f"https://app.herofashion.com/order_image/{filename}"
-        else:
-            obj['photo'] = ""
+    else:
+        data = list(queryset.order_by("-dt").values())
 
     return JsonResponse(data, safe=False)
 
 
+@csrf_exempt
 @require_http_methods(["GET", "POST", "PUT"])
 def RollChecking_Details(request):
 
@@ -225,7 +249,8 @@ def RollChecking_Details(request):
             'oil', 'stain', 'holes', 'setoff', 'needle_line',
             'compact_kadi', 'sidepin_hole', 'streaks', 'roll_joint',
             'yarn_mistake', 'patches', 'gsm_hole', 'print_mistake',
-            'remark', 'timer', 'submit', 'submit_date', 'points'
+            'remark', 'timer', 'submit', 'submit_date', 'points',
+            'a_gsm', 'f_dia', 'meter'
         ]
 
         for field in fields:
@@ -243,6 +268,8 @@ def RollChecking_Details(request):
             "colour": obj.colour
         })
 
+    
+@csrf_exempt
 @require_POST
 def RollChecking_ImageUpload(request):
     rlno = request.POST.get('rlno')
