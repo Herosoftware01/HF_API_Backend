@@ -266,3 +266,61 @@ class CutSampleSerializer(serializers.ModelSerializer):
     class Meta:
         model = cut_sample_data_final
         fields = '__all__'
+
+
+
+from .models import MasContract, Cont_employee
+
+class MasContractSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = MasContract
+        fields = ['contract_id', 'contract_des']
+
+class ContEmployeeSerializer(serializers.ModelSerializer):
+    contract_description = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Cont_employee
+        fields = ['id', 'name', 'con_id', 'code', 'contract_description']
+        read_only_fields = ['code']
+
+    def get_contract_description(self, obj):
+        if not obj.con_id:
+            return '-'
+        try:
+            contract = MasContract.objects.using('main').get(contract_id=obj.con_id)
+            return contract.contract_des or 'No Description'
+        except MasContract.DoesNotExist:
+            return 'Unknown Contractor'
+
+    def create(self, validated_data):
+        con_id = validated_data.get('con_id')
+        
+        # 1. Fetch contractor from 'main' database
+        try:
+            contractor = MasContract.objects.using('main').get(contract_id=con_id)
+            contractor_code_str = str(contractor.contract_id)
+        except MasContract.DoesNotExist:
+            raise serializers.ValidationError({"con_id": f"Contract with ID {con_id} does not exist."})
+
+        # 2. Generate prefix (Last 2 digits of contract_id)
+        prefix = contractor_code_str[-2:] if len(contractor_code_str) >= 2 else contractor_code_str.zfill(2)
+        
+        # 3. Find last employee sequence for this con_id in 'default' database
+        last = Cont_employee.objects.using('default').filter(con_id=con_id).order_by('-id').first()
+
+        if last and last.code:
+            try:
+                last_seq = int(last.code[-2:])
+                new_seq = last_seq + 1
+            except ValueError:
+                new_seq = 1
+        else:
+            new_seq = 1
+
+        # 4. Assign generated code
+        validated_data['code'] = f"{prefix}{new_seq:02d}"
+
+        # 5. Save using 'default' database
+        employee = Cont_employee.objects.using('default').create(**validated_data)
+        return employee

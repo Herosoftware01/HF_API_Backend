@@ -132,6 +132,7 @@ def qr_api(request):
         scaner_id=sl,
         types=data['t']
     )
+    
     # =========================
     # ALREADY SAVED CASE
     # =========================

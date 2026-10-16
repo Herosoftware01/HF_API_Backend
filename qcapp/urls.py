@@ -51,6 +51,8 @@ urlpatterns = [
     path("role_qc/", views.role_qc, name='role_qc'),
     path("qc_hourly_approval_api/", views.qc_hourly_approval_api, name='qc_hourly_approval_api'),
     path("qcroving_qcwise/",views.qcroving_qcwise, name='qcroving_qcwise'),
+    path('contracts/', views.contract_list_api, name='contract-list-api'),
+    path('employees/', views.employee_list_create_api, name='employee-list-create-api'),
     path(
         "save_measurementss/",
         views.save_measurementss,
