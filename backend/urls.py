@@ -57,5 +57,6 @@ if settings.DEBUG:
     urlpatterns += static(settings.ORDER_IMAGES_URL, document_root=settings.ORDER_IMAGES_ROOT)
     urlpatterns += static(settings.WORKENTRY_IMAGES_URL, document_root=settings.WORKENTRY_IMAGES_ROOT)
     urlpatterns += static(settings.DC_RECEIVER_IMAGES_URL, document_root=settings.DC_RECEIVER_IMAGES_ROOT)
-
+    urlpatterns += static(settings.ROLL_CHECKING_IMAGES_URL, document_root=settings.ROLL_CHECKING_IMAGES_ROOT)
+    urlpatterns += static(settings.DEFECT_IMAGES_URL, document_root=settings.DEFECT_IMAGES_ROOT)
 
