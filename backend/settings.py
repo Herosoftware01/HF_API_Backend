@@ -343,6 +343,9 @@ DC_RECEIVER_IMAGES_ROOT = r'\\10.1.21.11\d\DC_Reciver_image'
 ROLL_CHECKING_IMAGES_URL = '/roll_checking_images/'
 ROLL_CHECKING_IMAGES_ROOT = r'\\10.1.21.11\d\Roll_Checking_Images'
 
+DEFECT_IMAGES_URL = '/defect_images/'
+DEFECT_IMAGES_ROOT = r'\\10.1.21.11\d\Defect_Images'
+
 PDF_STORAGE_PATH = r"\\adminserver\File Sharing\AAAA Hero\Syncfusion Pdf Reports"
 
 # Email configurationcmd
