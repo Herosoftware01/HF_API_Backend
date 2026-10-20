@@ -727,7 +727,7 @@ class EmployeeAPIView(APIView):
             contractors.values_list('con_id', flat=True).distinct()
         )
         contract_map = {
-            c.contract_id: c for c in MasContract.objects.using('main').filter(contract_id__in=contract_ids)
+            c.contract_id: c for c in MasContract.objects.using('main').filter(contract_id__in=contract_ids,act='Y')
         }
 
         for emp in contractors:
@@ -774,8 +774,8 @@ from .serializers import MasContractSerializer, ContEmployeeSerializer
 
 @api_view(['GET'])
 def contract_list_api(request):
-    """Fetch all contracts from the 'main' database for dropdown"""
-    contracts = MasContract.objects.using('main').all().order_by('contract_id')
+    # contracts = MasContract.objects.using('main').all().order_by('contract_id')
+    contracts = MasContract.objects.using('main').filter(act='Y').order_by('contract_id')
     serializer = MasContractSerializer(contracts, many=True)
     return Response(serializer.data)
 
