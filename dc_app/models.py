@@ -456,6 +456,7 @@ class ViewGeneralDeiveryType1(models.Model):
     dd1 = models.DateTimeField(blank=True, null=True)
     department = models.CharField(db_column='Department', max_length=50, blank=True, null=True)  # Field name made lowercase.
     qrid = models.CharField(max_length=24, blank=True, null=True)
+    loginname = models.CharField(max_length=24, blank=True, null=True)
 
     class Meta:
         managed = False
@@ -509,12 +510,15 @@ class TrsGatemodule(models.Model):
     verify = models.CharField(db_column='Verify', max_length=50, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)  # Field name made lowercase.
     prepered = models.CharField(max_length=50, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)
     fhero = models.CharField(max_length=50, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)
-    inch_verify_date = models.DateField(blank=True, null=True)
-    inch_verify_status = models.BooleanField(blank=True, null=True, default=False)
+    inch_verify_date = models.DateTimeField(blank=True, null=True)
+    inch_verify_status = models.BooleanField(blank=True, null=True)
+    inch_reject_remakrs = models.TextField(db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)
+    inch_remakrs_date = models.DateTimeField(blank=True, null=True)
 
     class Meta:
         managed = False
         db_table = 'Trs_Gatemodule'
+
 
 
 

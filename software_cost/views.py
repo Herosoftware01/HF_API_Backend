@@ -1117,7 +1117,11 @@ def trs_workentry(request, id=None):
                 if image_file:
                     obj.image = image_file
                 obj.save()
-                ...
+                return JsonResponse({
+                    "status": True,
+                    "message": "Record updated successfully",
+                    "id": obj.id
+                })
             else:
                 # INSERT LOGIC
                 tf = build_time_fields(body)
