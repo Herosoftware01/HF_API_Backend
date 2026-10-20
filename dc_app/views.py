@@ -484,7 +484,7 @@ def general_delivery_type1(request, dcno=None):
         data = list(queryset.filter(no=selected_dcno).values())
     else:
         dc_options = (
-            queryset.values("no", "suppliername", "department")
+            queryset.values("no", "suppliername", "department","ty")
             .distinct()
             .order_by("no")
         )
@@ -493,6 +493,7 @@ def general_delivery_type1(request, dcno=None):
                 "dcno": option["no"],
                 "supplier": option["suppliername"],
                 "department": option["department"],
+                "type" : option["ty"]
             }
             for option in dc_options
         ]
@@ -582,8 +583,8 @@ def gate_module_api(request, pk=None):
             queryset = queryset.filter(no=dc_no)
         if filter_date:
             queryset = queryset.filter(date__date=filter_date)
-        if not dc_no and not filter_date:
-            queryset = queryset[:50]
+
+    
 
         data = []
         for obj in queryset:
@@ -632,8 +633,10 @@ def gate_module_api(request, pk=None):
                 gate_delivery_date=parse_datetime(gate_date_val) if gate_date_val else None,
                 prepered=body.get("prepered"),
                 fhero=body.get("fhero"),
-                inch_verify_date=parse_date(inch_verify_date) if inch_verify_date else None,
+                inch_verify_date=parse_datetime(inch_verify_date) if inch_verify_date else None,
                 inch_verify_status=body.get("inch_verify_status"),
+                inch_reject_remakrs=body.get("inch_reject_remakrs"),
+                inch_remakrs_date=body.get("inch_remakrs_date"),
             )
 
             return JsonResponse({"status": True, "message": "Dc Created Successfully"}, status=201)
@@ -668,12 +671,20 @@ def gate_module_api(request, pk=None):
                 
             if "inch_verify_date" in body:
                 date_str = body["inch_verify_date"]
-                obj.inch_verify_date = parse_date(date_str) if date_str else None
+                obj.inch_verify_date = parse_datetime(date_str) if date_str else None
+               
                 
             if "inch_verify_status" in body:
                 obj.inch_verify_status = body["inch_verify_status"]
 
+            if "inch_reject_remakrs" in body:
+                obj.inch_reject_remakrs = body["inch_reject_remakrs"]
+
+            if "inch_remakrs_date" in body:
+                obj.inch_remakrs_date = body["inch_remakrs_date"]
+
             obj.save(using="demo")
+            
 
             return JsonResponse({
                 "status": True,

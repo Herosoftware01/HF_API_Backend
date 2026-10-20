@@ -450,6 +450,7 @@ def get_eligible_assembly_bundle_ids(job_no, process_des, top_bottom=None, unit=
     dependency_query = dependency.objects.filter(
         job_no__iexact=job_no,
         process_des__iexact=process_des,
+        
     )
     if top_bottom:
         top_bottom_filter = Q(tb_name__iexact=top_bottom)
@@ -703,6 +704,22 @@ class GetUnitDataAPIView(APIView):
                 dependency_statuses = get_assembly_dependency_statuses(
                     job_no, process_des, top_bottom
                 )
+                unverified_processes = [
+                    item["process"]
+                    for item in dependency_statuses
+                    if not item["verified"]
+                ]
+                if unverified_processes:
+                    return Response({
+                        "status": True,
+                        "data": [],
+                        "dependency_statuses": dependency_statuses,
+                        "message": (
+                            "Dependency not verified for: "
+                            + ", ".join(unverified_processes)
+                        ),
+                    })
+
                 allowed, eligible_bundle_ids, error_message = get_eligible_assembly_bundle_ids_for_processes(
                     job_no, process_des, top_bottom, unit
                 )
@@ -1317,6 +1334,8 @@ def get_process_details(request):
             {"error": "Jobno and TopBottom required"},
             status=400
         )
+    result = []
+    has_preparatory = False
         
     with connections['demo'].cursor() as cursor:
         cursor.execute(
@@ -1326,8 +1345,7 @@ def get_process_details(request):
 
         columns = [col[0] for col in cursor.description]
         rows = cursor.fetchall()
-
-        result = []
+        
 
         for row in rows:
             item = dict(zip(columns, row))
@@ -1337,9 +1355,21 @@ def get_process_details(request):
                 item.get('Trn', '') or ''
             ).strip().upper()
 
-            if trn in ('A'):
+            if trn in ('A', 'R'):
                 item['Trn'] = trn
                 result.append(item)
+                if trn == 'R':
+                    has_preparatory = True
+
+        preporatory_data = []
+        if has_preparatory:
+            cursor.execute(
+                "EXEC sp_GetRibDef %s, %s",
+                [jobno, topbottom]
+            )
+            rib_columns = [col[0] for col in cursor.description]
+            rib_rows = cursor.fetchall()
+            preporatory_data = [dict(zip(rib_columns, row)) for row in rib_rows]
 
     # =========================================================
     # 2. Process_ID -> Trn mapping
@@ -1382,9 +1412,6 @@ def get_process_details(request):
             dep
         )
 
-    # =========================================================
-    # 4. Saved data iruntha
-    # =========================================================
     if latest_by_process:
 
         saved_result = []
@@ -1393,6 +1420,7 @@ def get_process_details(request):
             reversed(list(latest_by_process.values())),
             start=1
         ):
+            current_trn = trn_map.get(dep.process_id, '')
             saved_result.append({
                 'Jobno': dep.job_no,
                 'TopBottdes': dep.tb_name,
@@ -1400,10 +1428,11 @@ def get_process_details(request):
                 'sl': index,
                 'Process_des': dep.process_des,
                 'mc': dep.mc,
+                'Part': dep.part,
                 'thrd': dep.thrd,
+                'preporatory_data': preporatory_data if current_trn == 'R' else [],
 
-                # Stored Procedure-la irunthu Trn
-                'Trn': trn_map.get(
+                'Trn': dep.trn or trn_map.get(
                     dep.process_id,
                     ''
                 ),
@@ -1456,7 +1485,7 @@ def get_process_details(request):
         process_id = item.get('Process_ID')
         job_no = item.get('Jobno')
         tb_id = item.get('TbID')
-
+        item['preporatory_data'] = preporatory_data if item['Trn'] == 'R' else []
         try:
             existing_dep = (
                 dependency.objects
@@ -1634,7 +1663,9 @@ def save_process_dependency(request):
                             tb_id=first_row.get('tb_id'),
                             bundle_id__in=affected_bundle_ids,
                         ).filter(impacted_assembly_filter)
-                        deleted_assembly_count, _ = impacted_assembly.delete()
+
+                        # deleted_assembly_count, _ = impacted_assembly.delete()
+                        deleted_assembly_count = impacted_assembly.update(edit_data=1)
 
                     if affected_bundle_ids:
                         unit_input.objects.filter(
@@ -1665,6 +1696,8 @@ def save_process_dependency(request):
 
                     dep.tb_name = row.get('tb_name')
                     dep.process_des = row.get('process_des')
+                    dep.part = row.get('part')
+                    dep.trn = row.get('trn')
                     dep.mc = row.get('mc')
                     # The procedure can return values such as "NIL", while the
                     # model stores Thread as an integer. Treat non-numeric
