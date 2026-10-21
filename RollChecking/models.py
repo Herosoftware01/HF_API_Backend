@@ -190,4 +190,50 @@ class MasterMistakes(models.Model):
     m11 = models.IntegerField(blank=True, null=True)
     m12 = models.IntegerField(blank=True, null=True)
     m13 = models.IntegerField(blank=True, null=True)
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        
+
+
+class DefectCategory(models.Model):
+    categoryid = models.AutoField(primary_key=True)
+    category_code = models.CharField(max_length=20, unique=True)
+    category_name = models.CharField(max_length=100)
+    date = models.DateTimeField(auto_now_add=True)
+    log = models.CharField(max_length=100, blank=True, null=True)
+
+    def __str__(self):
+        return self.category_name
+
+class DefectMaster(models.Model):
+    defectid = models.AutoField(primary_key=True)
+
+    categoryid = models.ForeignKey(
+        DefectCategory,
+        on_delete=models.PROTECT,
+        db_column='categoryid',
+        related_name='defects'
+    )
+
+    defect_code = models.CharField(max_length=30)
+    defectname = models.CharField(max_length=100)
+    defectserial = models.CharField(max_length=5, blank=True, null=True)
+    defect_subname = models.CharField(max_length=100, blank=True, null=True)
+    defect_type = models.CharField(max_length=50, blank=True, null=True)
+    topbottom = models.CharField(max_length=20, blank=True, null=True)
+    tamil = models.CharField(max_length=200, blank=True, null=True)
+    hindi = models.CharField(max_length=200, blank=True, null=True)
+
+    image = models.CharField(max_length=255, blank=True, null=True)
+
+    date = models.DateTimeField(auto_now_add=True)
+    log = models.CharField(max_length=100, blank=True, null=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['defect_code', 'defectserial'],
+                name='unique_defect_code_serial'
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.defect_code} - {self.defectname}"            
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          
