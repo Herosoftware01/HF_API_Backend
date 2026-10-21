@@ -450,6 +450,7 @@ def get_eligible_assembly_bundle_ids(job_no, process_des, top_bottom=None, unit=
     dependency_query = dependency.objects.filter(
         job_no__iexact=job_no,
         process_des__iexact=process_des,
+        
     )
     if top_bottom:
         top_bottom_filter = Q(tb_name__iexact=top_bottom)
@@ -1327,12 +1328,20 @@ save_assembly = SaveAssemblyAPIView.as_view()
 def get_process_details(request):
     jobno = request.data.get('jobno')
     topbottom = request.data.get('topbottom')
+    include_saved_raw = request.data.get('include_saved', True)
+
+    if isinstance(include_saved_raw, str):
+        include_saved = include_saved_raw.strip().lower() not in {'false', '0', 'no'}
+    else:
+        include_saved = bool(include_saved_raw)
 
     if not jobno or not topbottom:
         return JsonResponse(
             {"error": "Jobno and TopBottom required"},
             status=400
         )
+    result = []
+    has_preparatory = False
         
     with connections['demo'].cursor() as cursor:
         cursor.execute(
@@ -1342,8 +1351,7 @@ def get_process_details(request):
 
         columns = [col[0] for col in cursor.description]
         rows = cursor.fetchall()
-
-        result = []
+        
 
         for row in rows:
             item = dict(zip(columns, row))
@@ -1353,9 +1361,21 @@ def get_process_details(request):
                 item.get('Trn', '') or ''
             ).strip().upper()
 
-            if trn in ('A'):
+            if trn in ('A', 'R'):
                 item['Trn'] = trn
                 result.append(item)
+                if trn == 'R':
+                    has_preparatory = True
+
+        preporatory_data = []
+        if has_preparatory:
+            cursor.execute(
+                "EXEC sp_GetRibDef %s, %s",
+                [jobno, topbottom]
+            )
+            rib_columns = [col[0] for col in cursor.description]
+            rib_rows = cursor.fetchall()
+            preporatory_data = [dict(zip(rib_columns, row)) for row in rib_rows]
 
     # =========================================================
     # 2. Process_ID -> Trn mapping
@@ -1398,10 +1418,7 @@ def get_process_details(request):
             dep
         )
 
-    # =========================================================
-    # 4. Saved data iruntha
-    # =========================================================
-    if latest_by_process:
+    if include_saved and latest_by_process:
 
         saved_result = []
 
@@ -1409,6 +1426,7 @@ def get_process_details(request):
             reversed(list(latest_by_process.values())),
             start=1
         ):
+            current_trn = trn_map.get(dep.process_id, '')
             saved_result.append({
                 'Jobno': dep.job_no,
                 'TopBottdes': dep.tb_name,
@@ -1418,6 +1436,7 @@ def get_process_details(request):
                 'mc': dep.mc,
                 'Part': dep.part,
                 'thrd': dep.thrd,
+                'preporatory_data': preporatory_data if current_trn == 'R' else [],
 
                 'Trn': dep.trn or trn_map.get(
                     dep.process_id,
@@ -1472,7 +1491,7 @@ def get_process_details(request):
         process_id = item.get('Process_ID')
         job_no = item.get('Jobno')
         tb_id = item.get('TbID')
-
+        item['preporatory_data'] = preporatory_data if item['Trn'] == 'R' else []
         try:
             existing_dep = (
                 dependency.objects
@@ -1650,7 +1669,9 @@ def save_process_dependency(request):
                             tb_id=first_row.get('tb_id'),
                             bundle_id__in=affected_bundle_ids,
                         ).filter(impacted_assembly_filter)
-                        deleted_assembly_count, _ = impacted_assembly.delete()
+
+                        # deleted_assembly_count, _ = impacted_assembly.delete()
+                        deleted_assembly_count = impacted_assembly.update(edit_data=1)
 
                     if affected_bundle_ids:
                         unit_input.objects.filter(
@@ -1661,6 +1682,11 @@ def save_process_dependency(request):
 
                     existing_group.update(verify=False)
                 group_already_exists = existing_group.exists()
+                changed_process_keys = {
+                    str(process_name or '').strip().casefold()
+                    for process_name in changed_processes
+                    if str(process_name or '').strip()
+                }
 
                 for row in data:
                     lookup = {
@@ -1673,9 +1699,10 @@ def save_process_dependency(request):
                     # another dependency record for the same process.
                     dep = dependency.objects.filter(**lookup).order_by('-id').first()
                     if dep is None:
-                        # Once a Job No + Top/Bottom configuration exists, Save
-                        # may update it only; it must not append new parent rows.
-                        if group_already_exists:
+                        process_key = str(row.get('process_des') or '').strip().casefold()
+                        if group_already_exists and (
+                            not edit_confirmed or process_key not in changed_process_keys
+                        ):
                             continue
                         dep = dependency(**lookup)
 

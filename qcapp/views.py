@@ -774,7 +774,6 @@ from .serializers import MasContractSerializer, ContEmployeeSerializer
 
 @api_view(['GET'])
 def contract_list_api(request):
-    """Fetch all contracts from the 'main' database for dropdown"""
     # contracts = MasContract.objects.using('main').all().order_by('contract_id')
     contracts = MasContract.objects.using('main').filter(act='Y').order_by('contract_id')
     serializer = MasContractSerializer(contracts, many=True)

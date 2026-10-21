@@ -28,6 +28,8 @@ class TrsGatemodule(models.Model):
     fhero = models.CharField(max_length=50, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)
     inch_verify_date = models.DateTimeField(blank=True, null=True)
     inch_verify_status = models.BooleanField(blank=True, null=True)
+    inch_reject_remakrs = models.TextField(db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)
+    inch_remakrs_date = models.DateTimeField(blank=True, null=True)
 
     class Meta:
         managed = False

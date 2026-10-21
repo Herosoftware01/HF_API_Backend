@@ -36,7 +36,7 @@ urlpatterns = [
     path('fabric_delivery_repl/', views.fabric_delivery_repl, name='fabric_delivery_repl'),
     path('fabric_delivery_repl/<int:dcno>/', views.fabric_delivery_repl, name='fabric_delivery_repl'),
     path('general_delivery_type1/', views.general_delivery_type1, name='general_delivery_type1'),
-    path('general_delivery_type1/<int:no>/', views.general_delivery_type1, name='general_delivery_type1'),
+    path('general_delivery_type1/<int:dcno>/', views.general_delivery_type1, name='general_delivery_type1'),
     path('gen_stock_issue/', views.gen_stock_issue, name='gen_stock_issue'),
     path('gen_stock_issue/<int:no>/', views.gen_stock_issue, name='gen_stock_issue'),
 
