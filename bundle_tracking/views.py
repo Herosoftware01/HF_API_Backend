@@ -356,7 +356,7 @@ def approve_bundle(request):
             job_no=pcs1.jobno,
             unit_id=current_unitid,
             mbundle_id=pcs21.mbundid,
-            tb_name=topbottom.topbottom_des,
+            tb_name=str(pcs1.tbid),
             total_bundles=pcs1.totbdl,  # safer from pcs1
             pcs_count=pcs1.totpcs,
             r_date=None,
@@ -621,13 +621,6 @@ def _pending_master_bundles_for_unit(unit, start_dt):
     mbund_ids = [row["mbundid"] for row in pcs21_qs if row.get("mbundid")]
     completed_mbuds = _get_completed_mbud_set(mbund_ids)
 
-    tbids = {row["tbid"] for row in pcs1_qs if row["tbid"] is not None}
-    topbottom_map = dict(
-        MasTopbottom.objects.using("main")
-        .filter(topbottom_id__in=tbids)
-        .values_list("topbottom_id", "topbottom_des")
-    )
-
     bundle_data = []
     for pcs1 in pcs1_qs:
         pcs21 = pcs21_by_id.get(pcs1["id"])
@@ -645,7 +638,7 @@ def _pending_master_bundles_for_unit(unit, start_dt):
             "mbundle_id": str(pcs21["mbundid"]),
             "bundle_no": None,
             "job_no": pcs1["jobno"],
-            "tb_name": topbottom_map.get(pcs1["tbid"], pcs1["tbid"]),
+            "tb_name": str(pcs1["tbid"]),
             "total_bundles": pcs1["totbdl"],
             "pcs_count": pcs1["totpcs"],
             "scan": int(pcs21["mbappr"] or 0),
