@@ -3,14 +3,14 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods, require_POST
 from django.db import IntegrityError, transaction
 import json
-import os
+import os, re
 import uuid
 from django.conf import settings
 from django.http import JsonResponse
 from datetime import date
 from django.db.models import OuterRef, Subquery
 
-from .models import RollEmployee, RollEmpDetails, RollChecking, RollCheckingDetails, MasterMistakes
+from .models import RollEmployee, RollEmpDetails, RollChecking, RollCheckingDetails, MasterMistakes, DefectCategory, DefectMaster
 
 def Roll_Employee(request):
 
@@ -320,3 +320,343 @@ def MasterMistakesList(request):
 
     data = list(queryset.values())
     return JsonResponse(data, safe=False)
+
+
+def read_body(request):
+    if request.content_type and request.content_type.startswith('multipart/form-data'):
+        return request.POST
+
+    try:
+        return json.loads(request.body or '{}')
+    except json.JSONDecodeError:
+        return {}
+
+
+def category_dict(obj):
+    return {
+        'categoryid': obj.categoryid,
+        'category_code': obj.category_code,
+        'category_name': obj.category_name,
+        'date': obj.date.isoformat() if obj.date else None,
+        'log': obj.log,
+    }
+
+
+def defect_dict(request, obj):
+    return {
+        'defectid': obj.defectid,
+        'categoryid': obj.categoryid_id,
+        'category_name': obj.categoryid.category_name,
+        'defect_code': obj.defect_code,
+        'defectname': obj.defectname,
+        'defectserial': obj.defectserial,
+        'defect_subname': obj.defect_subname,
+        'defect_type': obj.defect_type,
+        'topbottom': obj.topbottom,
+        'tamil': obj.tamil,
+        'hindi': obj.hindi,
+        'image': (
+            request.build_absolute_uri(obj.image)
+            if obj.image and obj.image.startswith(('http://', 'https://'))
+            else obj.image
+        ),
+        'date': obj.date.isoformat() if obj.date else None,
+        'log': obj.log,
+    }
+
+
+@csrf_exempt
+@require_http_methods(['GET', 'POST', 'PUT', 'DELETE'])
+def Defect_Category(request):
+    if request.method == 'GET':
+        queryset = DefectCategory.objects.all().order_by('categoryid')
+        categoryid = request.GET.get('categoryid')
+
+        if categoryid:
+            queryset = queryset.filter(categoryid=categoryid)
+
+        return JsonResponse(
+            [category_dict(obj) for obj in queryset],
+            safe=False
+        )
+
+    body = read_body(request)
+    categoryid = body.get('categoryid') or request.GET.get('categoryid')
+
+    if request.method == 'POST':
+        code = body.get('category_code')
+        name = body.get('category_name')
+
+        if not code or not name:
+            return JsonResponse(
+                {'error': 'category_code and category_name are required'},
+                status=400
+            )
+
+        try:
+            obj = DefectCategory.objects.create(
+                category_code=code,
+                category_name=name,
+                log=body.get('log')
+            )
+        except IntegrityError:
+            return JsonResponse(
+                {'error': 'Category code already exists'},
+                status=409
+            )
+
+        return JsonResponse(category_dict(obj), status=201)
+
+    if not categoryid:
+        return JsonResponse({'error': 'categoryid is required'}, status=400)
+
+    try:
+        obj = DefectCategory.objects.get(categoryid=categoryid)
+    except DefectCategory.DoesNotExist:
+        return JsonResponse({'error': 'Category not found'}, status=404)
+
+    if request.method == 'PUT':
+        for field in ['category_code', 'category_name', 'log']:
+            if field in body:
+                setattr(obj, field, body[field])
+
+        try:
+            obj.save()
+        except IntegrityError:
+            return JsonResponse(
+                {'error': 'Category code already exists'},
+                status=409
+            )
+
+        return JsonResponse(category_dict(obj))
+
+    try:
+        obj.delete()
+    except IntegrityError:
+        return JsonResponse(
+            {'error': 'Cannot delete category while defects reference it'},
+            status=409
+        )
+
+    return JsonResponse({'message': 'Category deleted successfully'})
+
+
+@csrf_exempt
+@require_http_methods(['GET', 'POST', 'PUT', 'DELETE'])
+def Defect_Master(request):
+    if request.method == 'GET':
+        queryset = DefectMaster.objects.select_related(
+            'categoryid'
+        ).all().order_by('defectid')
+
+        for param, field in [
+            ('defectid', 'defectid'),
+            ('categoryid', 'categoryid_id'),
+            ('defect_code', 'defect_code'),
+        ]:
+            value = request.GET.get(param)
+            if value:
+                queryset = queryset.filter(**{field: value})
+
+        return JsonResponse(
+            [defect_dict(request, obj) for obj in queryset],
+            safe=False
+        )
+
+    body = read_body(request)
+
+    if request.method == 'POST':
+        if not body.get('categoryid') or not body.get('defectname'):
+            return JsonResponse(
+                {'error': 'categoryid and defectname are required'},
+                status=400
+            )
+
+        try:
+            with transaction.atomic():
+                category = DefectCategory.objects.get(
+                    categoryid=body['categoryid']
+                )
+
+                # Empty dropdown = automatically generate next defect code.
+                selected_code = (body.get('defect_code') or '').strip()
+
+                if selected_code:
+                    # Reuse an existing code belonging to this category.
+                    code_exists = DefectMaster.objects.filter(
+                        categoryid=category,
+                        defect_code=selected_code
+                    ).exists()
+
+                    if not code_exists:
+                        return JsonResponse(
+                            {
+                                'error': (
+                                    'Selected defect code does not exist '
+                                    'in this category'
+                                )
+                            },
+                            status=400
+                        )
+
+                    defect_code = selected_code
+
+                else:
+                    # Find the highest numeric code for this category.
+                    prefix = f'{category.category_code}.'
+                    existing_codes = (
+                        DefectMaster.objects
+                        .filter(categoryid=category)
+                        .values_list('defect_code', flat=True)
+                        .distinct()
+                    )
+
+                    highest_number = 0
+
+                    for code in existing_codes:
+                        match = re.fullmatch(
+                            re.escape(prefix) + r'(\d+)',
+                            code or ''
+                        )
+
+                        if match:
+                            highest_number = max(
+                                highest_number,
+                                int(match.group(1))
+                            )
+
+                    defect_code = (
+                        f'{category.category_code}.{highest_number + 1:02d}'
+                    )
+
+                # Find the first unused serial for this code.
+                used_serials = set(
+                    DefectMaster.objects
+                    .filter(defect_code=defect_code)
+                    .values_list('defectserial', flat=True)
+                )
+
+                defectserial = next(
+                    (
+                        letter for letter in 'abcdefghijklmnopqrstuvwxyz'
+                        if letter not in used_serials
+                    ),
+                    None
+                )
+
+                if defectserial is None:
+                    return JsonResponse(
+                        {'error': 'All serials a-z are already used'},
+                        status=400
+                    )
+
+                obj = DefectMaster.objects.create(
+                    categoryid=category,
+                    defect_code=defect_code,
+                    defectname=body['defectname'].strip(),
+                    defectserial=defectserial,
+                    defect_subname=body.get('defect_subname') or None,
+                    defect_type=body.get('defect_type') or None,
+                    topbottom=body.get('topbottom') or None,
+                    tamil=body.get('tamil') or None,
+                    hindi=body.get('hindi') or None,
+                    log=body.get('log') or None,
+                )
+
+        except DefectCategory.DoesNotExist:
+            return JsonResponse(
+                {'error': 'Category not found'},
+                status=404
+            )
+
+        except IntegrityError:
+            return JsonResponse(
+                {
+                    'error': (
+                        'Defect code and serial already exist. '
+                        'Please retry.'
+                    )
+                },
+                status=409
+            )
+
+        return JsonResponse(defect_dict(request, obj), status=201)
+
+    if request.method == 'PUT':
+        for field in [
+            'defect_code', 'defectname', 'defectserial',
+            'defect_subname', 'defect_type', 'topbottom',
+            'tamil', 'hindi', 'log'
+        ]:
+            if field in body:
+                setattr(obj, field, body[field])
+
+        if 'categoryid' in body:
+            try:
+                obj.categoryid = DefectCategory.objects.get(
+                    categoryid=body['categoryid']
+                )
+            except DefectCategory.DoesNotExist:
+                return JsonResponse({'error': 'Category not found'}, status=404)
+
+        try:
+            obj.save()
+        except IntegrityError:
+            return JsonResponse(
+                {'error': 'Defect code and serial already exist'},
+                status=409
+            )
+
+        return JsonResponse(defect_dict(request, obj))
+
+    obj.delete()
+    return JsonResponse({'message': 'Defect deleted successfully'})
+
+
+@csrf_exempt
+@require_POST
+def Defect_ImageUpload(request):
+    defectid = request.POST.get('defectid')
+    image = request.FILES.get('image')
+
+    if not defectid or not image:
+        return JsonResponse(
+            {'error': 'defectid and image are required'},
+            status=400
+        )
+
+    try:
+        obj = DefectMaster.objects.get(defectid=defectid)
+    except DefectMaster.DoesNotExist:
+        return JsonResponse({'error': 'Defect not found'}, status=404)
+
+    # Basic image-type validation
+    if image.content_type not in ['image/jpeg', 'image/png', 'image/webp']:
+        return JsonResponse(
+            {'error': 'Only JPEG, PNG, and WEBP images are allowed'},
+            status=400
+        )
+
+    os.makedirs(settings.DEFECT_IMAGES_ROOT, exist_ok=True)
+
+    filename = f"{uuid.uuid4().hex}_{os.path.basename(image.name)}"
+    filepath = os.path.join(settings.DEFECT_IMAGES_ROOT, filename)
+
+    try:
+        with open(filepath, 'wb+') as destination:
+            for chunk in image.chunks():
+                destination.write(chunk)
+    except OSError:
+        return JsonResponse(
+            {'error': 'Unable to save image to server folder'},
+            status=500
+        )
+
+    obj.image = f"{settings.DEFECT_IMAGES_URL}{filename}"
+    obj.save(update_fields=['image'])
+
+    return JsonResponse({
+        'message': 'Image uploaded successfully',
+        'defectid': obj.defectid,
+        'image': obj.image
+    })
