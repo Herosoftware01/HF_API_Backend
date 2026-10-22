@@ -529,6 +529,7 @@ class ViewAccinwardVerification(models.Model):
     name = models.CharField(db_column='Name', max_length=35, blank=True, null=True)  # Field name made lowercase.
     supplierdcno = models.CharField(db_column='SupplierDCNo', max_length=50)  # Field name made lowercase.
     pono = models.IntegerField(db_column='PONo', blank=True, null=True)  # Field name made lowercase.
+    poqty = models.DecimalField(db_column='PoQty', max_digits=38, decimal_places=4, blank=True, null=True)  # Field name made lowercase.
     jobno = models.CharField(db_column='JobNo', max_length=50, blank=True, null=True)  # Field name made lowercase.
     items = models.CharField(db_column='Items', max_length=71, blank=True, null=True)  # Field name made lowercase.
     clr_siz = models.CharField(max_length=101, blank=True, null=True)
