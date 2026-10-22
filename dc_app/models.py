@@ -506,20 +506,21 @@ class TrsGatemodule(models.Model):
     kg = models.DecimalField(max_digits=18, decimal_places=3)
     mtrs = models.DecimalField(max_digits=18, decimal_places=2)
     print_delivery_date = models.DateTimeField(db_column='Print_Delivery_date', blank=True, null=True)  # Field name made lowercase.
-    gate_delivery_date = models.DateTimeField(db_column='Gate_Delivery_date', blank=True, null=True)  # Field name made lowercase.
-    verify = models.CharField(db_column='Verify', max_length=50, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)  # Field name made lowercase.
     prepered = models.CharField(max_length=50, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)
     fhero = models.CharField(max_length=50, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)
     inch_verify_date = models.DateTimeField(blank=True, null=True)
     inch_verify_status = models.BooleanField(blank=True, null=True)
     inch_reject_remakrs = models.TextField(db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)
     inch_remakrs_date = models.DateTimeField(blank=True, null=True)
+    verify = models.CharField(db_column='Verify', max_length=50, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)  # Field name made lowercase.
+    gate_delivery_date = models.DateTimeField(db_column='Gate_Delivery_date', blank=True, null=True)  # Field name made lowercase.
+    sl = models.IntegerField(blank=True, null=True)
+    without_inch_verify = models.BooleanField()
+    without_iv_date = models.DateTimeField(blank=True, null=True)
 
     class Meta:
         managed = False
         db_table = 'Trs_Gatemodule'
-
-
 
 
 class ViewAccinwardVerification(models.Model):

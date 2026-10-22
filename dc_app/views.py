@@ -11,18 +11,17 @@ Dc_Reciver_Verify,ViewGeneralDeiveryType1,ViewGenStockIssue,ModuleMaster)
 import json
 from django.views.decorators.csrf import csrf_exempt
 from django.forms.models import model_to_dict
-from django.utils.dateparse import parse_date, parse_datetime
-from django.utils import timezone
+from django.utils.dateparse import  parse_datetime
 from django.core.exceptions import ValidationError
 from decimal import Decimal, InvalidOperation
 from django.db import IntegrityError, transaction
 from django.db import transaction
 from django.http.multipartparser import MultiPartParser, MultiPartParserError
 from django.utils import timezone
-from datetime import date
+from datetime import date, datetime
 from django.views.decorators.http import require_http_methods
 import re
-
+from django.db.models import Max
 
 
 def cutting_del_print(request, id=None):
@@ -563,6 +562,7 @@ def gate_module_api(request, pk=None):
         return response
 
     # ---------------- GET ----------------
+    # ---------------- GET ----------------
     if request.method == "GET":
         if pk:
             try:
@@ -584,16 +584,23 @@ def gate_module_api(request, pk=None):
         if filter_date:
             queryset = queryset.filter(date__date=filter_date)
 
-    
+        # Calculate the next available SL for today
+        today_date = datetime.now().date()
+        max_sl_dict = TrsGatemodule.objects.using("demo").filter(
+            gate_delivery_date__date=today_date
+        ).aggregate(Max('sl'))
+        next_sl = (max_sl_dict.get('sl__max') or 0) + 1
 
         data = []
         for obj in queryset:
             item = model_to_dict(obj)
             if obj.date:
                 item["date"] = obj.date.strftime("%Y-%m-%d %H:%M:%S")
+            # Attach next_sl so the frontend can preview it before saving
+            item["next_sl"] = next_sl 
             data.append(item)
 
-        return JsonResponse({"status": True, "count": len(data), "data": data})
+        return JsonResponse({"status": True, "count": len(data), "data": data, "next_sl": next_sl})
 
     # ---------------- POST ----------------
     elif request.method == "POST":
@@ -614,6 +621,26 @@ def gate_module_api(request, pk=None):
             print_date_val = body.get("print_delivery_date")
             gate_date_val = body.get("gate_delivery_date")
             inch_verify_date = body.get("inch_verify_date")
+            without_iv_date = body.get("without_iv_date")
+
+            parsed_date = parse_datetime(date_val) if date_val else None
+            
+            # --- Auto-generate daily SL ---
+            new_sl = 1
+            if parsed_date:
+                record_date = parsed_date.date()
+                max_sl_dict = TrsGatemodule.objects.using("demo").filter(
+                    date__date=record_date
+                ).aggregate(Max('sl'))
+                
+                current_max = max_sl_dict.get('sl__max') or 0
+                new_sl = current_max + 1
+
+                if new_sl > 500:
+                    return JsonResponse({
+                        "status": False, 
+                        "message": "Daily limit of 500 records reached."
+                    }, status=400)
 
             TrsGatemodule.objects.using("demo").create(
                 module=module,
@@ -621,7 +648,7 @@ def gate_module_api(request, pk=None):
                 companyid=body.get("companyid"),
                 year=body.get("year"),
                 no=body.get("no"),
-                date=parse_datetime(date_val) if date_val else None,
+                date=parsed_date,
                 jobno=body.get("jobno"),
                 suppliername=body.get("suppliername"),
                 descr=body.get("descr"),
@@ -637,6 +664,9 @@ def gate_module_api(request, pk=None):
                 inch_verify_status=body.get("inch_verify_status"),
                 inch_reject_remakrs=body.get("inch_reject_remakrs"),
                 inch_remakrs_date=body.get("inch_remakrs_date"),
+                sl=new_sl,
+                without_inch_verify=body.get("without_inch_verify", False),
+                without_iv_date=body.get("without_iv_date")
             )
 
             return JsonResponse({"status": True, "message": "Dc Created Successfully"}, status=201)
@@ -657,22 +687,20 @@ def gate_module_api(request, pk=None):
             body = json.loads(request.body)
             obj = TrsGatemodule.objects.using("demo").get(pk=pk)
 
-            # Original fields
+            # Update original fields
             if "verify" in body:
                 obj.verify = body["verify"]
-
+            
             if "gate_delivery_date" in body:
                 date_str = body["gate_delivery_date"]
                 obj.gate_delivery_date = parse_datetime(date_str) if date_str else None
 
-            # ADD THESE LINES to capture the new frontend payload
             if "fhero" in body:
                 obj.fhero = body["fhero"]
                 
             if "inch_verify_date" in body:
                 date_str = body["inch_verify_date"]
                 obj.inch_verify_date = parse_datetime(date_str) if date_str else None
-               
                 
             if "inch_verify_status" in body:
                 obj.inch_verify_status = body["inch_verify_status"]
@@ -682,13 +710,43 @@ def gate_module_api(request, pk=None):
 
             if "inch_remakrs_date" in body:
                 obj.inch_remakrs_date = body["inch_remakrs_date"]
+                
+            if "without_inch_verify" in body:
+                obj.without_inch_verify = body["without_inch_verify"]
+
+            if "without_iv_date" in body:
+                obj.without_iv_date = body["without_iv_date"]
+
+            # --- AUTO-GENERATE SL ON GATE VERIFICATION ---
+            # Generate SL only if this is a standard verify (not just an inch-bypass logging attempt) 
+            # and it doesn't already have an SL.
+            if "verify" in body and not obj.sl and body.get("without_inch_verify") is not True:
+                # Group by today's date based on gate_delivery_date to reset daily
+                record_date = datetime.now().date()
+                if obj.gate_delivery_date:
+                    record_date = obj.gate_delivery_date.date()
+
+                max_sl_dict = TrsGatemodule.objects.using("demo").filter(
+                    gate_delivery_date__date=record_date
+                ).aggregate(Max('sl'))
+                
+                current_max = max_sl_dict.get('sl__max') or 0
+                new_sl = current_max + 1
+
+                if new_sl > 500:
+                    return JsonResponse({
+                        "status": False, 
+                        "message": "Daily limit of 500 records reached."
+                    }, status=400)
+                    
+                obj.sl = new_sl
 
             obj.save(using="demo")
-            
 
             return JsonResponse({
                 "status": True,
-                "message": "Verification saved successfully"
+                "message": "Verification saved successfully",
+                "sl": obj.sl  # Pass the generated SL back to React
             }, status=200)
 
         except TrsGatemodule.DoesNotExist:
@@ -696,6 +754,7 @@ def gate_module_api(request, pk=None):
         except Exception as e:
             return JsonResponse({"status": False, "message": str(e)}, status=400)
 
+        
     # ---------------- FALLBACK ----------------
     return JsonResponse({
         "status": False,
