@@ -10,7 +10,7 @@ from django.http import JsonResponse
 from datetime import date
 from django.db.models import OuterRef, Subquery
 
-from .models import RollEmployee, RollEmpDetails, RollChecking, RollCheckingDetails, MasterMistakes, DefectCategory, DefectMaster
+from .models import RollEmployee, RollEmpDetails, RollChecking, RollCheckingDetails, RollCheckingDefect, MasterMistakes, DefectCategory, DefectMaster
 
 def Roll_Employee(request):
 
@@ -196,9 +196,7 @@ def RollChecking_Details(request):
         fields = [
             'empid_checker', 'checker_name', 'empid_helper', 'helper_name', 'mach_id', 'jobno', 
             'colour', 'dcno', 'dia', 'lotno', 'type', 'fabric', 'weight', 'meter', 'gsm', 'a_gsm', 'f_dia', 
-            'remark', 'timer', 'points', 'image', 'submit', 'submit_date', 'oil', 'stain', 'holes', 
-            'setoff', 'needle_line', 'compact_kadi', 'sidepin_hole', 'streaks', 'roll_joint', 'yarn_mistake', 
-            'patches', 'gsm_hole', 'print_mistake'
+            'remark', 'timer', 'image', 'submit', 'submit_date'
         ]
 
         values = {
@@ -246,10 +244,7 @@ def RollChecking_Details(request):
             )
 
         fields = [
-            'oil', 'stain', 'holes', 'setoff', 'needle_line',
-            'compact_kadi', 'sidepin_hole', 'streaks', 'roll_joint',
-            'yarn_mistake', 'patches', 'gsm_hole', 'print_mistake',
-            'remark', 'timer', 'submit', 'submit_date', 'points',
+            'remark', 'timer', 'submit', 'submit_date',
             'a_gsm', 'f_dia', 'meter'
         ]
 
@@ -309,6 +304,87 @@ def RollChecking_ImageUpload(request):
         'colour': obj.colour,
         'c_img': obj.c_img
     }, status=200)
+
+
+@csrf_exempt
+def RollChecking_Defect(request):
+
+    if request.method == 'GET':
+        rlno = request.GET.get('rlno')
+
+        qs = RollCheckingDefect.objects.all()
+
+        if rlno:
+            qs = qs.filter(rlno=rlno)
+
+        return JsonResponse(list(qs.values()), safe=False)
+
+    try:
+        data = json.loads(request.body or '{}')
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON'}, status=400)
+
+    if request.method == 'POST':
+        try:
+            obj = RollCheckingDefect.objects.create(
+                rlno=data['rlno'],
+                colour=data.get('colour'),
+                dcno=data.get('dcno'),
+                defectcode=data['defectcode'],
+                defectname=data['defectname'],
+                subname=data.get('subname'),
+                points=data.get('points'),
+                inches=data.get('inches'),
+                counts=data.get('count'),
+                tcounts=data.get('tcount'),
+                tpoints=data.get('tpoints'),
+            )
+            return JsonResponse({'message': 'Roll checking defect created successfully', 'sl': obj.sl}, status=201)
+
+        except IntegrityError:
+            return JsonResponse({'error': 'Duplicate roll/DC/colour'}, status=409)
+        except KeyError as e:
+            return JsonResponse({'error': f'Missing field: {e.args[0]}'}, status=400)
+
+    if request.method == 'PUT':
+        sl = data.get('sl') or request.GET.get('sl')
+
+        if not sl:
+            return JsonResponse({'error': 'sl is required'}, status=400)
+
+        try:
+            obj = RollCheckingDefect.objects.get(sl=sl)
+        except RollCheckingDefect.DoesNotExist:
+            return JsonResponse({'error': 'Record not found'}, status=404)
+
+        for field in [
+            'rlno', 'colour', 'dcno', 'defectcode', 'inches', 'counts'
+            'defectname', 'subname', 'points', 'tpoints', 'tcounts'
+        ]:
+            if field in data:
+                setattr(obj, field, data[field])
+
+        try:
+            obj.save()
+        except IntegrityError:
+            return JsonResponse({'error': 'Duplicate roll/DC/colour'}, status=409)
+
+        return JsonResponse({'message': 'Updated'})
+
+    if request.method == 'DELETE':
+        sl = data.get('sl') or request.GET.get('sl')
+
+        if not sl:
+            return JsonResponse({'error': 'sl is required'}, status=400)
+
+        deleted, _ = RollCheckingDefect.objects.filter(sl=sl).delete()
+
+        if not deleted:
+            return JsonResponse({'error': 'Record not found'}, status=404)
+
+        return JsonResponse({'message': 'Deleted'})
+
+    return JsonResponse({'error': 'Method not allowed'}, status=405)
 
 
 def MasterMistakesList(request):

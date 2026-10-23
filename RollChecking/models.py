@@ -68,25 +68,10 @@ class RollCheckingDetails(models.Model):
     f_dia = models.CharField(max_length=20, blank=True, null=True)
     remark = models.CharField(max_length=200, blank=True, null=True)
     timer = models.CharField(db_column='Timer',max_length=50, blank=True, null=True) 
-    points = models.IntegerField(blank=True, null=True)
     image = models.CharField(max_length=100, blank=True, null=True)
     c_img = models.CharField(max_length=100, blank=True, null=True)
     submit = models.BooleanField(default=False)
     submit_date =  models.DateTimeField(blank=True, null=True)    
-
-    oil = models.CharField(max_length=50,blank=True, null=True)
-    stain = models.CharField(max_length=50,blank=True, null=True)
-    holes = models.CharField(max_length=50,blank=True, null=True)
-    setoff = models.CharField(max_length=50,blank=True, null=True)
-    needle_line = models.CharField(max_length=50,blank=True, null=True)
-    compact_kadi = models.CharField(max_length=50,blank=True, null=True)
-    sidepin_hole = models.CharField(max_length=50,blank=True, null=True)
-    streaks = models.CharField(max_length=50,blank=True, null=True)
-    roll_joint = models.CharField(max_length=50,blank=True, null=True)
-    yarn_mistake = models.CharField(max_length=50,blank=True, null=True)
-    patches = models.CharField(max_length=50,blank=True, null=True)
-    gsm_hole = models.CharField(max_length=50,blank=True, null=True)
-    print_mistake = models.CharField(max_length=50,blank=True, null=True)
 
     class Meta:
         constraints = [
@@ -96,6 +81,29 @@ class RollCheckingDetails(models.Model):
             )
         ]
 
+
+class RollCheckingDefect(models.Model):
+    sl = models.AutoField(primary_key=True)
+    rlno = models.CharField(max_length=20)
+    colour = models.CharField(max_length=50, blank=True, null=True)
+    dcno = models.CharField(max_length=30, blank=True, null=True)
+    defectcode = models.CharField(max_length=30)
+    defectname = models.CharField(max_length=100)
+    subname = models.CharField(max_length=100, blank=True, null=True)
+    points = models.IntegerField(blank=True, null=True)
+    inches = models.IntegerField(blank=True, null=True)
+    counts = models.IntegerField(blank=True, null=True)
+    tcounts = models.IntegerField(blank=True, null=True)
+    tpoints = models.IntegerField(blank=True, null=True)
+    date = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['rlno', 'dcno', 'colour'],
+                name='unique_dcno_rlno_colour'
+            )
+        ]
 
 class MasterMistakes(models.Model):
     choice = (
