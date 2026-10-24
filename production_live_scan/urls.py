@@ -31,6 +31,8 @@ urlpatterns = [
     path("delete_process_dependency/", views.delete_process_dependency, name="delete_process_dependency"),
     path("save_preporatory_dependency/", views.save_preporatory_dependency, name="save_preporatory_dependency"),
     path("delete_preporatory_dependency/", views.delete_preporatory_dependency, name="delete_preporatory_dependency"),
+    path("get_stock_data/", views.get_stock_data_python, name="get_stock_data"),
+    path("get_stock_summary/", views.get_stock_summary_python, name="get_stock_summary"),
 
     path(
         "users/",
@@ -62,4 +64,5 @@ urlpatterns = [
     path('api/sizes/', GetSizesView.as_view(), name='get-sizes'),
     path('api/sequences/', GetSequencesView.as_view(), name='get-sequences'),
     path('api/assembly/save/', SaveAssemblySelectionView.as_view(), name='save-assembly'),
+    path('get-dependency-pc/',views.get_dependency_pc,name='get_dependency_pc')
 ]  

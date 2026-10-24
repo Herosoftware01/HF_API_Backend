@@ -97,6 +97,7 @@ class RptCut002(models.Model):
         db_table = 'Rpt_Cut002'
 
 class HrWrkdtlsnew(models.Model):
+    code = models.IntegerField(primary_key=True)
     monthlysalary = models.CharField(db_column='MonthlySalary', max_length=1, blank=True, null=True)  # Field name made lowercase.
     esino = models.CharField(max_length=50, blank=True, null=True)
     pfno = models.CharField(max_length=50, blank=True, null=True)
@@ -119,7 +120,6 @@ class HrWrkdtlsnew(models.Model):
     sc = models.CharField(max_length=2)
     dept = models.CharField(max_length=70, blank=True, null=True)
     prs = models.CharField(db_column='PRS', max_length=8000, blank=True, null=True)  # Field name made lowercase.
-    code = models.IntegerField(primary_key=True)
     category = models.CharField(db_column='Category', max_length=70, blank=True, null=True)  # Field name made lowercase.
     name = models.CharField(max_length=100, blank=True, null=True)
     mobile = models.CharField(max_length=50, blank=True, null=True)

@@ -4,6 +4,7 @@ from django.shortcuts import render,get_object_or_404
 from django.db import connections
 from rest_framework.decorators import api_view
 from django.db.models import Exists, OuterRef
+from django.utils.dateparse import parse_date, parse_datetime
 # import pandas as pd
 from rest_framework.views import APIView
 from zoneinfo import ZoneInfo
@@ -40,6 +41,9 @@ from django.db.models import Max
 
 from django.contrib.auth import get_user_model
 User = get_user_model()
+from production_live_scan.models import Assembly_data, dependency,dependency_data, user_unit_permission
+from bundle_tracking.models import TrsMcutstickerprod
+from advance.models import HrWrkdtlsnew
 
 
 
@@ -583,13 +587,14 @@ def latest_online_allocations_by_employee(allocations):
         if allocation.status
     }
 
-
+from django.db.models import Count, Q
 class MachineAllocationAPIView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
         unit_id = request.GET.get("unit")
         line_id = request.GET.get("line")
+        print("unit_id:", unit_id, "line_id:", line_id)
         selected_date = parse_date(request.GET.get("date", "") or "")
         if request.GET.get("date") and selected_date is None:
             return Response({"error": "date must use YYYY-MM-DD format"}, status=400)
@@ -609,12 +614,39 @@ class MachineAllocationAPIView(APIView):
         if line_id:
             allocations = allocations.filter(line=line_id)
 
+        unit_dept_map = {
+            "1": "UNIT-1",
+            "2": "UNIT-2",
+            "3": "UNIT-3",
+            "4": "UNIT-4",
+            "5": "Training Instutite",
+            "6": "UNIT-6",
+        }
+
+        dept_name = unit_dept_map.get(str(unit_id))
+        
+        details = HrWrkdtlsnew.objects.using('main').filter(
+            sc='s',
+            category='Tailor',
+            dept=dept_name
+        ).aggregate(
+            present_count=Count('code', filter=Q(prab='Present')),
+            absent_count=Count('code', filter=Q(prab='Absent'))
+        )
+
         serializer = MachineAllocationSerializer(
             allocations,
             many=True,
             context={"selected_date": selected_date},
         )
-        return Response(serializer.data)
+        
+
+        # return Response(serializer.data)
+        return Response({
+            "allocations": serializer.data,
+            "present_count": details["present_count"],
+            "absent_count": details["absent_count"],
+        })
 
     def post(self, request):
         machines = request.data.get("machine_id")  # use `machine_id` consistently
@@ -841,38 +873,38 @@ class Employee_and_staff_login_APIView(APIView):
 
         return Response(data)
 
-        usernames = (
-            User.objects
-            .values_list("username", flat=True)
-        )
+        # usernames = (
+        #     User.objects
+        #     .values_list("username", flat=True)
+        # )
 
-        # Numeric usernames மட்டும்
-        employee_codes = [int(u) for u in usernames if str(u).isdigit()]
+        # # Numeric usernames மட்டும்
+        # employee_codes = [int(u) for u in usernames if str(u).isdigit()]
 
-        employees = (
-            VueUser.objects.using("main")
-            .exclude(code__in=employee_codes)
-            .values("code", "name", "photo", "wunit")
-        )
+        # employees = (
+        #     VueUser.objects.using("main")
+        #     .exclude(code__in=employee_codes)
+        #     .values("code", "name", "photo", "wunit")
+        # )
 
-        staff_url = settings.STAFF_IMAGES_URL.rstrip("/")
+        # staff_url = settings.STAFF_IMAGES_URL.rstrip("/")
 
-        data = []
-        for emp in employees:
-            photo_url = None
+        # data = []
+        # for emp in employees:
+        #     photo_url = None
 
-            if emp.get("photo"):
-                filename = emp["photo"].split("\\")[-1]
-                photo_url = f"https://hfapi.herofashion.com/{staff_url}/{filename}"
+        #     if emp.get("photo"):
+        #         filename = emp["photo"].split("\\")[-1]
+        #         photo_url = f"https://hfapi.herofashion.com/{staff_url}/{filename}"
 
-            data.append({
-                "code": emp["code"],
-                "name": emp["name"],
-                "dept": emp["wunit"],
-                "photo": photo_url,
-            })
+        #     data.append({
+        #         "code": emp["code"],
+        #         "name": emp["name"],
+        #         "dept": emp["wunit"],
+        #         "photo": photo_url,
+        #     })
 
-        return Response(data)
+        # return Response(data)
 
 class EmpAllocateAPIView(APIView):
 
@@ -910,19 +942,78 @@ class EmpAllocateAPIView(APIView):
                 status=400
             )
 
-        selected_date = parse_date(data.get("date", "") or "")
-        if data.get("date") and selected_date is None:
-            return Response({"error": "date must use YYYY-MM-DD format"}, status=400)
-        selected_date = selected_date or timezone.localdate()
-        allocation_time = (
-            timezone.localtime(timezone.now())
-            if settings.USE_TZ
-            else timezone.now()
-        ).replace(
-            year=selected_date.year,
-            month=selected_date.month,
-            day=selected_date.day,
-        )
+        # selected_date = parse_date(data.get("date", "") or "")
+        # if data.get("date") and selected_date is None:
+        #     return Response({"error": "date must use YYYY-MM-DD format"}, status=400)
+        # selected_date = selected_date or timezone.localdate()
+        # allocation_time = (
+        #     timezone.localtime(timezone.now())
+        #     if settings.USE_TZ
+        #     else timezone.now()
+        # ).replace(
+        #     year=selected_date.year,
+        #     month=selected_date.month,
+        #     day=selected_date.day,
+        # )
+        date_value = data.get("date")
+
+        if date_value:
+            parsed_datetime = parse_datetime(str(date_value))
+
+            if parsed_datetime is not None:
+                selected_date = parsed_datetime.date()
+                allocation_time = parsed_datetime
+
+            else:
+                selected_date = parse_date(str(date_value))
+
+                if selected_date is None:
+                    return Response(
+                        {
+                            "error": (
+                                "Invalid date format. Use "
+                                "YYYY-MM-DD or "
+                                "YYYY-MM-DD HH:MM:SS"
+                            )
+                        },
+                        status=400
+                    )
+
+                # Date-only input: use the current time
+                now = (
+                    timezone.localtime(timezone.now())
+                    if settings.USE_TZ
+                    else timezone.now()
+                )
+
+                allocation_time = now.replace(
+                    year=selected_date.year,
+                    month=selected_date.month,
+                    day=selected_date.day,
+                )
+
+        else:
+            selected_date = timezone.localdate()
+
+            allocation_time = (
+                timezone.localtime(timezone.now())
+                if settings.USE_TZ
+                else timezone.now()
+            )
+
+        # Handle timezone-aware and naive datetime values
+        if settings.USE_TZ:
+            if timezone.is_naive(allocation_time):
+                allocation_time = timezone.make_aware(
+                    allocation_time,
+                    timezone.get_current_timezone()
+                )
+        else:
+            if timezone.is_aware(allocation_time):
+                allocation_time = timezone.make_naive(
+                    allocation_time,
+                    timezone.get_current_timezone()
+                )
 
         # ==================================================
         # STATUS UPDATE (ONLINE / OFFLINE)
@@ -1265,13 +1356,27 @@ class MachineTransferListCreateAPIView(APIView):
     def post(self, request):
         serializer = MachineTrasnsferSerializer(data=request.data)
         if serializer.is_valid():
-            if not user_unit_permission.objects.filter(
-                user_id=request.user.pk,
-                app="machine_transfer",
-                unit_id=serializer.validated_data["unit"].pk,
-            ).exists():
+            # latest_ids = MachineAllocation.objects.values("machine").annotate(
+            #     latest_id=Max("id")
+            # ).values_list("latest_id", flat=True)
+            # source_is_permitted = MachineAllocation.objects.filter(
+            #     id__in=latest_ids,
+            #     unit_id__in=self.get_permitted_unit_ids(request.user),
+            #     machine_id=serializer.validated_data["machine"].pk,
+            # ).exists()
+            # if not source_is_permitted:
+            #     return Response(
+            #         {"machine_id": ["You do not have permission to transfer this machine."]},
+            #         status=status.HTTP_403_FORBIDDEN,
+            #     )
+            machine_online = emp_allocate.objects.filter(
+                machine_id=serializer.validated_data["machine"].pk,
+                status=True
+            ).exists()
+
+            if machine_online:
                 return Response(
-                    {"unit": ["You do not have machine transfer permission for this unit."]},
+                    {"machine_id": ["Machine is online, cannot transfer"]},
                     status=status.HTTP_403_FORBIDDEN,
                 )
             serializer.save()  # Allows multiple allocations per day
@@ -1680,6 +1785,321 @@ def get_allocate_report(request):
 
 
 
+# def get_allocate_live(request):
+#     unit_id = request.GET.get("unit")
+#     line_id = request.GET.get("line")
+#     selected_date = request.GET.get("date")
+#     selected_shift = request.GET.get("shift", "day")
+    
+#     if selected_date:
+#         try:
+#             report_day = datetime.strptime(
+#                 selected_date,
+#                 "%Y-%m-%d"
+#             ).date()
+#         except ValueError:
+#             report_day = date.today()
+#     else:
+#         report_day = date.today()
+
+#     # --------------------------------
+#     # LINE
+#     # --------------------------------
+#     selected_line = Line.objects.filter(
+#         id=line_id
+#     ).only("line_number").first()
+
+#     assembly_line = (
+#         selected_line.line_number
+#         if selected_line
+#         else line_id
+#     )
+
+#     if selected_shift == "night":
+#         shift_start = datetime.combine(
+#             report_day - timedelta(days=1),
+#             time(20, 48)
+#         )
+#         shift_end = datetime.combine(
+#             report_day,
+#             time(8, 0)
+#         )
+#         slot_ranges = (
+#             (time(20, 48), time(21, 30)),
+#             (time(21, 30), time(22, 30)),
+#             (time(22, 30), time(23, 30)),
+#             (time(0, 0), time(1, 0)),
+#             (time(1, 0), time(2, 0)),
+#             (time(2, 0), time(3, 0)),
+#             (time(3, 0), time(4, 0)),
+#             (time(4, 0), time(5, 0)),
+#             (time(5, 0), time(6, 0)),
+#             (time(6, 0), time(7, 0)),
+#             (time(7, 0), time(8, 0)),
+#         )
+#     else:
+#         shift_start = datetime.combine(
+#             report_day,
+#             time.min
+#         )
+#         shift_end = shift_start + timedelta(days=1)
+#         slot_ranges = (
+#             (time(8, 30), time(9, 30)),
+#             (time(9, 30), time(10, 30)),
+#             (time(10, 45), time(11, 45)),
+#             (time(11, 45), time(12, 45)),
+#             (time(13, 30), time(14, 30)),
+#             (time(14, 30), time(15, 30)),
+#             (time(15, 30), time(16, 30)),
+#             (time(16, 30), time(17, 30)),
+#             (time(17, 45), time(18, 45)),
+#             (time(18, 45), time(20, 0)),
+#         )
+
+#     # --------------------------------
+#     # EMP ALLOCATION (As it is, no splitting)
+#     # --------------------------------
+#     s_data = emp_allocate.objects.filter(
+#         unit=unit_id,
+#         line=line_id,
+#         date__gte=shift_start,
+#         date__lt=shift_end
+#     ).values(
+#         "emp_code",
+#         "machine__Identity",
+#         "date",
+#         "seq",       # E.g., "Shorts Side Pocket Attach, Shorts Pocket Dummy Stitch"
+#         "jobno",
+#         "top_bottom",
+#         "status"
+#     )
+
+#     # --------------------------------
+#     # SCANS
+#     # --------------------------------
+#     scans = list(
+#         Assembly_data.objects.filter(
+#             unit=unit_id,
+#             line=assembly_line,
+#             entry_date__gte=shift_start,
+#             entry_date__lt=shift_end,
+#         ).values(
+#             "machine",
+#             "job_no",
+#             "tb_name",
+#             "seq",
+#             "pc",
+#             "entry_date"
+#         )
+#     )
+
+#     # --------------------------------
+#     # HELPERS
+#     # --------------------------------
+#     def normalized(value):
+#         return str(value or "").strip().casefold()
+
+#     def scan_key(machine, job_no, top_bottom):
+#         return tuple(
+#             normalized(value)
+#             for value in (
+#                 machine,
+#                 job_no,
+#                 top_bottom
+#             )
+#         )
+
+#     def operation_key(job_no, top_bottom, process_des):
+#         return tuple(
+#             normalized(value)
+#             for value in (
+#                 job_no,
+#                 top_bottom,
+#                 process_des
+#             )
+#         )
+
+#     def hourly_target(wsec):
+#         value = str(wsec or "").strip()
+#         if not value:
+#             return ""
+#         try:
+#             minutes_text, seconds_text = (
+#                 value.split(".", 1) + [""]
+#             )[:2]
+#             minutes = int(minutes_text or 0)
+#             seconds = (
+#                 int((seconds_text + "00")[:2])
+#                 if seconds_text
+#                 else 0
+#             )
+#             operation_seconds = (
+#                 minutes * 60
+#             ) + seconds
+#             return (
+#                 int(3600 / operation_seconds)
+#                 if operation_seconds > 0
+#                 else ""
+#             )
+#         except (TypeError, ValueError, ZeroDivisionError):
+#             return ""
+
+#     # --------------------------------
+#     # DEPENDENCY TARGETS (Sum or get target for the combined sequences)
+#     # --------------------------------
+#     job_nos_list = list(set([row["jobno"] for row in s_data]))
+#     dependency_rows = dependency.objects.filter(
+#         job_no__in=job_nos_list
+#     ).values("job_no", "tb_name", "process_des", "wsec")
+
+#     dependency_targets = {
+#         operation_key(
+#             row["job_no"],
+#             row["tb_name"],
+#             row["process_des"]
+#         ): row["wsec"]
+#         for row in dependency_rows
+#     }
+
+#     # --------------------------------
+#     # HOURLY TOTALS (Grouped by Machine + Job + TopBottom)
+#     # --------------------------------
+#     hourly_totals = defaultdict(
+#         lambda: [0] * len(slot_ranges)
+#     )
+
+#     for scan in scans:
+#         scan_datetime = scan["entry_date"]
+#         if timezone.is_aware(scan_datetime):
+#             scan_datetime = localtime(scan_datetime)
+
+#         scan_time = scan_datetime.time().replace(
+#             tzinfo=None
+#         )
+
+#         slot_index = next(
+#             (
+#                 index
+#                 for index, (start, end)
+#                 in enumerate(slot_ranges)
+#                 if start <= scan_time < end
+#             ),
+#             None
+#         )
+
+#         if slot_index is None:
+#             continue
+
+#         try:
+#             pieces = int(scan["pc"] or 0)
+#         except (TypeError, ValueError):
+#             try:
+#                 pieces = int(float(scan["pc"]))
+#             except (TypeError, ValueError):
+#                 pieces = 0
+
+#         # Key without seq, so all scans for this machine/job/tb go to same bucket
+#         key = scan_key(
+#             scan["machine"],
+#             scan["job_no"],
+#             scan["tb_name"]
+#         )
+
+#         hourly_totals[key][slot_index] += pieces
+
+#     # --------------------------------
+#     # FINAL DATA
+#     # --------------------------------
+#     data = []
+
+#     for row in s_data:
+#         emp = Empwisesal.objects.using(
+#             "main"
+#         ).filter(
+#             code=row["emp_code"]
+#         ).first()
+
+#         if emp and emp.name:
+#             employee_name = emp.name
+#         else:
+#             # Second priority: Cont_employee
+#             contractor_emp = Cont_employee.objects.filter(
+#                 code=row["emp_code"]
+#             ).first()
+
+#             employee_name = (
+#                 contractor_emp.name
+#                 if contractor_emp
+#                 else ""
+#             )
+
+#         allocation_key = scan_key(
+#             row["machine__Identity"],
+#             row["jobno"],
+#             row["top_bottom"]
+#         )
+
+#         employee_hours = hourly_totals[allocation_key]
+
+#         allocation_datetime = row["date"]
+#         if timezone.is_aware(allocation_datetime):
+#             allocation_datetime = localtime(allocation_datetime)
+
+#         allocation_time = (
+#             allocation_datetime
+#             .time()
+#             .replace(tzinfo=None)
+#         )
+
+#         allocation_slot = next(
+#             (
+#                 index + 1
+#                 for index, (start, end)
+#                 in enumerate(slot_ranges)
+#                 if start <= allocation_time < end
+#             ),
+#             1
+#         )
+
+#         allocation_time_display = allocation_datetime.strftime("%I:%M %p")
+
+#         # Handle target calculation if multiple seqs are comma-separated
+#         seq_str = row["seq"] or ""
+#         individual_seqs = [s.strip() for s in seq_str.split(",") if s.strip()]
+        
+#         # Calculate combined or primary target (e.g., taking the sum or first available)
+#         total_target = 0
+#         for s in individual_seqs:
+#             t_val = dependency_targets.get(
+#                 operation_key(row["jobno"], row["top_bottom"], s),
+#                 ""
+#             )
+#             if t_val:
+#                 parsed_t = hourly_target(t_val)
+#                 if isinstance(parsed_t, int):
+#                     total_target += parsed_t
+
+#         data.append({
+#             "emp_code": row["emp_code"],
+#             "machine": row["machine__Identity"],
+#             "status": row["status"],
+#             "seq": row["seq"],  # String apdiyae "Shorts Side Pocket Attach, Shorts Pocket Dummy Stitch" nu pogum
+#             "jobno": row["jobno"],
+#             "top_bottom": row["top_bottom"],
+#             "name": employee_name,
+#             "allocation_slot": allocation_slot,
+#             "allocation_time": allocation_time_display,
+#             "target": total_target if total_target > 0 else "",
+#             "hours": employee_hours,
+#         })
+
+#     return JsonResponse(
+#         data,
+#         safe=False
+#     )
+
+
+@api_view(['GET', 'POST'])
 def get_allocate_live(request):
     unit_id = request.GET.get("unit")
     line_id = request.GET.get("line")
@@ -1752,9 +2172,9 @@ def get_allocate_live(request):
         )
 
     # --------------------------------
-    # EMP ALLOCATION (As it is, no splitting)
+    # EMP ALLOCATION
     # --------------------------------
-    s_data = emp_allocate.objects.filter(
+    s_data = list(emp_allocate.objects.filter(
         unit=unit_id,
         line=line_id,
         date__gte=shift_start,
@@ -1765,9 +2185,9 @@ def get_allocate_live(request):
         "date",
         "seq",       # E.g., "Shorts Side Pocket Attach, Shorts Pocket Dummy Stitch"
         "jobno",
-        "top_bottom",
+        "top_bottom", # e.g. "Pant" or TBID name matching tb_name
         "status"
-    )
+    ))
 
     # --------------------------------
     # SCANS
@@ -1814,38 +2234,53 @@ def get_allocate_live(request):
             )
         )
 
-    def hourly_target(wsec):
-        value = str(wsec or "").strip()
-        if not value:
-            return ""
+    # def hourly_target(wsec):
+    #     value = str(wsec or "").strip()
+    #     if not value:
+    #         return ""
+    #     try:
+    #         minutes_text, seconds_text = (
+    #             value.split(".", 1) + [""]
+    #         )[:2]
+    #         minutes = int(minutes_text or 0)
+    #         seconds = (
+    #             int((seconds_text + "00")[:2])
+    #             if seconds_text
+    #             else 0
+    #         )
+    #         operation_seconds = (
+    #             minutes*60*1.15
+    #         ) + seconds
+    #         return (
+    #             int(3600 / operation_seconds)
+    #             if operation_seconds > 0
+    #             else ""
+    #         )
+    #     except (TypeError, ValueError, ZeroDivisionError):
+    #         return ""
+    def hourly_target(w_sec):
         try:
-            minutes_text, seconds_text = (
-                value.split(".", 1) + [""]
-            )[:2]
-            minutes = int(minutes_text or 0)
-            seconds = (
-                int((seconds_text + "00")[:2])
-                if seconds_text
-                else 0
-            )
-            operation_seconds = (
-                minutes * 60
-            ) + seconds
-            return (
-                int(3600 / operation_seconds)
-                if operation_seconds > 0
-                else ""
-            )
+            minutes = float(w_sec or 0)
+
+            if minutes <= 0:
+                return ""
+
+            operation_seconds = minutes * 60 * 1.15
+
+            return int(3600 / operation_seconds)
+
         except (TypeError, ValueError, ZeroDivisionError):
             return ""
 
     # --------------------------------
-    # DEPENDENCY TARGETS (Sum or get target for the combined sequences)
+    # DEPENDENCY TARGETS & RULES FOR STOCK CALCULATION
     # --------------------------------
     job_nos_list = list(set([row["jobno"] for row in s_data]))
+    
+    # Fetch dependencies with wsec and process info
     dependency_rows = dependency.objects.filter(
         job_no__in=job_nos_list
-    ).values("job_no", "tb_name", "process_des", "wsec")
+    ).values("id", "job_no", "tb_name", "process_des", "wsec")
 
     dependency_targets = {
         operation_key(
@@ -1855,6 +2290,90 @@ def get_allocate_live(request):
         ): row["wsec"]
         for row in dependency_rows
     }
+    
+    dep_id_map = {
+        operation_key(
+            row["job_no"],
+            row["tb_name"],
+            row["process_des"]
+        ): row["id"]
+        for row in dependency_rows
+    }
+
+    # Fetch dependency data (AND/OR rules) for stock checking logic
+    dep_ids = [row["id"] for row in dependency_rows]
+    dep_data_qs = dependency_data.objects.filter(dep_id_id__in=dep_ids).values("dep_id_id", "and_data", "or_data", "descriptions")
+    
+    dep_rules = defaultdict(lambda: {"and_descs": [], "or_descs": []})
+    for dd in dep_data_qs:
+        if dd["and_data"]:
+            dep_rules[dd["dep_id_id"]]["and_descs"].append(normalized(dd["descriptions"]))
+        if dd["or_data"]:
+            dep_rules[dd["dep_id_id"]]["or_descs"].append(normalized(dd["descriptions"]))
+
+    sticker_prod_qs = TrsMcutstickerprod.objects.using('demo').filter(
+        jobno__in=job_nos_list,
+        livescan='1',
+        scan=1
+    ).values("jobno", "bundid", "tbid", "pc")
+
+    # Map assembly scans for checking dependency fulfillment per bundle
+    # Bundle key: (job_no, tb_name/tb_id, bundle_id) -> set of scanned sequences
+    assembly_scanned_map = set()
+    for asm in Assembly_data.objects.filter(job_no__in=job_nos_list).values("job_no", "tb_name", "bundle_id", "seq"):
+        if asm["seq"]:
+            assembly_scanned_map.add((
+                normalized(asm["job_no"]),
+                normalized(asm["tb_name"]),
+                normalized(asm["bundle_id"]),
+                normalized(asm["seq"])
+            ))
+
+    # Pre-calculate stock for each bundle per process rule
+    # Let's map process stock: stock_cache[(job_no, top_bottom, process_des)] = total pending stock
+    # Or calculate dynamically per allocation request.
+    # To optimize, let's build a stock calculator function:
+    def get_process_stock(job_no, top_bottom, process_des):
+        op_key = operation_key(job_no, top_bottom, process_des)
+        d_id = dep_id_map.get(op_key)
+        if not d_id:
+            return 0
+        
+        rules = dep_rules.get(d_id)
+        if not rules:
+            return 0
+            
+        and_list = rules["and_descs"]
+        or_list = rules["or_descs"]
+        total_and = len(and_list)
+        total_or = len(or_list)
+
+        process_total_stock = 0
+        for prod in sticker_prod_qs:
+            # Match top_bottom name if applicable
+            # prod["tbid"] might correspond to tb_name or you can match via tb_name if stored in sticker prod or via joined tables. 
+            # Assuming top_bottom matches tb_name or we check both:
+            b_job = prod["jobno"]
+            b_id = prod["bundid"]
+            pc_val = prod["pc"] or 0
+
+            # Check scanned sequences for this specific bundle
+            # Note: Assembly_data uses tb_name usually
+            scanned_seqs_for_bundle = [
+                desc for desc in and_list + or_list
+                if (normalized(b_job), normalized(top_bottom), normalized(b_id), desc) in assembly_scanned_map
+            ]
+            
+            matched_and = sum(1 for desc in and_list if (normalized(b_job), normalized(top_bottom), normalized(b_id), desc) in assembly_scanned_map)
+            matched_or = sum(1 for desc in or_list if (normalized(b_job), normalized(top_bottom), normalized(b_id), desc) in assembly_scanned_map)
+
+            is_and_satisfied = (total_and == matched_and)
+            is_or_satisfied = (total_or == 0 or matched_or > 0)
+
+            if not (is_and_satisfied and is_or_satisfied):
+                process_total_stock += pc_val
+                
+        return process_total_stock
 
     # --------------------------------
     # HOURLY TOTALS (Grouped by Machine + Job + TopBottom)
@@ -1893,7 +2412,6 @@ def get_allocate_live(request):
             except (TypeError, ValueError):
                 pieces = 0
 
-        # Key without seq, so all scans for this machine/job/tb go to same bucket
         key = scan_key(
             scan["machine"],
             scan["job_no"],
@@ -1917,7 +2435,6 @@ def get_allocate_live(request):
         if emp and emp.name:
             employee_name = emp.name
         else:
-            # Second priority: Cont_employee
             contractor_emp = Cont_employee.objects.filter(
                 code=row["emp_code"]
             ).first()
@@ -1958,33 +2475,38 @@ def get_allocate_live(request):
 
         allocation_time_display = allocation_datetime.strftime("%I:%M %p")
 
-        # Handle target calculation if multiple seqs are comma-separated
+        # Handle target and total stock calculation if multiple seqs are comma-separated
         seq_str = row["seq"] or ""
         individual_seqs = [s.strip() for s in seq_str.split(",") if s.strip()]
         
-        # Calculate combined or primary target (e.g., taking the sum or first available)
         total_target = 0
+        total_stock_sum = 0
+
         for s in individual_seqs:
-            t_val = dependency_targets.get(
-                operation_key(row["jobno"], row["top_bottom"], s),
-                ""
-            )
+            op_k = operation_key(row["jobno"], row["top_bottom"], s)
+            
+            # Target calculation
+            t_val = dependency_targets.get(op_k, "")
             if t_val:
                 parsed_t = hourly_target(t_val)
                 if isinstance(parsed_t, int):
                     total_target += parsed_t
+            
+            # Stock calculation for this specific process
+            total_stock_sum += get_process_stock(row["jobno"], row["top_bottom"], s)
 
         data.append({
             "emp_code": row["emp_code"],
             "machine": row["machine__Identity"],
             "status": row["status"],
-            "seq": row["seq"],  # String apdiyae "Shorts Side Pocket Attach, Shorts Pocket Dummy Stitch" nu pogum
+            "seq": row["seq"], 
             "jobno": row["jobno"],
             "top_bottom": row["top_bottom"],
             "name": employee_name,
             "allocation_slot": allocation_slot,
             "allocation_time": allocation_time_display,
             "target": total_target if total_target > 0 else "",
+            "total_stock": total_stock_sum, # Added total stock here based on jobno, top_bottom & process_des (seq)
             "hours": employee_hours,
         })
 
@@ -1992,9 +2514,6 @@ def get_allocate_live(request):
         data,
         safe=False
     )
-
-
-
 
 def machine_allocation_api(request):
     selected_date = request.GET.get("date")
