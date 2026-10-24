@@ -311,11 +311,17 @@ def RollChecking_Defect(request):
 
     if request.method == 'GET':
         rlno = request.GET.get('rlno')
+        colour = request.GET.get('colour')
+        dcno = request.GET.get('dcno')
 
         qs = RollCheckingDefect.objects.all()
 
         if rlno:
             qs = qs.filter(rlno=rlno)
+        if colour:
+            qs = qs.filter(colour=colour)
+        if dcno:
+            qs = qs.filter(dcno=dcno)
 
         return JsonResponse(list(qs.values()), safe=False)
 
@@ -334,15 +340,15 @@ def RollChecking_Defect(request):
                 defectname=data['defectname'],
                 subname=data.get('subname'),
                 points=data.get('points'),
+                holes=data.get('holes'),
                 inches=data.get('inches'),
-                counts=data.get('count'),
-                tcounts=data.get('tcount'),
+                counts=data.get('counts'),
+                tcounts=data.get('tcounts'),
                 tpoints=data.get('tpoints'),
+                entrytype=data.get('entrytype')
             )
             return JsonResponse({'message': 'Roll checking defect created successfully', 'sl': obj.sl}, status=201)
 
-        except IntegrityError:
-            return JsonResponse({'error': 'Duplicate roll/DC/colour'}, status=409)
         except KeyError as e:
             return JsonResponse({'error': f'Missing field: {e.args[0]}'}, status=400)
 
@@ -358,18 +364,17 @@ def RollChecking_Defect(request):
             return JsonResponse({'error': 'Record not found'}, status=404)
 
         for field in [
-            'rlno', 'colour', 'dcno', 'defectcode', 'inches', 'counts'
-            'defectname', 'subname', 'points', 'tpoints', 'tcounts'
+            'rlno', 'colour', 'dcno', 'defectcode', 'inches', 'counts', 'entrytype',
+            'defectname', 'subname', 'points', 'tpoints', 'tcounts', 'holes'
         ]:
             if field in data:
                 setattr(obj, field, data[field])
 
         try:
             obj.save()
-        except IntegrityError:
-            return JsonResponse({'error': 'Duplicate roll/DC/colour'}, status=409)
-
-        return JsonResponse({'message': 'Updated'})
+            return JsonResponse({'message': 'Updated'})
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=500)
 
     if request.method == 'DELETE':
         sl = data.get('sl') or request.GET.get('sl')

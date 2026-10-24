@@ -1328,6 +1328,12 @@ save_assembly = SaveAssemblyAPIView.as_view()
 def get_process_details(request):
     jobno = request.data.get('jobno')
     topbottom = request.data.get('topbottom')
+    include_saved_raw = request.data.get('include_saved', True)
+
+    if isinstance(include_saved_raw, str):
+        include_saved = include_saved_raw.strip().lower() not in {'false', '0', 'no'}
+    else:
+        include_saved = bool(include_saved_raw)
 
     if not jobno or not topbottom:
         return JsonResponse(
@@ -1412,7 +1418,7 @@ def get_process_details(request):
             dep
         )
 
-    if latest_by_process:
+    if include_saved and latest_by_process:
 
         saved_result = []
 
@@ -1676,6 +1682,11 @@ def save_process_dependency(request):
 
                     existing_group.update(verify=False)
                 group_already_exists = existing_group.exists()
+                changed_process_keys = {
+                    str(process_name or '').strip().casefold()
+                    for process_name in changed_processes
+                    if str(process_name or '').strip()
+                }
 
                 for row in data:
                     lookup = {
@@ -1688,9 +1699,10 @@ def save_process_dependency(request):
                     # another dependency record for the same process.
                     dep = dependency.objects.filter(**lookup).order_by('-id').first()
                     if dep is None:
-                        # Once a Job No + Top/Bottom configuration exists, Save
-                        # may update it only; it must not append new parent rows.
-                        if group_already_exists:
+                        process_key = str(row.get('process_des') or '').strip().casefold()
+                        if group_already_exists and (
+                            not edit_confirmed or process_key not in changed_process_keys
+                        ):
                             continue
                         dep = dependency(**lookup)
 

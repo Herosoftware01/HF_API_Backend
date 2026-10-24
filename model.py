@@ -8,29 +8,24 @@
 from django.db import models
 
 
-class TrsGatemodule(models.Model):
-    module = models.CharField(db_column='Module', max_length=50, db_collation='SQL_Latin1_General_CP1_CI_AS')  # Field name made lowercase.
-    qr_code_dtls = models.CharField(db_column='Qr_Code_Dtls', max_length=500, db_collation='SQL_Latin1_General_CP1_CI_AS')  # Field name made lowercase.
-    companyid = models.IntegerField(db_column='CompanyID')  # Field name made lowercase.
-    year = models.IntegerField(db_column='Year')  # Field name made lowercase.
-    no = models.IntegerField(db_column='No')  # Field name made lowercase.
+class ViewAccinwardVerification(models.Model):
+    slno = models.BigIntegerField(db_column='SlNo', blank=True, null=True)  # Field name made lowercase.
     date = models.DateTimeField(db_column='Date')  # Field name made lowercase.
-    jobno = models.CharField(db_column='Jobno', max_length=50, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)  # Field name made lowercase.
-    suppliername = models.CharField(db_column='SupplierName', max_length=200, db_collation='SQL_Latin1_General_CP1_CI_AS')  # Field name made lowercase.
-    descr = models.CharField(db_column='Descr', max_length=500, db_collation='SQL_Latin1_General_CP1_CI_AS')  # Field name made lowercase.
-    rls_bdls = models.IntegerField()
-    kg = models.DecimalField(max_digits=18, decimal_places=3)
-    mtrs = models.DecimalField(max_digits=18, decimal_places=2)
-    print_delivery_date = models.DateTimeField(db_column='Print_Delivery_date', blank=True, null=True)  # Field name made lowercase.
-    gate_delivery_date = models.DateTimeField(db_column='Gate_Delivery_date', blank=True, null=True)  # Field name made lowercase.
-    verify = models.CharField(db_column='Verify', max_length=50, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)  # Field name made lowercase.
-    prepered = models.CharField(max_length=50, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)
-    fhero = models.CharField(max_length=50, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)
-    inch_verify_date = models.DateTimeField(blank=True, null=True)
-    inch_verify_status = models.BooleanField(blank=True, null=True)
-    inch_reject_remakrs = models.TextField(db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)
-    inch_remakrs_date = models.DateTimeField(blank=True, null=True)
+    pk = models.CharField(max_length=360, blank=True, null=True)
+    name = models.CharField(db_column='Name', max_length=35, blank=True, null=True)  # Field name made lowercase.
+    supplierdcno = models.CharField(db_column='SupplierDCNo', max_length=50)  # Field name made lowercase.
+    pono = models.IntegerField(db_column='PONo', blank=True, null=True)  # Field name made lowercase.
+    poqty = models.DecimalField(db_column='PoQty', max_digits=38, decimal_places=4, blank=True, null=True)  # Field name made lowercase.
+    jobno = models.CharField(db_column='JobNo', max_length=50, blank=True, null=True)  # Field name made lowercase.
+    items = models.CharField(db_column='Items', max_length=71, blank=True, null=True)  # Field name made lowercase.
+    clr_siz = models.CharField(max_length=101)
+    quantity = models.DecimalField(db_column='Quantity', max_digits=18, decimal_places=4)  # Field name made lowercase.
+    uom = models.CharField(db_column='UOM', max_length=25)  # Field name made lowercase.
+    bill_rate = models.DecimalField(db_column='Bill_Rate', max_digits=19, decimal_places=4, blank=True, null=True)  # Field name made lowercase.
+    gst = models.CharField(db_column='GST', max_length=50, blank=True, null=True)  # Field name made lowercase.
+    billno = models.CharField(db_column='BillNo', max_length=50, blank=True, null=True)  # Field name made lowercase.
+    billdate = models.DateTimeField(db_column='BillDate', blank=True, null=True)  # Field name made lowercase.
 
     class Meta:
         managed = False
-        db_table = 'Trs_Gatemodule'
+        db_table = 'view_accinward_verification'

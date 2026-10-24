@@ -92,18 +92,13 @@ class RollCheckingDefect(models.Model):
     subname = models.CharField(max_length=100, blank=True, null=True)
     points = models.IntegerField(blank=True, null=True)
     inches = models.IntegerField(blank=True, null=True)
+    holes = models.IntegerField(blank=True, null=True)
     counts = models.IntegerField(blank=True, null=True)
     tcounts = models.IntegerField(blank=True, null=True)
     tpoints = models.IntegerField(blank=True, null=True)
+    entrytype = models.CharField(max_length=30, blank=True, null=True)
     date = models.DateTimeField(auto_now_add=True)
 
-    class Meta:
-        constraints = [
-            models.UniqueConstraint(
-                fields=['rlno', 'dcno', 'colour'],
-                name='unique_dcno_rlno_colour'
-            )
-        ]
 
 class MasterMistakes(models.Model):
     choice = (
