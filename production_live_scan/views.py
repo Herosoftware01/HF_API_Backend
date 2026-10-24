@@ -9,7 +9,7 @@ from django.db import transaction
 from imp_reports.models import UnitBundlereport
 from bundle_tracking.models import TrsMcutstickerprod,MasUnit,MasTopbottom
 from qcapp.models import Unit,Line,machine_details,emp_allocate,Empwisesal
-from .models import Assembly_data,bundle_transfer,end_line_data, unit_input, Msizes,dependency,dependency_data,PreporatoryEntry,ViewRibdelPreparatory,RibdelEntry
+from .models import Assembly_data,bundle_transfer,end_line_data, unit_input, Msizes,dependency,dependency_data,PreporatoryEntry,ViewRibdelPreparatory,RibdelEntry,VueCutPlnStat
 from django.utils.dateparse import parse_date, parse_datetime
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
@@ -21,14 +21,15 @@ from rest_framework.decorators import permission_classes
 from rest_framework import permissions
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
-
 from django.db.models import Sum
-
+from django.db.models import Sum, Value
+from django.db.models.functions import Coalesce
 from django.views import View
 from .models import user_unit_permission
 from herofashion.models import User
 from qcapp.models import Unit
-
+from django.db.models import Sum, IntegerField, Value
+from django.db.models.functions import Cast, Coalesce
 import json
 
 
@@ -675,7 +676,7 @@ class GetUnitDataAPIView(APIView):
         process_des = request.query_params.get('process_des')
         top_bottom = str(request.query_params.get('top_bottom', '') or '').strip()
         selected_date = request.query_params.get('date') 
-
+        
         if selected_date:
             date_obj = datetime.strptime(selected_date, '%Y-%m-%d')
             # data = unit_input.objects.filter(unit=unit, line=line, entry_date__date=date_obj).order_by('-entry_date')
@@ -686,6 +687,7 @@ class GetUnitDataAPIView(APIView):
             print("Today's date:", today)
             # data = unit_input.objects.filter(unit=unit, line=line, entry_date__gte=today).order_by('-entry_date')
             data = unit_input.objects.filter(unit=unit, job_no=job_no).order_by('-entry_date')
+            print("date filter applied:", data.query)
 
         if job_no is not None:
             job_no = job_no.strip()
@@ -1055,20 +1057,18 @@ class GetUnitAssemply(APIView):
 
         if all_dates:
             data = Assembly_data.objects.filter(
-                unit=unit, line=line,scan=False
+                unit=unit,scan=False
             ).order_by('-date')
         elif selected_date:
             date_obj = datetime.strptime(selected_date, '%Y-%m-%d')
             data = Assembly_data.objects.filter(
                 unit=unit,
-                line=line,
                 scan=False,
                 date__date=date_obj,
             ).order_by('-date')
         else:
             data = Assembly_data.objects.filter(
                 unit=unit,
-                line=line,
                 scan=False,
                 date__gte=date.today(),
             ).order_by('-date')
@@ -2424,3 +2424,355 @@ class SaveAssemblySelectionView(APIView):
             {'success': True, 'message': 'Bundles transferred successfully!'},
             status=status.HTTP_200_OK,
         )
+
+
+
+@api_view(['POST', 'GET'])
+def get_stock_data_python(request):
+    jobno = request.data.get('jobno') or request.GET.get('jobno')
+    topbottom = request.data.get('topbottom') or request.GET.get('topbottom')
+    print(f"Received jobno: {jobno}, topbottom: {topbottom}")  # Debugging line
+
+    if not jobno or not topbottom:
+        return JsonResponse(
+            {"error": "jobno and topbottom are required parameters"},
+            status=400
+        )
+
+    # 1. Fetch dependencies based on jobno and topbottom (tb_id or tb_name)
+    dep_query = dependency.objects.filter(job_no__iexact=str(jobno).strip())
+    if str(topbottom).strip().isdigit():
+        dep_query = dep_query.filter(tb_id=int(topbottom))
+    else:
+        dep_query = dep_query.filter(tb_name__iexact=str(topbottom).strip())
+    
+    dependencies = list(dep_query)
+    if not dependencies:
+        return JsonResponse([], safe=False)
+
+    valid_tb_ids = list(set(d.tb_id for d in dependencies))
+
+    # 2. Fetch Tally sticker production records
+    prod_records = TrsMcutstickerprod.objects.using('demo').filter(
+        jobno__iexact=str(jobno).strip(),
+        tbid__in=valid_tb_ids,
+        livescan='1',
+        scan=1
+    )
+
+    # 3. Map size names from mSizes
+    size_ids = list(set(p.sizid for p in prod_records if p.sizid))
+    sizes_map = {s.id: s.name for s in Msizes.objects.using('test').filter(id__in=size_ids)}
+
+    # 4. Fetch assembly scan records for matching bundles
+    assembly_records = Assembly_data.objects.filter(
+        job_no__iexact=str(jobno).strip(),
+        tb_id__in=valid_tb_ids
+    )
+    
+    # Organize assembly scans into a dictionary: (job_no, tb_id, bundle_id) -> set of scanned seqs
+    assembly_map = {}
+    for asm in assembly_records:
+        key = (asm.job_no.strip().upper(), asm.tb_id, asm.bundle_id.strip())
+        if key not in assembly_map:
+            assembly_map[key] = set()
+        if asm.seq:
+            assembly_map[key].add(asm.seq.strip())
+
+    # 5. Fetch dependency data (AND / OR rules) for these dependencies
+    dep_ids = [d.id for d in dependencies]
+    dep_data_qs = dependency_data.objects.filter(dep_id_id__in=dep_ids)
+    
+    dep_rules = {}
+    for d in dependencies:
+        dep_rules[d.id] = {
+            'dependency': d,
+            'and_descs': [],
+            'or_descs': []
+        }
+    
+    for dd in dep_data_qs:
+        if dd.dep_id_id in dep_rules:
+            if dd.and_data:
+                dep_rules[dd.dep_id_id]['and_descs'].append(dd.descriptions.strip())
+            if dd.or_data:
+                dep_rules[dd.dep_id_id]['or_descs'].append(dd.descriptions.strip())
+
+    # 6. Process each bundle and calculate stock using python logic
+    results = []
+    for prod in prod_records:
+        bundle_key = (prod.jobno.strip().upper(), prod.tbid, prod.bundid.strip())
+        scanned_seqs = assembly_map.get(bundle_key, set())
+        size_name = sizes_map.get(prod.sizid, str(prod.sizid))
+
+        for dep_id, rules in dep_rules.items():
+            dep_obj = rules['dependency']
+            and_list = rules['and_descs']
+            or_list = rules['or_descs']
+
+            total_and = len(and_list)
+            matched_and = sum(1 for desc in and_list if desc in scanned_seqs)
+
+            total_or = len(or_list)
+            matched_or = sum(1 for desc in or_list if desc in scanned_seqs)
+
+            # Business Logic: AND must be fully matched, OR must have at least one match (if present)
+            is_and_satisfied = (total_and == matched_and)
+            is_or_satisfied = (total_or == 0 or matched_or > 0)
+
+            if is_and_satisfied and is_or_satisfied:
+                stock = 0
+            else:
+                stock = prod.pc
+
+            results.append({
+                "job_no": prod.jobno,
+                "tb_id": prod.tbid,
+                "tb_name": dep_obj.tb_name,
+                "bundle_id": prod.bundid,
+                "color": prod.comboclr,
+                "size": size_name,
+                "process_des": dep_obj.process_des,
+                "stock": stock
+            })
+
+    return JsonResponse(results, safe=False, status=200)
+
+
+@api_view(['POST', 'GET'])
+def get_stock_summary_python(request):
+    jobno = request.data.get('jobno') or request.GET.get('jobno')
+    topbottom = request.data.get('topbottom') or request.GET.get('topbottom')
+
+    if not jobno or not topbottom:
+        return JsonResponse(
+            {"error": "jobno and topbottom are required parameters"},
+            status=400
+        )
+
+    # 1. Fetch dependencies based on jobno and topbottom (tb_id or tb_name)
+    dep_query = dependency.objects.filter(job_no__iexact=str(jobno).strip())
+    if str(topbottom).strip().isdigit():
+        dep_query = dep_query.filter(tb_id=int(topbottom))
+    else:
+        dep_query = dep_query.filter(tb_name__iexact=str(topbottom).strip())
+    
+    dependencies = list(dep_query)
+    if not dependencies:
+        return JsonResponse([], safe=False)
+
+    valid_tb_ids = list(set(d.tb_id for d in dependencies))
+
+    # 2. Fetch Tally sticker production records for these TB IDs
+    prod_records = list(TrsMcutstickerprod.objects.using('demo').filter(
+        jobno__iexact=str(jobno).strip(),
+        tbid__in=valid_tb_ids,
+        livescan='1',
+        scan=1
+    ))
+
+    if not prod_records:
+        return JsonResponse([], safe=False)
+
+    # 3. Fetch assembly scan records for matching bundles
+    assembly_records = Assembly_data.objects.filter(
+        job_no__iexact=str(jobno).strip(),
+        tb_id__in=valid_tb_ids
+    )
+    
+    assembly_map = {}
+    for asm in assembly_records:
+        key = (asm.job_no.strip().upper(), asm.tb_id, asm.bundle_id.strip())
+        if key not in assembly_map:
+            assembly_map[key] = set()
+        if asm.seq:
+            assembly_map[key].add(asm.seq.strip())
+
+    # 4. Fetch dependency data (AND / OR rules)
+    dep_ids = [d.id for d in dependencies]
+    dep_data_qs = dependency_data.objects.filter(dep_id_id__in=dep_ids)
+    
+    dep_rules = {}
+    for d in dependencies:
+        dep_rules[d.id] = {
+            'dependency': d,
+            'and_descs': [],
+            'or_descs': []
+        }
+    
+    for dd in dep_data_qs:
+        if dd.dep_id_id in dep_rules:
+            if dd.and_data:
+                dep_rules[dd.dep_id_id]['and_descs'].append(dd.descriptions.strip())
+            if dd.or_data:
+                dep_rules[dd.dep_id_id]['or_descs'].append(dd.descriptions.strip())
+
+    # 5. Initialize summary dictionary per process_des
+    process_summary = {}
+    for d in dependencies:
+        process_summary[d.id] = {
+            "job_no": jobno,
+            "tb_id": d.tb_id,
+            "tb_name": d.tb_name,
+            "process_des": d.process_des,
+            "total_pieces": 0,
+            "total_stock": 0
+        }
+
+    # 6. Iterate through all production bundles and accumulate stock per process
+    for prod in prod_records:
+        bundle_key = (prod.jobno.strip().upper(), prod.tbid, prod.bundid.strip())
+        scanned_seqs = assembly_map.get(bundle_key, set())
+        pc_val = prod.pc or 0
+
+        for dep_id, rules in dep_rules.items():
+            # Match production TBID with dependency TBID
+            if prod.tbid != rules['dependency'].tb_id:
+                continue
+
+            and_list = rules['and_descs']
+            or_list = rules['or_descs']
+
+            total_and = len(and_list)
+            matched_and = sum(1 for desc in and_list if desc in scanned_seqs)
+
+            total_or = len(or_list)
+            matched_or = sum(1 for desc in or_list if desc in scanned_seqs)
+
+            is_and_satisfied = (total_and == matched_and)
+            is_or_satisfied = (total_or == 0 or matched_or > 0)
+
+            # Calculate stock for this bundle under this process
+            bundle_stock = 0 if (is_and_satisfied and is_or_satisfied) else pc_val
+
+            # Accumulate totals
+            process_summary[dep_id]["total_pieces"] += pc_val
+            process_summary[dep_id]["total_stock"] += bundle_stock
+
+    results = list(process_summary.values())
+    return JsonResponse(results, safe=False, status=200, json_dumps_params={'ensure_ascii': False})
+
+
+from django.db.models import Min
+
+def get_dependency_pc(request):
+    job_no = request.GET.get('job_no')
+    tb_name = request.GET.get('tb_name')
+    color = request.GET.get('color')
+
+    if not job_no or not tb_name or not color:
+        return JsonResponse({
+            "error": "job_no, tb_name and color are required"
+        }, status=400)
+       
+    processes = list(
+        dependency.objects.filter(
+            job_no=job_no,
+            tb_name=tb_name
+        )
+        .values('process_des')
+        .annotate(first_id=Min('id'))
+        .order_by('first_id')
+        .values_list('process_des', flat=True)
+    )
+
+    assembly_data = (
+        Assembly_data.objects.filter(
+            job_no=job_no,
+            tb_name=tb_name,
+            color=color
+        )
+        .values('tb_id', 'size', 'seq')
+        .annotate(
+            total_pc=Coalesce(
+                Sum(Cast('pc', output_field=IntegerField())),
+                Value(0),
+                output_field=IntegerField()
+            )
+        )
+    )
+
+    size_data = {}
+    tb_ids = set()
+
+    for row in assembly_data:
+        size = row['size']
+        seq = row['seq']
+        tb_id = row['tb_id']
+
+        tb_ids.add(tb_id)
+
+        if size not in size_data:
+            size_data[size] = {}
+
+        size_data[size][seq] = row['total_pc']
+
+    cut_data = {}
+
+    for tb_id in tb_ids:
+        cut_rows = (
+            VueCutPlnStat.objects.using('demo').filter(
+                ordno=job_no,
+                topbottom_id=tb_id,
+                clr=color
+            )
+            .values('siz')
+            .annotate(
+                total_cut=Coalesce(
+                    Sum('ord2'),
+                    Value(0),
+                    output_field=IntegerField()
+                )
+            )
+        )
+
+        for row in cut_rows:
+            cut_data[row['siz']] = (
+                cut_data.get(row['siz'], 0)
+                + (row['total_cut'] or 0)
+            )
+
+    # 4. Size list
+    sizes = list(
+        Assembly_data.objects.filter(
+            job_no=job_no,
+            tb_name=tb_name,
+            color=color
+        )
+        .values_list('size', flat=True)
+        .distinct()
+    )
+
+    # Cut table-la mattum irukkira size-um include pannuvom
+    for size in cut_data:
+        if size not in sizes:
+            sizes.append(size)
+
+    # 5. Final response
+    result_data = []
+
+    for size in sizes:
+        cut_qty = cut_data.get(size, 0)
+        seq_data = {}
+
+        for process in processes:
+            pc = size_data.get(size, {}).get(process, 0)
+
+            seq_data[process] = {
+                "cut_qty": cut_qty,
+                "pc": pc,
+                "bal": cut_qty - pc
+            }
+
+        result_data.append({
+            "size": size,
+            "cut_qty": cut_qty,
+            "seq": seq_data
+        })
+
+    return JsonResponse({
+        "job_no": job_no,
+        "tb_name": tb_name,
+        "color": color,
+        "data": result_data
+    })
