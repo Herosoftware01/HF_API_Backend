@@ -471,6 +471,7 @@ class Mas_contractor(models.Model):
 
 #         super().save(*args, **kwargs)
 
+
 class MasContract(models.Model):
     contract_des = models.CharField(max_length=50, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)
     contract_id = models.IntegerField(primary_key=True)  # Field name made lowercase.
