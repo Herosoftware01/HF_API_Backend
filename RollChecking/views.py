@@ -445,6 +445,18 @@ def defect_dict(request, obj):
         'log': obj.log,
     }
 
+def generate_serials():
+    import string
+
+    letters = string.ascii_lowercase
+
+    for first in letters:
+        yield first
+
+    for first in letters:
+        for second in letters:
+            yield first + second
+
 
 @csrf_exempt
 @require_http_methods(['GET', 'POST', 'PUT', 'DELETE'])
@@ -619,15 +631,15 @@ def Defect_Master(request):
 
                 defectserial = next(
                     (
-                        letter for letter in 'abcdefghijklmnopqrstuvwxyz'
-                        if letter not in used_serials
+                        serial for serial in generate_serials()
+                        if serial not in used_serials
                     ),
                     None
                 )
 
                 if defectserial is None:
                     return JsonResponse(
-                        {'error': 'All serials a-z are already used'},
+                        {'error': 'No available defect serials'},
                         status=400
                     )
 
