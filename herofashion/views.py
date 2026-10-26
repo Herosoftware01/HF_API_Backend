@@ -304,6 +304,11 @@ class RoleSubMenuPermissionListCreateAPI(generics.ListCreateAPIView):
     serializer_class = RoleSubMenuPermissionSerializer
     permission_classes = [permissions.IsAuthenticated]
 
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        role_id = self.request.query_params.get("role_id")
+        return queryset.filter(role_id=role_id) if role_id else queryset
+
 class RoleSubMenuPermissionDetailAPI(generics.RetrieveUpdateDestroyAPIView):
     queryset = RoleSubMenuPermission.objects.all()
     serializer_class = RoleSubMenuPermissionSerializer
@@ -314,11 +319,47 @@ class RoleListAPI(generics.ListAPIView):
     serializer_class = RoleSerializer
     permission_classes = [permissions.IsAuthenticated]
 
+class RolePermissionSummaryAPI(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        role_id = request.query_params.get("role_id")
+        if not role_id or not role_id.isdigit():
+            return Response(
+                {"detail": "A valid role_id is required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        return Response({
+            "menu_permissions": list(
+                RoleMenuPermission.objects.filter(role_id=role_id)
+                .values("menu_id", "can_view")
+            ),
+            "submenu_permissions": list(
+                {
+                    "id": permission["id"],
+                    "submenu": {
+                        "id": permission["submenu_id"],
+                        "name": permission["submenu__name"],
+                        "menu_id": permission["submenu__menu_id"],
+                    },
+                    "can_view": permission["can_view"],
+                }
+                for permission in RoleSubMenuPermission.objects.filter(role_id=role_id)
+                .values("id", "submenu_id", "submenu__name", "submenu__menu_id", "can_view")
+            ),
+        })
+
 # views.py
 class RoleMenuPermissionListCreateAPI(generics.ListCreateAPIView):
     queryset = RoleMenuPermission.objects.all()
     serializer_class = RoleMenuPermissionSerializer
     permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        role_id = self.request.query_params.get("role_id")
+        return queryset.filter(role_id=role_id) if role_id else queryset
 
 class RoleMenuPermissionDetailAPI(generics.RetrieveUpdateDestroyAPIView):
     queryset = RoleMenuPermission.objects.all()
