@@ -55,6 +55,7 @@ class Assembly_data(models.Model):
     entry_mode = models.CharField(max_length=20, blank=True, null=True)
     unit_transfer = models.BooleanField(default=False)
     edit_data = models.BooleanField(default=False)
+    allocate_id = models.IntegerField()
     # process_des = models.CharField(max_length=500)
 
 

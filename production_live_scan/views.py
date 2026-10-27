@@ -1115,6 +1115,7 @@ def assembly_emp(request):
         line=line_obj.id,
         # status=1
     ).values(
+        'id',
         'emp_code',
         'machine',
         'machine__Identity',
@@ -1166,6 +1167,7 @@ class SaveAssemblyAPIView(APIView):
     def post(self, request):
         emp_code = str(request.data.get('emp_code', '')).strip()
         machine_id = request.data.get('machine_id')
+        allocate_id = request.data.get('allocate_id')
         job_no = str(request.data.get('job_no', '')).strip()
         selected_seq = str(request.data.get('seq', '') or '').strip()
         selected_top_bottom = str(request.data.get('top_bottom', '') or '').strip()
@@ -1302,7 +1304,8 @@ class SaveAssemblyAPIView(APIView):
                     scan=False,
                     lot=bundle.lot,
                     emp_id=emp_code,
-                    entry_mode=entry_mode
+                    entry_mode=entry_mode,
+                    allocate_id=allocate_id,
                 )
                 for bundle, description in bundle_process_pairs(
                     [bundles_by_id[bundle_id] for bundle_id in unique_ids],
