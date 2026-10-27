@@ -104,7 +104,7 @@ class UserSerializer(serializers.ModelSerializer):
     role_id = serializers.PrimaryKeyRelatedField(
         queryset=Role.objects.all(),
         source="role",
-        write_only=True,
+        write_only=False,
         required=False
     )
 

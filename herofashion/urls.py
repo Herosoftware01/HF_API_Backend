@@ -40,6 +40,7 @@ urlpatterns = [
     # Role permissions
     path("role-menu-permissions/", RoleMenuPermissionListCreateAPI.as_view(), name="role-menu-permissions-list-create"),
     path("role-menu-permissions/<int:pk>/", RoleMenuPermissionDetailAPI.as_view(), name="role-menu-permissions-detail"),
+    path("role-permission-summary/", RolePermissionSummaryAPI.as_view(), name="role-permission-summary"),
     path("role-submenu-permissions/", RoleSubMenuPermissionListCreateAPI.as_view(), name="role-submenu-permissions-list-create"),
     path("role-submenu-permissions/<int:pk>/", RoleSubMenuPermissionDetailAPI.as_view(), name="role-submenu-permissions-detail"),
 

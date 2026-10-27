@@ -1371,6 +1371,7 @@ class MachineTransferListCreateAPIView(APIView):
             #     )
             machine_online = emp_allocate.objects.filter(
                 machine_id=serializer.validated_data["machine"].pk,
+                date__date=timezone.now(),
                 status=True
             ).exists()
 
@@ -2234,30 +2235,6 @@ def get_allocate_live(request):
             )
         )
 
-    # def hourly_target(wsec):
-    #     value = str(wsec or "").strip()
-    #     if not value:
-    #         return ""
-    #     try:
-    #         minutes_text, seconds_text = (
-    #             value.split(".", 1) + [""]
-    #         )[:2]
-    #         minutes = int(minutes_text or 0)
-    #         seconds = (
-    #             int((seconds_text + "00")[:2])
-    #             if seconds_text
-    #             else 0
-    #         )
-    #         operation_seconds = (
-    #             minutes*60*1.15
-    #         ) + seconds
-    #         return (
-    #             int(3600 / operation_seconds)
-    #             if operation_seconds > 0
-    #             else ""
-    #         )
-    #     except (TypeError, ValueError, ZeroDivisionError):
-    #         return ""
     def hourly_target(w_sec):
         try:
             minutes = float(w_sec or 0)
@@ -2317,8 +2294,6 @@ def get_allocate_live(request):
         scan=1
     ).values("jobno", "bundid", "tbid", "pc")
 
-    # Map assembly scans for checking dependency fulfillment per bundle
-    # Bundle key: (job_no, tb_name/tb_id, bundle_id) -> set of scanned sequences
     assembly_scanned_map = set()
     for asm in Assembly_data.objects.filter(job_no__in=job_nos_list).values("job_no", "tb_name", "bundle_id", "seq"):
         if asm["seq"]:
@@ -2329,10 +2304,7 @@ def get_allocate_live(request):
                 normalized(asm["seq"])
             ))
 
-    # Pre-calculate stock for each bundle per process rule
-    # Let's map process stock: stock_cache[(job_no, top_bottom, process_des)] = total pending stock
-    # Or calculate dynamically per allocation request.
-    # To optimize, let's build a stock calculator function:
+
     def get_process_stock(job_no, top_bottom, process_des):
         op_key = operation_key(job_no, top_bottom, process_des)
         d_id = dep_id_map.get(op_key)
@@ -2350,15 +2322,9 @@ def get_allocate_live(request):
 
         process_total_stock = 0
         for prod in sticker_prod_qs:
-            # Match top_bottom name if applicable
-            # prod["tbid"] might correspond to tb_name or you can match via tb_name if stored in sticker prod or via joined tables. 
-            # Assuming top_bottom matches tb_name or we check both:
             b_job = prod["jobno"]
             b_id = prod["bundid"]
             pc_val = prod["pc"] or 0
-
-            # Check scanned sequences for this specific bundle
-            # Note: Assembly_data uses tb_name usually
             scanned_seqs_for_bundle = [
                 desc for desc in and_list + or_list
                 if (normalized(b_job), normalized(top_bottom), normalized(b_id), desc) in assembly_scanned_map
@@ -2374,23 +2340,17 @@ def get_allocate_live(request):
                 process_total_stock += pc_val
                 
         return process_total_stock
-
-    # --------------------------------
-    # HOURLY TOTALS (Grouped by Machine + Job + TopBottom)
-    # --------------------------------
+    
     hourly_totals = defaultdict(
         lambda: [0] * len(slot_ranges)
     )
-
     for scan in scans:
         scan_datetime = scan["entry_date"]
         if timezone.is_aware(scan_datetime):
             scan_datetime = localtime(scan_datetime)
-
         scan_time = scan_datetime.time().replace(
             tzinfo=None
         )
-
         slot_index = next(
             (
                 index
@@ -2400,7 +2360,6 @@ def get_allocate_live(request):
             ),
             None
         )
-
         if slot_index is None:
             continue
 
@@ -2419,10 +2378,6 @@ def get_allocate_live(request):
         )
 
         hourly_totals[key][slot_index] += pieces
-
-    # --------------------------------
-    # FINAL DATA
-    # --------------------------------
     data = []
 
     for row in s_data:
@@ -2474,8 +2429,6 @@ def get_allocate_live(request):
         )
 
         allocation_time_display = allocation_datetime.strftime("%I:%M %p")
-
-        # Handle target and total stock calculation if multiple seqs are comma-separated
         seq_str = row["seq"] or ""
         individual_seqs = [s.strip() for s in seq_str.split(",") if s.strip()]
         
@@ -2484,15 +2437,13 @@ def get_allocate_live(request):
 
         for s in individual_seqs:
             op_k = operation_key(row["jobno"], row["top_bottom"], s)
-            
-            # Target calculation
+
             t_val = dependency_targets.get(op_k, "")
             if t_val:
                 parsed_t = hourly_target(t_val)
                 if isinstance(parsed_t, int):
                     total_target += parsed_t
             
-            # Stock calculation for this specific process
             total_stock_sum += get_process_stock(row["jobno"], row["top_bottom"], s)
 
         data.append({
@@ -2506,7 +2457,7 @@ def get_allocate_live(request):
             "allocation_slot": allocation_slot,
             "allocation_time": allocation_time_display,
             "target": total_target if total_target > 0 else "",
-            "total_stock": total_stock_sum, # Added total stock here based on jobno, top_bottom & process_des (seq)
+            "total_stock": total_stock_sum,
             "hours": employee_hours,
         })
 
