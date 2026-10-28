@@ -5,6 +5,7 @@ from .models import TrsCdelPcs21,TrsCdelPcs1,MasUnit,Bundlereport,TrsMcutsticker
 from django.views.decorators.csrf import csrf_exempt
 from django.utils import timezone
 import json
+import re
 from django.shortcuts import redirect
 from django.db.models import Q,Count
 
@@ -654,21 +655,41 @@ def update_child_bundle_scan(request):
 
     bundid = request.POST.get("bundid")
     mbundid = request.POST.get("mbundid")
-    unit_id = request.POST.get("unit_id")
+    raw_unit_id = request.POST.get("unit_id")
 
-    if not bundid or not mbundid or not unit_id:
+    if not bundid or not mbundid or not raw_unit_id:
         return JsonResponse({"status": "error", "message": "Missing data"}, status=400)
+
+    # Resolve unit string (e.g. 'UNIT-5') to its numeric ID and unit code
+    unit, unit_code, unit_number = _resolve_unit_for_value(raw_unit_id)
+
+    # Derive the integer value for TrsMcutstickerprod.unit_id
+    numeric_unit_id = None
+    if unit_number is not None:
+        try:
+            numeric_unit_id = int(unit_number)
+        except (ValueError, TypeError):
+            pass
+
+    # Fallback: extract digits if unit_number was not directly convertible (e.g., 'UNIT-5' -> 5)
+    if numeric_unit_id is None:
+        match = re.search(r'\d+', str(raw_unit_id))
+        if match:
+            numeric_unit_id = int(match.group())
 
     try:
         pcs21 = TrsCdelPcs21.objects.using("demo").get(mbundid=mbundid)
     except TrsCdelPcs21.DoesNotExist:
         return JsonResponse({"status": "error", "message": "Invalid master bundle"}, status=404)
 
-    # Update child row
+    # 1. Update child row using the integer unit ID
     updated = TrsMcutstickerprod.objects.using("demo").filter(
         mbud=pcs21.mbundid,
         bundid=bundid
-    ).update(scan=1)
+    ).update(
+        scan=1,
+        unit_id=numeric_unit_id
+    )
 
     if updated == 0:
         return JsonResponse({"status": "error", "message": "Child bundle not found"}, status=404)
@@ -684,14 +705,17 @@ def update_child_bundle_scan(request):
 
     all_done = (total_count == scanned_count and total_count > 0)
 
+    # 2. Update master Bundlereport when all children are scanned
     if all_done:
-        unit, unit_code, unit_number = _resolve_unit_for_value(unit_id)
+        target_unit = unit_code or unit_number or raw_unit_id
+
         Bundlereport.objects.using("app").filter(
             mbundle_id=mbundid
         ).filter(
-            Q(unit_id=unit_code) | Q(unit_id=unit_number)
+            Q(unit_id=unit_code) | Q(unit_id=unit_number) | Q(unit_id=raw_unit_id)
         ).update(
             scan=1,
+            unit_id=target_unit,
             r_date=timezone.now().date()
         )
 

@@ -2,7 +2,7 @@
 import json
 from django.views.decorators.csrf import csrf_exempt
 from django.http import JsonResponse
-from .models import VueAccPodetails, VueAccPodetails1, TrsGatemoduleInward
+from .models import VueAccPodetails, VueAccPodetails1, TrsGatemoduleInward,Lotsticker
 
 def po_details(request):
     companyid = request.GET.get('companyid')
@@ -85,3 +85,15 @@ def GatemoduleInward(request):
                 status=201
             )
 
+
+def lotsticker(request):
+
+    if request.method == "GET":
+        stck = Lotsticker.objects.using('demo').all()
+
+        data = list(stck.values())
+
+    return JsonResponse(
+        data,
+        safe=False
+    )

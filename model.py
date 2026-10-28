@@ -8,24 +8,29 @@
 from django.db import models
 
 
-class ViewAccinwardVerification(models.Model):
-    slno = models.BigIntegerField(db_column='SlNo', blank=True, null=True)  # Field name made lowercase.
-    date = models.DateTimeField(db_column='Date')  # Field name made lowercase.
-    pk = models.CharField(max_length=360, blank=True, null=True)
-    name = models.CharField(db_column='Name', max_length=35, blank=True, null=True)  # Field name made lowercase.
-    supplierdcno = models.CharField(db_column='SupplierDCNo', max_length=50)  # Field name made lowercase.
-    pono = models.IntegerField(db_column='PONo', blank=True, null=True)  # Field name made lowercase.
-    poqty = models.DecimalField(db_column='PoQty', max_digits=38, decimal_places=4, blank=True, null=True)  # Field name made lowercase.
-    jobno = models.CharField(db_column='JobNo', max_length=50, blank=True, null=True)  # Field name made lowercase.
-    items = models.CharField(db_column='Items', max_length=71, blank=True, null=True)  # Field name made lowercase.
-    clr_siz = models.CharField(max_length=101)
-    quantity = models.DecimalField(db_column='Quantity', max_digits=18, decimal_places=4)  # Field name made lowercase.
-    uom = models.CharField(db_column='UOM', max_length=25)  # Field name made lowercase.
-    bill_rate = models.DecimalField(db_column='Bill_Rate', max_digits=19, decimal_places=4, blank=True, null=True)  # Field name made lowercase.
-    gst = models.CharField(db_column='GST', max_length=50, blank=True, null=True)  # Field name made lowercase.
-    billno = models.CharField(db_column='BillNo', max_length=50, blank=True, null=True)  # Field name made lowercase.
-    billdate = models.DateTimeField(db_column='BillDate', blank=True, null=True)  # Field name made lowercase.
+class TrsMcutstickerprod(models.Model):
+    dt = models.DateTimeField(db_column='Dt')  # Field name made lowercase.
+    empid = models.IntegerField(db_column='EmpID')  # Field name made lowercase.
+    mbud = models.IntegerField(db_column='Mbud')  # Field name made lowercase.
+    bundid = models.CharField(db_column='BundID', primary_key=True, max_length=200, db_collation='SQL_Latin1_General_CP1_CI_AS')  # Field name made lowercase.
+    jobno = models.CharField(db_column='JobNo', max_length=50, db_collation='SQL_Latin1_General_CP1_CI_AS')  # Field name made lowercase.
+    tbid = models.IntegerField(db_column='TBID')  # Field name made lowercase.
+    comboclr = models.CharField(db_column='Comboclr', max_length=50, db_collation='SQL_Latin1_General_CP1_CI_AS')  # Field name made lowercase.
+    sizid = models.IntegerField(db_column='SIZID')  # Field name made lowercase.
+    bdl = models.IntegerField(db_column='Bdl')  # Field name made lowercase.
+    pc = models.IntegerField(db_column='Pc')  # Field name made lowercase.
+    porid = models.IntegerField(db_column='PorID')  # Field name made lowercase.
+    weight = models.DecimalField(max_digits=18, decimal_places=3, blank=True, null=True)
+    bund_id = models.IntegerField(blank=True, null=True)
+    lotno = models.CharField(max_length=10, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)
+    hempid = models.IntegerField(blank=True, null=True)
+    frmbc = models.CharField(max_length=1, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)
+    scan = models.CharField(max_length=1, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)
+    livescan = models.CharField(max_length=1, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)
+    old = models.CharField(max_length=1, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)
+    assembly_complected = models.CharField(max_length=1, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)
+    unit_id = models.IntegerField(blank=True, null=True)
 
     class Meta:
         managed = False
-        db_table = 'view_accinward_verification'
+        db_table = 'Trs_MCutStickerProd'
