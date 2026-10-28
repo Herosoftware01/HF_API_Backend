@@ -195,3 +195,4 @@ class TrsMcutstickerprod(models.Model):
         managed = False
         db_table = 'Trs_MCutStickerProd'
 
+

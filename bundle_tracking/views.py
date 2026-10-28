@@ -5,6 +5,7 @@ from .models import TrsCdelPcs21,TrsCdelPcs1,MasUnit,Bundlereport,TrsMcutsticker
 from django.views.decorators.csrf import csrf_exempt
 from django.utils import timezone
 import json
+import re
 from django.shortcuts import redirect
 from django.db.models import Q,Count
 
@@ -654,25 +655,51 @@ def update_child_bundle_scan(request):
 
     bundid = request.POST.get("bundid")
     mbundid = request.POST.get("mbundid")
-    unit_id = request.POST.get("unit_id")
+    raw_unit_id = request.POST.get("unit_id")
 
-    if not bundid or not mbundid or not unit_id:
+    if not bundid or not mbundid or not raw_unit_id:
         return JsonResponse({"status": "error", "message": "Missing data"}, status=400)
 
+    # 1. Resolve Unit
+    unit, unit_code, unit_number = _resolve_unit_for_value(raw_unit_id)
+
+    # Determine the actual numeric Database ID (e.g. 53)
+    target_db_unit_id = None
+    if unit is not None:
+        # Prefer the actual PK / ID of the Unit model instance
+        target_db_unit_id = getattr(unit, 'id', None) or getattr(unit, 'unit_id', None)
+
+    if target_db_unit_id is None and unit_number is not None:
+        try:
+            target_db_unit_id = int(unit_number)
+        except (ValueError, TypeError):
+            pass
+
+    # Fallback to digits in raw_unit_id if resolution didn't yield an int
+    if target_db_unit_id is None:
+        match = re.search(r'\d+', str(raw_unit_id))
+        if match:
+            target_db_unit_id = int(match.group())
+
+    # 2. Check Master Bundle in demo database
     try:
         pcs21 = TrsCdelPcs21.objects.using("demo").get(mbundid=mbundid)
     except TrsCdelPcs21.DoesNotExist:
         return JsonResponse({"status": "error", "message": "Invalid master bundle"}, status=404)
 
-    # Update child row
+    # 3. Update Child Row in TrsMcutstickerprod
     updated = TrsMcutstickerprod.objects.using("demo").filter(
         mbud=pcs21.mbundid,
         bundid=bundid
-    ).update(scan=1)
+    ).update(
+        scan=1,
+        unit_id=target_db_unit_id
+    )
 
     if updated == 0:
         return JsonResponse({"status": "error", "message": "Child bundle not found"}, status=404)
 
+    # 4. Check if all child bundles are scanned
     total_count = TrsMcutstickerprod.objects.using("demo").filter(
         mbud=pcs21.mbundid
     ).count()
@@ -684,14 +711,34 @@ def update_child_bundle_scan(request):
 
     all_done = (total_count == scanned_count and total_count > 0)
 
+    # 5. When all child bundles are scanned, complete the master bundle
     if all_done:
-        unit, unit_code, unit_number = _resolve_unit_for_value(unit_id)
-        Bundlereport.objects.using("app").filter(
-            mbundle_id=mbundid
-        ).filter(
-            Q(unit_id=unit_code) | Q(unit_id=unit_number)
-        ).update(
+        # Build comprehensive filter matching any representation of the unit
+        possible_unit_keys = {
+            str(raw_unit_id).strip(),
+            str(raw_unit_id).strip().upper()
+        }
+        if unit_code:
+            possible_unit_keys.add(str(unit_code).strip())
+            possible_unit_keys.add(str(unit_code).strip().upper())
+        if unit_number is not None:
+            possible_unit_keys.add(str(unit_number).strip())
+        if target_db_unit_id is not None:
+            possible_unit_keys.add(str(target_db_unit_id).strip())
+
+        # Target the master bundle report
+        master_qs = Bundlereport.objects.using("app").filter(mbundle_id=mbundid)
+
+        # Filter by unit if multiple units share the same mbundle_id;
+        # otherwise update the matched mbundle_id directly
+        filtered_qs = master_qs.filter(unit_id__in=list(possible_unit_keys))
+        if not filtered_qs.exists():
+            # If unit string didn't match directly, fall back to master bundle ID
+            filtered_qs = master_qs
+
+        filtered_qs.update(
             scan=1,
+            unit_id=str(target_db_unit_id) if target_db_unit_id is not None else raw_unit_id,
             r_date=timezone.now().date()
         )
 

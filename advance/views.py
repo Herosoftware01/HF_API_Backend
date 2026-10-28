@@ -218,7 +218,7 @@ def send_advance_mail(request):
                 "🧾 New Advance Request Submitted",
                 "",
                 settings.EMAIL_HOST_USER,
-                ["hfautomation2026@gmail.com","hr@herofashion.com","hrm@herofashion.com"],
+                ["hfautomation2026@gmail.com","hr@herofashion.com","hrm@herofashion.com","anush@herofashion.com"],
             )
 
             # IMAGE ATTACH (optional)
@@ -315,7 +315,7 @@ def send_approval_mail(request):
                 subject,
                 text_content,
                 settings.EMAIL_HOST_USER,
-                ["hfautomation2026@gmail.com","hr@herofashion.com","hrm@herofashion.com"],
+                ["hfautomation2026@gmail.com","hr@herofashion.com","hrm@herofashion.com","accounts@herofashion.com"],
             )
 
             email.attach_alternative(html_content, "text/html")
@@ -390,9 +390,9 @@ def ad_approve(request):
         return JsonResponse({"error": str(e)}, status=500)
 
 
-def get_next_bank_serial(starting_serial=3097):
-    counter_file = r"F:\txt\bank_serial.txt"
-    os.makedirs(r"F:\txt", exist_ok=True)
+def get_next_bank_serial(starting_serial=3103):
+    counter_file = r"\\adminserver\in$\bank_serial.txt"
+    os.makedirs(r"\\adminserver\in$", exist_ok=True)
 
     if not os.path.exists(counter_file):
         next_serial = starting_serial
@@ -462,7 +462,7 @@ def generate_bank_txt(obj, line_serial=1):
     # ==========================================================
     # Folder & File Path (Filename uses file_serial)
     # ==========================================================
-    base_path = r"F:\txt"
+    base_path = r"\\adminserver\in$"
     os.makedirs(base_path, exist_ok=True)
 
     date_str = now.strftime("%d%m%Y")

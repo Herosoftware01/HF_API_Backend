@@ -75,3 +75,38 @@ class TrsGatemoduleInward(models.Model):
     class Meta:
         managed = False
         db_table = 'Trs_Gatemodule_Inward'
+
+
+
+class Lotsticker(models.Model):
+    sl = models.AutoField(db_column='Sl', primary_key=True)  # Field name made lowercase.
+    colour = models.CharField(db_column='Colour', max_length=80, db_collation='SQL_Latin1_General_CP1_CI_AS')  # Field name made lowercase.
+    lotno = models.CharField(db_column='LotNo', max_length=10, db_collation='SQL_Latin1_General_CP1_CI_AS')  # Field name made lowercase.
+    fabric = models.CharField(db_column='Fabric', max_length=80, db_collation='SQL_Latin1_General_CP1_CI_AS')  # Field name made lowercase.
+    rollno = models.CharField(db_column='RollNo', max_length=20, db_collation='SQL_Latin1_General_CP1_CI_AS')  # Field name made lowercase.
+    dcno = models.CharField(max_length=20, db_collation='SQL_Latin1_General_CP1_CI_AS')
+    wgt = models.DecimalField(db_column='Wgt', max_digits=18, decimal_places=2)  # Field name made lowercase.
+    m1 = models.CharField(db_column='M1', max_length=550, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)  # Field name made lowercase.
+    m2 = models.CharField(db_column='M2', max_length=80, db_collation='SQL_Latin1_General_CP1_CI_AS')  # Field name made lowercase.
+    m3 = models.CharField(db_column='M3', max_length=80, db_collation='SQL_Latin1_General_CP1_CI_AS')  # Field name made lowercase.
+    m4 = models.CharField(db_column='M4', max_length=80, db_collation='SQL_Latin1_General_CP1_CI_AS')  # Field name made lowercase.
+    m5 = models.CharField(db_column='M5', max_length=80, db_collation='SQL_Latin1_General_CP1_CI_AS')  # Field name made lowercase.
+    m6 = models.CharField(db_column='M6', max_length=80, db_collation='SQL_Latin1_General_CP1_CI_AS')  # Field name made lowercase.
+    m7 = models.CharField(db_column='M7', max_length=80, db_collation='SQL_Latin1_General_CP1_CI_AS')  # Field name made lowercase.
+    m8 = models.CharField(db_column='M8', max_length=80, db_collation='SQL_Latin1_General_CP1_CI_AS')  # Field name made lowercase.
+    m9 = models.CharField(db_column='M9', max_length=80, db_collation='SQL_Latin1_General_CP1_CI_AS')  # Field name made lowercase.
+    m10 = models.CharField(db_column='M10', max_length=80, db_collation='SQL_Latin1_General_CP1_CI_AS')  # Field name made lowercase.
+    m12 = models.CharField(db_column='M12', max_length=80, db_collation='SQL_Latin1_General_CP1_CI_AS')  # Field name made lowercase.
+    fdia = models.CharField(db_column='Fdia', max_length=80, db_collation='SQL_Latin1_General_CP1_CI_AS')  # Field name made lowercase.
+    mtr = models.DecimalField(db_column='Mtr', max_digits=18, decimal_places=2)  # Field name made lowercase.
+    m11 = models.CharField(max_length=80, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)
+    jobno = models.CharField(max_length=50, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)
+    dia = models.CharField(max_length=50, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)
+    gsm = models.IntegerField(blank=True, null=True)
+    re = models.CharField(max_length=650, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)
+    em = models.CharField(max_length=50, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)
+    u = models.CharField(max_length=10, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)
+
+    class Meta:
+        managed = False
+        db_table = 'LotSticker'
