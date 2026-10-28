@@ -34,6 +34,8 @@ urlpatterns = [
     path("get_stock_data/", views.get_stock_data_python, name="get_stock_data"),
     path("get_stock_summary/", views.get_stock_summary_python, name="get_stock_summary"),
     path('api/bundle-detail/', views.bundle_detail_api, name='bundle-detail'),
+    path("api/bundle/transfer/",views.transfer_bundles,name="transfer_bundles",),
+    path('api/bundle/<str:bundid>/', views.get_bundle_detail, name='get_bundle_detail'),
 
     path(
         "users/",

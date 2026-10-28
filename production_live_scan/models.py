@@ -248,3 +248,10 @@ class VueCutPlnStat(models.Model):
     class Meta:
         managed = False
         db_table = 'vue_cut_pln_stat'
+
+
+class sub_bundle_unit_transfer(models.Model):
+    bundle_id=models.CharField(max_length=50)
+    from_unit = models.IntegerField()
+    to_unit = models.IntegerField()
+    date = models.DateTimeField()
