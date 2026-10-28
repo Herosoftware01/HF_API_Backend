@@ -9,7 +9,7 @@ from django.db import transaction
 from imp_reports.models import UnitBundlereport
 from bundle_tracking.models import TrsMcutstickerprod,MasUnit,MasTopbottom
 from qcapp.models import Unit,Line,machine_details,emp_allocate,Empwisesal
-from .models import Assembly_data,bundle_transfer,end_line_data, unit_input, Msizes,dependency,dependency_data,PreporatoryEntry,ViewRibdelPreparatory,RibdelEntry,VueCutPlnStat
+from .models import Assembly_data,bundle_transfer,end_line_data, unit_input,sub_bundle_unit_transfer, Msizes,dependency,dependency_data,PreporatoryEntry,ViewRibdelPreparatory,RibdelEntry,VueCutPlnStat
 from django.utils.dateparse import parse_date, parse_datetime
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
@@ -34,9 +34,86 @@ import json
 
 
 
+# @require_GET
+# def live_scan_data(request):
+   
+#     trs_data = TrsMcutstickerprod.objects.using("demo").filter(
+#         scan="1",
+#         livescan__isnull=True
+#     ).order_by('jobno','tbid','comboclr','lotno','sizid','bdl')
+
+#     tbid_list = {row.tbid for row in trs_data if row.tbid}
+#     tob_bottom_map = {
+#         str(item.topbottom_id): item.topbottom_des 
+#         for item in MasTopbottom.objects.using("main").filter(topbottom_id__in=tbid_list)
+#     }
+#     sizeid_list = {row.sizid for row in trs_data if row.sizid}
+#     size_map = {
+#         str(item.id): item.name
+#         for item in Msizes.objects.using("test").filter(id__in=sizeid_list)
+#     }
+
+
+#     mbud_list = [str(row.mbud) for row in trs_data]
+   
+#     reports = UnitBundlereport.objects.using("app").filter(
+#         mbundle_id__in=mbud_list
+#     )
+    
+#     report_map = {str(r.mbundle_id): r for r in reports}
+    
+#     unit_ids = {int(r.unit_id) for r in trs_data if r.unit_id}
+#     unit_name_map = {
+#         str(u.unitcode): u.unitname 
+#         for u in MasUnit.objects.using("main").filter(unitcode__in=unit_ids)
+#     }
+    
+#     final_data = {}
+    
+#     for row in trs_data:
+#         report = report_map.get(str(row.mbud))
+        
+#         uid = str(report.unit_id) if report else "0"
+#         u_name = unit_name_map.get(uid, "Unknown Unit")
+        
+#         if uid not in final_data:
+#             final_data[uid] = {
+#                 "unit_id": uid,
+#                 "unit_name": u_name,
+#                 "total_records": 0,
+#                 "data": []
+#             }
+            
+#         final_data[uid]["total_records"] += 1
+        
+#         final_data[uid]["data"].append({
+#             "dt": row.dt,
+#             "empid": row.empid,
+#             "mbud": row.mbud,
+#             "bundid": row.bundid,
+#             "jobno": row.jobno,
+#             "tbid": row.tbid,
+#             "tbid_name": tob_bottom_map.get(str(row.tbid), "N/A"),
+#             "bdl": row.bdl,
+#             "comboclr": row.comboclr,
+#             "sizid": row.sizid,
+#             "sizid_name": size_map.get(str(row.sizid), "N/A"),
+#             "pc": row.pc,
+#             "total_bundles": report.total_bundles if report else 0,
+#             "pcs_count": report.pcs_count if report else 0,
+#             "lot": row.lotno,
+#         })
+
+#     return JsonResponse({
+#         "status": True,
+#         "unit_count": len(final_data),
+#         "all_unit_data_count": sum(unit["total_records"] for unit in final_data.values()), # இது 6305 ஆக இருக்கும்
+#         "data": list(final_data.values())
+#     })
+
+
 @require_GET
 def live_scan_data(request):
-   
     trs_data = TrsMcutstickerprod.objects.using("demo").filter(
         scan="1",
         livescan__isnull=True
@@ -47,22 +124,22 @@ def live_scan_data(request):
         str(item.topbottom_id): item.topbottom_des 
         for item in MasTopbottom.objects.using("main").filter(topbottom_id__in=tbid_list)
     }
+    
     sizeid_list = {row.sizid for row in trs_data if row.sizid}
     size_map = {
         str(item.id): item.name
         for item in Msizes.objects.using("test").filter(id__in=sizeid_list)
     }
 
-
     mbud_list = [str(row.mbud) for row in trs_data]
    
     reports = UnitBundlereport.objects.using("app").filter(
         mbundle_id__in=mbud_list
     )
-    
     report_map = {str(r.mbundle_id): r for r in reports}
     
-    unit_ids = {int(r.unit_id) for r in reports if r.unit_id}
+    # 1. TrsMcutstickerprod-la iruka unit_id-a base panni unit_ids edukrom
+    unit_ids = {int(row.unit_id) for row in trs_data if row.unit_id is not None}
     unit_name_map = {
         str(u.unitcode): u.unitname 
         for u in MasUnit.objects.using("main").filter(unitcode__in=unit_ids)
@@ -73,7 +150,8 @@ def live_scan_data(request):
     for row in trs_data:
         report = report_map.get(str(row.mbud))
         
-        uid = str(report.unit_id) if report else "0"
+        # 2. Report-ku bathila TrsMcutstickerprod table-oda unit_id-a uid-ah use panrom
+        uid = str(row.unit_id) if row.unit_id is not None else "0"
         u_name = unit_name_map.get(uid, "Unknown Unit")
         
         if uid not in final_data:
@@ -107,12 +185,118 @@ def live_scan_data(request):
     return JsonResponse({
         "status": True,
         "unit_count": len(final_data),
-        "all_unit_data_count": sum(unit["total_records"] for unit in final_data.values()), # இது 6305 ஆக இருக்கும்
+        "all_unit_data_count": sum(unit["total_records"] for unit in final_data.values()),
         "data": list(final_data.values())
     })
 
 
+def get_bundle_detail(request, bundid):
+    try:
+        # 1. Muthalil antha bundid database-la irukka nu check panrom (filters illamal)
+        bundle = TrsMcutstickerprod.objects.using('demo').filter(bundid=bundid).first()
 
+        if not bundle:
+            return JsonResponse({'error': 'Bundle ID not found!'}, status=404)
+
+        # 2. Condition check: livescan = 1 iruntha already unit input complete
+        if bundle.livescan == '1' or bundle.livescan == 1:  # String or Integer handling
+            return JsonResponse({'error': 'Bundle already unit input completed!'}, status=400)
+
+        # 3. Condition check: scan = 0 iruntha bundle not scanned by unit
+        if bundle.scan == '0' or bundle.scan == 0:
+            return JsonResponse({'error': 'Bundle not scanned by unit!'}, status=400)
+
+        # 4. Ellam correct-ah iruntha details-a return panrom
+        data = {
+            'bundid': bundle.bundid,
+            'jobno': bundle.jobno,
+            'comboclr': bundle.comboclr,
+            'sizid': bundle.sizid,
+            'bdl': bundle.bdl,
+            'pc': bundle.pc,
+            'unit_id': bundle.unit_id,
+            'weight': float(bundle.weight) if bundle.weight else None,
+            'lotno': bundle.lotno,
+        }
+        return JsonResponse(data, status=200)
+
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@csrf_exempt
+def transfer_bundles(request):
+    if request.method != "POST":
+        return JsonResponse(
+            {"error": "POST method required"},
+            status=405
+        )
+
+    try:
+        data = json.loads(request.body)
+
+        bundids = data.get("bundids", [])
+        unit_name_or_code = data.get("unit_id") # React-il irunthu varura Unit Name or Code
+
+        print(f"bundle ids {bundids} and target unit input {unit_name_or_code}")
+
+        if not bundids or not unit_name_or_code:
+            return JsonResponse(
+                {"error": "Invalid data provided"},
+                status=400
+            )
+
+        # 1. MasUnit table-la target unitcode-a find panrom
+        unit_obj = MasUnit.objects.using("main").filter(
+            unitname=unit_name_or_code
+        ).first()
+
+        if not unit_obj:
+            unit_obj = MasUnit.objects.using("main").filter(
+                unitcode=unit_name_or_code
+            ).first()
+
+        if not unit_obj:
+            return JsonResponse({"error": "Selected unit not found in database!"}, status=404)
+
+        target_unit_code = unit_obj.unitcode  # New To Unit Code
+
+        updated_count = 0
+        current_time = datetime.now()
+
+        # 2. Ovvoru bundle-kum loop panrom
+        for bundid in bundids:
+            bundle = TrsMcutstickerprod.objects.using("demo").filter(bundid=bundid).first()
+            
+            if bundle:
+                old_unit_id = bundle.unit_id  # Current unit_id becomes from_unit
+                
+                # TrsMcutstickerprod table update: unit_id and unit_trs = 1
+                bundle.unit_id = target_unit_code
+                bundle.unit_trs = 1  # True / 1
+                bundle.save(using="demo")
+                
+                # sub_bundle_unit_transfer table-la ONLY CREATE (No update, logs every transfer)
+                sub_bundle_unit_transfer.objects.create(
+                    bundle_id=bundid,
+                    from_unit=old_unit_id if old_unit_id is not None else 0,
+                    to_unit=target_unit_code,
+                    date=current_time
+                )
+                updated_count += 1
+
+        return JsonResponse({
+            "message": "Transferred successfully and history logged",
+            "updated_count": updated_count,
+            "assigned_unitcode": target_unit_code
+        })
+
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "Invalid JSON"}, status=400)
+    except Exception as e:
+        print(f"Error: {str(e)}")
+        return JsonResponse({"error": str(e)}, status=500)
+    
 
 @require_GET
 def end_live_scan_data(request):

@@ -189,6 +189,7 @@ class TrsMcutstickerprod(models.Model):
     old = models.CharField(max_length=1, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)
     assembly_complected = models.CharField(max_length=1, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)
     unit_id = models.IntegerField(blank=True, null=True)
+    unit_trs = models.BooleanField()
 
     class Meta:
         managed = False
