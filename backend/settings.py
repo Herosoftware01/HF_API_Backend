@@ -109,7 +109,7 @@ INSTALLED_APPS = [
     'hr_module',
     'GateInward',
     'incentive_debit',
-
+    'weighing',
 
 ]
 
