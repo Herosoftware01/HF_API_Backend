@@ -2100,6 +2100,7 @@ def get_allocate_report(request):
 #     )
 
 
+
 @api_view(['GET', 'POST'])
 def get_allocate_live(request):
     unit_id = request.GET.get("unit")
@@ -2181,25 +2182,30 @@ def get_allocate_live(request):
         date__gte=shift_start,
         date__lt=shift_end
     ).values(
+        "id",
         "emp_code",
         "machine__Identity",
         "date",
-        "seq",       # E.g., "Shorts Side Pocket Attach, Shorts Pocket Dummy Stitch"
+        "seq",      # E.g., "Shorts Side Pocket Attach, Shorts Pocket Dummy Stitch"
         "jobno",
         "top_bottom", # e.g. "Pant" or TBID name matching tb_name
         "status"
     ))
 
     # --------------------------------
-    # SCANS
+    # SCANS (Included 'allocate_id' inside .values safely)
     # --------------------------------
+    emp_allocation_ids = [row["id"] for row in s_data]
+    
     scans = list(
         Assembly_data.objects.filter(
             unit=unit_id,
             line=assembly_line,
             entry_date__gte=shift_start,
             entry_date__lt=shift_end,
+            allocate_id__in=emp_allocation_ids,
         ).values(
+            "allocate_id",
             "machine",
             "job_no",
             "tb_name",
@@ -2304,7 +2310,6 @@ def get_allocate_live(request):
                 normalized(asm["seq"])
             ))
 
-
     def get_process_stock(job_no, top_bottom, process_des):
         op_key = operation_key(job_no, top_bottom, process_des)
         d_id = dep_id_map.get(op_key)
@@ -2325,10 +2330,6 @@ def get_allocate_live(request):
             b_job = prod["jobno"]
             b_id = prod["bundid"]
             pc_val = prod["pc"] or 0
-            scanned_seqs_for_bundle = [
-                desc for desc in and_list + or_list
-                if (normalized(b_job), normalized(top_bottom), normalized(b_id), desc) in assembly_scanned_map
-            ]
             
             matched_and = sum(1 for desc in and_list if (normalized(b_job), normalized(top_bottom), normalized(b_id), desc) in assembly_scanned_map)
             matched_or = sum(1 for desc in or_list if (normalized(b_job), normalized(top_bottom), normalized(b_id), desc) in assembly_scanned_map)
@@ -2344,6 +2345,11 @@ def get_allocate_live(request):
     hourly_totals = defaultdict(
         lambda: [0] * len(slot_ranges)
     )
+    
+    emp_hourly_totals = defaultdict(
+        lambda: [0] * len(slot_ranges)
+    )
+
     for scan in scans:
         scan_datetime = scan["entry_date"]
         if timezone.is_aware(scan_datetime):
@@ -2378,6 +2384,11 @@ def get_allocate_live(request):
         )
 
         hourly_totals[key][slot_index] += pieces
+        
+        alloc_id = scan.get("allocate_id")
+        if alloc_id:
+            emp_hourly_totals[alloc_id][slot_index] += pieces
+
     data = []
 
     for row in s_data:
@@ -2406,7 +2417,9 @@ def get_allocate_live(request):
             row["top_bottom"]
         )
 
-        employee_hours = hourly_totals[allocation_key]
+        employee_hours = emp_hourly_totals.get(row["id"])
+        if not employee_hours or sum(employee_hours) == 0:
+            employee_hours = hourly_totals[allocation_key]
 
         allocation_datetime = row["date"]
         if timezone.is_aware(allocation_datetime):
@@ -2465,6 +2478,8 @@ def get_allocate_live(request):
         data,
         safe=False
     )
+
+
 
 def machine_allocation_api(request):
     selected_date = request.GET.get("date")

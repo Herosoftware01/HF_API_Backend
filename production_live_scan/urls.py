@@ -33,6 +33,7 @@ urlpatterns = [
     path("delete_preporatory_dependency/", views.delete_preporatory_dependency, name="delete_preporatory_dependency"),
     path("get_stock_data/", views.get_stock_data_python, name="get_stock_data"),
     path("get_stock_summary/", views.get_stock_summary_python, name="get_stock_summary"),
+    path('api/bundle-detail/', views.bundle_detail_api, name='bundle-detail'),
 
     path(
         "users/",

@@ -2779,3 +2779,51 @@ def get_dependency_pc(request):
         "color": color,
         "data": result_data
     })
+
+
+@api_view(['GET'])
+def bundle_detail_api(request):
+    bundle_id = request.GET.get('bundle_id')
+    
+    if not bundle_id:
+        return Response({"error": "bundle_id parameter is required"}, status=status.HTTP_400_BAD_REQUEST)
+    
+    try:
+        # bundle_id allathu bdl_no vechu thedalaam
+        bundle = Assembly_data.objects.filter(bundle_id=bundle_id).first()
+        if not bundle:
+            bundle = Assembly_data.objects.filter(bdl_no=bundle_id).first()
+            
+        if not bundle:
+            return Response({"error": "Bundle not found"}, status=status.HTTP_404_NOT_FOUND)
+            
+        data = {
+            "id": bundle.id,
+            "unit": bundle.unit,
+            "line": bundle.line,
+            "job_no": bundle.job_no,
+            "tb_id": bundle.tb_id,
+            "tb_name": bundle.tb_name,
+            "machine": bundle.machine,
+            "seq": bundle.seq,
+            "date": bundle.date,
+            "bundle_id": bundle.bundle_id,
+            "bdl_no": bundle.bdl_no,
+            "mbud": bundle.mbud,
+            "size": bundle.size,
+            "size_id": bundle.size_id,
+            "color": bundle.color,
+            "pc": bundle.pc,
+            "entry_date": bundle.entry_date,
+            "scan": bundle.scan, # Boolean (True / False) or 1 / 0
+            "lot": bundle.lot,
+            "emp_id": bundle.emp_id,
+            "entry_mode": bundle.entry_mode,
+            "unit_transfer": bundle.unit_transfer,
+            "edit_data": bundle.edit_data,
+            "allocate_id": bundle.allocate_id
+        }
+        return Response(data, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
