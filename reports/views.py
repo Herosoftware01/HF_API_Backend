@@ -21,16 +21,13 @@ from .models import (
     Employeeworking1,
     BitcheckHour,
     StickerHour,
+    TrsPoDtls1New,
+    UnitPoVerify,
 )
 from django.http import JsonResponse
 import os
 import json
-from django.db.models import (
-    Q,
-    Count,
-    Sum,
-    Max
-)
+from django.db.models import( Q, Count, Sum, Max)
 from django.db import connections
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db.models import OuterRef, Subquery
@@ -42,6 +39,8 @@ from dateutil.relativedelta import relativedelta
 from collections import defaultdict
 from django.views.decorators.csrf import csrf_exempt
 import calendar
+from django.core.paginator import Paginator
+from django.views.decorators.http import require_GET
 from collections import OrderedDict
 
 # dt_timezone = timezone.make_aware(timezone.datetime(2012, 1, 1), timezone=timezone.UTC)
@@ -724,3 +723,91 @@ def Master_Repcut_Details(request):
 
         return JsonResponse({"message": "Records deleted successfully"})
 
+@require_GET
+def Fab_Details(request):
+# Pagination parameters
+    try:
+        page = max(1, int(request.GET.get("page", 1)))
+        page_size = int(request.GET.get("page_size", 100))
+        page_size = max(1, min(page_size, 200))
+    except (ValueError, TypeError):
+        return JsonResponse(
+        {"error": "Invalid page or page_size"},
+        status=400
+        )
+
+    # Query database for the requested page only
+    queryset = (
+        TrsPoDtls1New.objects.using("demo")
+        .all()
+        .order_by("-finaldelvdate")
+    )
+
+    paginator = Paginator(queryset, page_size)
+    page_obj = paginator.get_page(page)
+
+    # Fetch only the records on this page
+    datas = list(page_obj.object_list.values())
+
+    # Build verification lookup
+    verification_map = {
+        (
+            (v.order_no or "").strip().upper(),
+            (v.type or "").strip().upper(),
+            (v.description or "").strip().upper()
+        ): v.verify
+        for v in UnitPoVerify.objects.using('app').all()
+    }
+
+    for obj in datas:
+        # Image URL
+        raw_path = obj.get("mainimagepath")
+        obj["mainimagepath"] = (
+            "https://app.herofashion.com/order_image/"
+            + raw_path.split("\\")[-1]
+            if raw_path else ""
+        )
+
+        # Calculate balance and percentage
+        try:
+            weight = float(obj.get("weight") or 0)
+            poqty = float(obj.get("poqty") or 0)
+            ytrs = float(obj.get("ytrs") or 0)
+
+            balance = round(weight - (poqty + ytrs), 3)
+
+            if abs(balance) < 1e-9:
+                balance = 0
+
+            obj["balance"] = balance
+            obj["balance_percent"] = (
+                f"{round((balance / weight) * 100, 2)}%"
+                if weight > 0 else "0.00%"
+            )
+        except (ValueError, TypeError):
+            obj["balance"] = 0
+            obj["balance_percent"] = "0.00%"
+
+        # Verification status
+        key = (
+            (obj.get("orderno") or "").strip().upper(),
+            (obj.get("t") or "").strip().upper(),
+            (obj.get("clr") or "").strip().upper()
+        )
+        obj["verification"] = verification_map.get(key, False)
+
+        # Unique frontend ID
+        obj["id"] = (
+            obj.get("id")
+            or f'{obj.get("orderno") or ""}_{obj.get("t") or ""}'
+        )
+
+    return JsonResponse({
+        "results": datas,
+        "count": paginator.count,
+        "page": page_obj.number,
+        "page_size": page_size,
+        "total_pages": paginator.num_pages,
+        "has_next": page_obj.has_next(),
+        "has_previous": page_obj.has_previous(),
+    })

@@ -725,3 +725,39 @@ class Employeeworking(models.Model):
     class Meta:
         managed = False
         db_table = 'EmployeeWorking' 
+
+class TrsPoDtls1New(models.Model):
+    orderno = models.CharField(db_column='OrderNo', max_length=50, blank=True, null=True)
+    t = models.CharField(max_length=50, blank=True, null=True)
+    clr = models.CharField(max_length=250, blank=True, null=True)
+    weight = models.DecimalField(db_column='Weight', max_digits=18, decimal_places=3, blank=True, null=True)
+    uom = models.CharField(db_column='Uom', max_length=50, blank=True, null=True)
+    ytrs = models.DecimalField(db_column='Ytrs', max_digits=18, decimal_places=3, blank=True, null=True)
+    po = models.CharField(max_length=250, blank=True, null=True)
+    dt = models.CharField(max_length=250, blank=True, null=True)
+    poqty = models.DecimalField(max_digits=18, decimal_places=3, blank=True, null=True)
+    buyer = models.CharField(db_column='Buyer', max_length=15, blank=True, null=True)
+    merch = models.CharField(max_length=35, blank=True, null=True)
+    mainimagepath = models.CharField(max_length=511, blank=True, null=True)
+    finaldelvdate = models.DateTimeField(blank=True, null=True)
+    director_sample_order = models.CharField(db_column='Director_Sample_Order', max_length=6, blank=True, null=True)
+    u50 = models.CharField(max_length=7)
+    run_over = models.CharField(db_column='Run_over', max_length=7)
+    slfab = models.IntegerField(blank=True, null=True)
+    rownumber = models.BigIntegerField(db_column='RowNumber', primary_key=True)
+
+    class Meta:
+        managed = False
+        db_table = 'trs_po_dtls1new'
+
+class UnitPoVerify(models.Model):
+    id = models.BigAutoField(primary_key=True)
+    order_no = models.CharField(max_length=50, db_collation='Latin1_General_CI_AI')
+    type = models.CharField(max_length=50, db_collation='Latin1_General_CI_AI')
+    description = models.CharField(max_length=200, db_collation='Latin1_General_CI_AI')
+    verify = models.BooleanField()
+
+    class Meta:
+        managed = False
+        db_table = 'unit_po_verify'
+        unique_together = (('order_no', 'type', 'description'),)

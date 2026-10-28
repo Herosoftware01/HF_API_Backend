@@ -855,10 +855,9 @@ def AccessoryDel(request):
         })
 
 from django.db.models import Sum, Min
+
 def CutBalpend(request):
     qs = ViewCutBalpend.objects.using("demo").all()
-
-    # Normal: show all records
     if request.GET.get("merge") != "true":
         data = list(qs.values())
 

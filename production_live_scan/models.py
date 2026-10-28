@@ -55,6 +55,7 @@ class Assembly_data(models.Model):
     entry_mode = models.CharField(max_length=20, blank=True, null=True)
     unit_transfer = models.BooleanField(default=False)
     edit_data = models.BooleanField(default=False)
+    allocate_id = models.IntegerField()
     # process_des = models.CharField(max_length=500)
 
 
@@ -225,4 +226,25 @@ class user_unit_permission(models.Model):
                 name="unique_user_app_unit"
             )
         ]
-    
+
+################################
+
+class VueCutPlnStat(models.Model):
+    ordno = models.CharField(max_length=50, blank=True, null=True)
+    topbottom_id = models.IntegerField(db_column='Topbottom_id', blank=True, null=True)  # Field name made lowercase.
+    clr = models.CharField(max_length=50, blank=True, null=True)
+    siz = models.CharField(max_length=50, blank=True, null=True)
+    qty = models.IntegerField(blank=True, null=True)
+    ord1 = models.IntegerField(blank=True, null=True)
+    stk = models.IntegerField(blank=True, null=True)
+    stkact = models.IntegerField(blank=True, null=True)
+    ord2 = models.IntegerField(blank=True, null=True)
+    ordact2 = models.IntegerField(blank=True, null=True)
+    zsact = models.IntegerField()
+    zoact = models.IntegerField()
+    hcut = models.IntegerField(blank=True, null=True)
+    rjqty = models.IntegerField()
+
+    class Meta:
+        managed = False
+        db_table = 'vue_cut_pln_stat'
