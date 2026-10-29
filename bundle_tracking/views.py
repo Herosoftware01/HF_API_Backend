@@ -1,152 +1,144 @@
 from collections import Counter
-from datetime import datetime,date
-from django.http import JsonResponse
-from .models import TrsCdelPcs21,TrsCdelPcs1,MasUnit,Bundlereport,TrsMcutstickerprod,MasTopbottom,Msizes
-from django.views.decorators.csrf import csrf_exempt
-from django.utils import timezone
+from datetime import datetime
 import json
-from django.shortcuts import redirect
-from django.db.models import Q,Count
+import re
+
+from django.db.models import Count, Q
+from django.http import JsonResponse
+from django.utils import timezone
+from django.views.decorators.csrf import csrf_exempt
+
+from .models import (
+    Bundlereport,
+    MasTopbottom,
+    MasUnit,
+    Msizes,
+    TrsCdelPcs1,
+    TrsCdelPcs21,
+    TrsMcutstickerprod,
+)
+
+SYSTEM_START_DATE = datetime(2026, 10, 1, 0, 0, 0)
 
 
+# ==============================================================================
+# Helper Functions
+# ==============================================================================
 
-def resolve_unit_code(raw_value, unit_lookup=None):
+def resolve_unit(raw_value):
     if raw_value is None:
-        raise ValueError("unitid is required")
+        raise ValueError("Unit ID is required")
 
-    value = str(raw_value).strip()
-    if not value:
-        raise ValueError("unitid is required")
+    val_str = str(raw_value).strip()
+    if not val_str:
+        raise ValueError("Unit ID is required")
 
-    try:
-        return int(value)
-    except ValueError:
-        if unit_lookup is not None:
-            resolved = unit_lookup(value)
-            if resolved is not None:
-                return int(resolved)
+    unit = MasUnit.objects.using("main").filter(unitname__iexact=val_str).first()
+    if not unit and val_str.isdigit():
+        unit = MasUnit.objects.using("main").filter(unitcode=int(val_str)).first()
 
-        raise ValueError(f"Unsupported unit id: {raw_value}")
+    if not unit:
+        num_part = re.sub(r"[^\d]", "", val_str)
+        if num_part:
+            unit = MasUnit.objects.using("main").filter(unitcode=int(num_part)).first()
 
+    if not unit:
+        if val_str.isdigit():
+            return None, int(val_str), val_str
+        raise ValueError(f"Unit could not be resolved from identifier: {raw_value}")
+
+    return unit, unit.unitcode, unit.unitname
+
+
+def _get_search_mbuds(mbund_id):
+    """
+    Returns search query IDs for TrsMcutstickerprod.mbud.
+    Matches either pcs21.id or pcs21.mbundid.
+    """
+    clean_id = str(mbund_id).strip()
+    pcs21 = TrsCdelPcs21.objects.using("demo").filter(mbundid=clean_id).first()
+    ids = [clean_id]
+    if pcs21:
+        ids.append(pcs21.id)
+        if str(pcs21.id) not in ids:
+            ids.append(str(pcs21.id))
+    return ids
+
+def _get_bundle_context(mbund_id):
+    """
+    Finds the exact pcs21 and pcs1 records for a master bundle.
+    """
+    clean_id = str(mbund_id).strip()
+    pcs21 = TrsCdelPcs21.objects.using("demo").filter(mbundid=clean_id).first()
+    pcs1 = None
+    if pcs21:
+        pcs1 = TrsCdelPcs1.objects.using("demo").filter(id=pcs21.id).first()
+    return pcs21, pcs1
+
+# ==============================================================================
+# Views
+# ==============================================================================
 
 @csrf_exempt
 def bundle_home(request):
-
-    pcs21 = list(
-        TrsCdelPcs21.objects.using('demo')
-        .values('id', 'mbundid', 'mbappr')
+    unapproved_pcs21 = list(
+        TrsCdelPcs21.objects.using("demo")
+        .filter(mbappr=0)
+        .values("id", "mbundid")
     )
+    dc_ids = list({p["id"] for p in unapproved_pcs21})
 
-    ids = list(set(p["id"] for p in pcs21))
-
-    start_dt = datetime(2026, 10, 1, 0, 0, 0)
-
-    pcs11_qs = TrsCdelPcs1.objects.using('demo').filter(
-        id__in=ids,
-        dt__gte=start_dt
-    ).values(
-        'id',
-        'unitid'
+    pcs1_qs = list(
+        TrsCdelPcs1.objects.using("demo")
+        .filter(id__in=dc_ids, dt__gte=SYSTEM_START_DATE)
+        .values("id", "unitid")
     )
+    pcs1_map = {row["id"]: row["unitid"] for row in pcs1_qs}
 
-    pcs11_map = {row["id"]: row for row in pcs11_qs}
-
-    unitids = list(
-        set(
-            row['unitid']
-            for row in pcs11_qs
-            if row['unitid'] is not None
-        )
-    )
-
-    units_qs = MasUnit.objects.using('main').filter(
-        unitcode__in=unitids
-    ).values(
-        'unitcode',
-        'unitname'
-    )
-
-    units_map = {
-        u['unitcode']: u['unitname']
-        for u in units_qs
-    }
+    all_units = list(MasUnit.objects.using("main").values("unitcode", "unitname"))
+    unit_map = {u["unitcode"]: u["unitname"] for u in all_units}
 
     master_counter = Counter()
-
-    for p21 in pcs21:
-
-        p11 = pcs11_map.get(p21["id"])
-
-        if not p11:
-            continue
-
-        unitid = p11.get("unitid")
-        unitname = units_map.get(unitid)
-
-        if unitname and p21["mbappr"] == 0:
+    for p21 in unapproved_pcs21:
+        unitcode = pcs1_map.get(p21["id"])
+        unitname = unit_map.get(unitcode)
+        if unitname:
             master_counter[unitname] += 1
 
     pending_counter = Counter()
+    pending_reports = Bundlereport.objects.using("app").filter(
+        scan=0, 
+        s_date__gte=SYSTEM_START_DATE
+    ).values("mbundle_id", "unit_id")
 
-    bundle_reports = Bundlereport.objects.using('app').filter(
-        scan=0,
-        s_date__gte=start_dt
-    ).values(
-        'mbundle_id',
-        'unit_id'
-    )
+    for report in pending_reports:
+        mbund_id = report["mbundle_id"]
+        unit_key = report["unit_id"]
 
-    mbundid_to_unit = {
-        int(br["mbundle_id"]): br["unit_id"]
-        for br in bundle_reports
-        if str(br["mbundle_id"]).isdigit()
-    }
+        try:
+            target_unit_name = unit_map.get(int(unit_key), str(unit_key))
+        except (ValueError, TypeError):
+            target_unit_name = str(unit_key)
 
-    pcs21_map = {
-        p["mbundid"]: p["id"]
-        for p in TrsCdelPcs21.objects.using('demo').values(
-            'mbundid',
-            'id'
-        )
-    }
-
-    for mbundid, unit_id in mbundid_to_unit.items():
-
-        pcs21_id = pcs21_map.get(mbundid)
-
-        if not pcs21_id:
-            continue
-
-        pending_child_count = (
-            TrsMcutstickerprod.objects.using('demo')
-            .filter(
-                mbud=pcs21_id,
-                scan=0
-            )
+        search_mbuds = _get_search_mbuds(mbund_id)
+        child_pending = (
+            TrsMcutstickerprod.objects.using("demo")
+            .filter(mbud__in=search_mbuds, scan__in=[0, "0", None])
             .count()
         )
+        if child_pending > 0:
+            pending_counter[target_unit_name] += child_pending
 
-        if pending_child_count > 0:
-
-            unit_name = units_map.get(int(unit_id))
-
-            if unit_name:
-                pending_counter[unit_name] += pending_child_count
-
-    all_units = sorted(
-        set(master_counter.keys()) |
-        set(pending_counter.keys())
-    )
-
+    all_unit_names = sorted(list(set(unit_map.values())))
     response_data = []
-
-    for unit in all_units:
-
+    for uname in all_unit_names:
+        m_count = master_counter.get(uname, 0)
+        p_count = pending_counter.get(uname, 0)
         response_data.append({
-            "unit_name": unit,
-            "master_bundle_count": master_counter.get(unit, 0),
-            "pending_child_bundle_count": pending_counter.get(unit, 0),
-            "detail_url": f"/bundle_tracking/allocate_unit/{unit}/"
+            "unit_name": uname,
+            "master_bundle_count": m_count,
+            "pending_child_bundle_count": p_count,
+            "detail_url": f"/bundle_tracking/allocate_unit/{uname}/"
         })
 
     return JsonResponse({
@@ -156,542 +148,303 @@ def bundle_home(request):
     })
 
 
-
 @csrf_exempt
 def allocate_unit(request, unitname=None):
+    raw_unit = unitname or request.GET.get("unit_name")
+    try:
+        unit, unit_code, unit_name = resolve_unit(raw_unit)
+    except ValueError as e:
+        return JsonResponse({"status": False, "message": str(e)}, status=400)
 
-    unitname = unitname or request.GET.get("unit_name")
-
-    if not unitname:
-        return JsonResponse({
-            "status": False,
-            "message": "unit_name is required"
-        }, status=400)
-
+    pcs21_qs = TrsCdelPcs21.objects.using("demo").filter(mbappr=0)
     mbundid_filter = request.GET.get("mbundid")
-
-    pcs21_qs = TrsCdelPcs21.objects.using('demo').filter(
-        mbappr=0
-    )
-
     if mbundid_filter:
-        pcs21_qs = pcs21_qs.filter(
-            mbundid=mbundid_filter
-        )
+        pcs21_qs = pcs21_qs.filter(mbundid=mbundid_filter)
 
-    pcs21_qs = pcs21_qs.values(
-        'id',
-        'mbundid',
-        'mbappr'
+    pcs21_rows = list(pcs21_qs.values("id", "mbundid", "mbappr"))
+    dc_ids = [p["id"] for p in pcs21_rows]
+
+    pcs1_rows = list(
+        TrsCdelPcs1.objects.using("demo")
+        .filter(id__in=dc_ids, unitid=unit_code, dt__gte=SYSTEM_START_DATE)
+        .values("id", "dt", "unitid", "jobno", "tbid", "totbdl", "totpcs", "del_remarks")
     )
+    pcs1_map = {row["id"]: row for row in pcs1_rows}
 
-    ids = [p['id'] for p in pcs21_qs]
-
-    start_dt = datetime(2026, 10, 1, 0, 0, 0)
-
-    pcs11_qs = TrsCdelPcs1.objects.using('demo').filter(
-        id__in=ids,
-        dt__gte=start_dt
-    ).values(
-        'id',
-        'dt',
-        'unitid',
-        'jobno',
-        'tbid',
-        'totbdl',
-        'totpcs',
-        'del_remarks'
-    )
-
-    pcs11_map = {
-        row['id']: row
-        for row in pcs11_qs
-    }
-
-    unitids = set(
-        row['unitid']
-        for row in pcs11_qs
-        if row['unitid'] is not None
-    )
-
-    units_qs = MasUnit.objects.using('main').filter(
-        unitcode__in=unitids
-    ).values(
-        'unitcode',
-        'unitname'
-    )
-
-    units_map = {
-        u['unitcode']: u['unitname']
-        for u in units_qs
-    }
-
-    current_unit_id = None
-
-    for uid, uname in units_map.items():
-
-        if uname.upper() == unitname.upper():
-            current_unit_id = uid
-            break
-
-    tbids = set(
-        row['tbid']
-        for row in pcs11_qs
-        if row['tbid'] is not None
-    )
-
-    topbottom_map = dict(
-        MasTopbottom.objects.using('main')
-        .filter(
-            topbottom_id__in=tbids
-        )
-        .values_list(
-            'topbottom_id',
-            'topbottom_des'
-        )
-    )
-
-    records = []
-
-    for p21 in pcs21_qs:
-
-        p11 = pcs11_map.get(
-            p21['id'],
-            {}
-        )
-
-        unitid_row = p11.get('unitid')
-
-        unitname_db = units_map.get(
-            unitid_row,
-            ""
-        )
-
-        if unitname_db.upper() != unitname.upper():
-            continue
-
-        records.append({
-            "id": p21["id"],
-            "mbundid": p21["mbundid"],
-            "mbappr": p21["mbappr"],
-            "dt": p11.get("dt"),
-            "unitid": unitid_row,
-            "jobno": p11.get("jobno"),
-            "tbid": topbottom_map.get(
-                p11.get('tbid')
-            ),
-            "totbdl": p11.get("totbdl"),
-            "totpcs": p11.get("totpcs"),
-            "del_remarks": p11.get("del_remarks"),
-        })
-
-    dc_counts = Counter(
-        record['id']
-        for record in records
-    )
-
-    return JsonResponse({
-        "status": True,
-        "unitname": unitname,
-        "unitid": current_unit_id,
-        "count": len(records),
-        "records": records,
-        "dc_counts": dict(dc_counts)
-    })
-
-@csrf_exempt
-def approve_bundle(request):
-    if request.method == "POST":
-        mbundid = request.POST.get("mbundid")
-        raw_unitid = request.POST.get("unitid")
-
-        try:
-            current_unitid = resolve_unit_code(
-                raw_unitid,
-                unit_lookup=lambda unit_name: MasUnit.objects.using("main")
-                .filter(unitname__iexact=unit_name)
-                .values_list("unitcode", flat=True)
-                .first()
-            )
-        except ValueError as exc:
-            return JsonResponse({"status": "error", "message": str(exc)}, status=400)
-
-        print("bundle and unit id is ", mbundid, current_unitid)
-
-        try:
-            # Step 1: Get pcs21 record
-            pcs21 = TrsCdelPcs21.objects.using('demo').get(mbundid=mbundid)
-        except TrsCdelPcs21.DoesNotExist:
-            return JsonResponse({"status": "error", "message": f"Bundle {mbundid} not found"}, status=404)
-
-        # Step 2: Get corresponding pcs1 record and related data
-        try:
-            pcs1 = TrsCdelPcs1.objects.using('demo').get(id=pcs21.id)
-            unit = MasUnit.objects.using('main').get(unitcode=pcs1.unitid)
-            unit_name = unit.unitname
-            topbottom = MasTopbottom.objects.using('main').get(topbottom_id=pcs1.tbid)
-        except TrsCdelPcs1.DoesNotExist:
-            return JsonResponse({"status": "error", "message": "Matching record not found in pcs1"}, status=404)
-        except MasUnit.DoesNotExist:
-            return JsonResponse({"status": "error", "message": f"Unit with code {pcs1.unitid} not found"}, status=404)
-        except MasTopbottom.DoesNotExist:
-            return JsonResponse({"status": "error", "message": f"Top/Bottom description for id {pcs1.tbid} not found"}, status=404)
-
-        # Step 3: Check unitid
-        if pcs1.unitid != current_unitid:
-            return JsonResponse({"status": "error", "message": f"This bundle {mbundid} belongs to another unit: {unit_name}"}, status=400)
-
-        # Step 4: Approve or show already approved
-        if pcs21.mbappr == 1:
-            return JsonResponse({
-                "status": "warning",
-                "message": f"This bundle {mbundid} already approved"
-            }, status=200)
-
-        pcs21.mbappr = 1
-        pcs21.save(using='demo')
-
-        Bundlereport.objects.using('app').create(
-            s_date=datetime.now(),
-            job_no=pcs1.jobno,
-            unit_id=current_unitid,
-            mbundle_id=pcs21.mbundid,
-            tb_name=str(pcs1.tbid),
-            total_bundles=pcs1.totbdl,  # safer from pcs1
-            pcs_count=pcs1.totpcs,
-            r_date=None,
-            scan=0                      # scanned successfully
-        )
-
-        return JsonResponse({"status": "success", "message": f"Bundle {mbundid} approved successfully"})
-
-    return JsonResponse({"status": "error", "message": "Invalid request"}, status=400)
-
-
-def _get_completed_mbud_set(mbund_ids):
-    """
-    Returns a set of mbud IDs where ALL child records in TrsMcutstickerprod 
-    have scan = 1 (or '1'). Handles string/int discrepancies.
-    """
-    if not mbund_ids:
-        return set()
-
-    # Get counts of total vs scanned for each mbud
-    child_stats = (
-        TrsMcutstickerprod.objects.using("demo")
-        .filter(mbud__in=mbund_ids)
-        .values("mbud")
-        .annotate(
-            total=Count("bundid"),
-            scanned=Count("bundid", filter=Q(scan__in=[1, "1", True]))
-        )
-    )
-
-    completed_mbuds = set()
-    for row in child_stats:
-        if row["total"] > 0 and row["total"] == row["scanned"]:
-            completed_mbuds.add(str(row["mbud"]).strip())
-
-    return completed_mbuds
-
-
-def sub_bundle_report(request, unit_id):
-    start_dt = datetime(2026, 10, 1, 0, 0, 0)
-    unit, unit_code, unit_number = _resolve_unit_for_value(unit_id)
-
-    # 1. Fetch only pending (scan=0) Bundlereport entries
-    bundles_qs = Bundlereport.objects.using("app").filter(
-        Q(unit_id=unit_code) | Q(unit_id=unit_number),
-        scan=0,
-        s_date__gte=start_dt
-    ).order_by("-s_date")
-
-    candidate_ids = [b.mbundle_id for b in bundles_qs if b.mbundle_id]
-    completed_mbuds = _get_completed_mbud_set(candidate_ids)
-
-    bundle_data = []
-    for bundle in bundles_qs:
-        clean_mb_id = str(bundle.mbundle_id).strip()
-        # BACKEND VALIDATION: Skip if all child bundles are already scanned
-        if clean_mb_id in completed_mbuds:
-            # Self-healing: mark Bundlereport as completed in background
-            Bundlereport.objects.using("app").filter(id=bundle.id).update(
-                scan=1, 
-                r_date=timezone.now().date()
-            )
-            continue
-
-        bundle_data.append({
-            "id": bundle.id,
-            "unit_id": bundle.unit_id,
-            "mbundle_id": bundle.mbundle_id,
-            "bundle_no": getattr(bundle, "bundle_no", None),
-            "job_no": getattr(bundle, "job_no", None),
-            "tb_name": getattr(bundle, "tb_name", None),
-            "total_bundles": getattr(bundle, "total_bundles", None),
-            "pcs_count": getattr(bundle, "pcs_count", None),
-            "scan": int(bundle.scan or 0),
-            "S_date": bundle.s_date.strftime("%Y-%m-%d %H:%M:%S") if bundle.s_date else None,
-        })
-
-    # 2. Fallback to PCS21 if Bundlereport has no active rows
-    if not bundle_data and unit:
-        bundle_data = _pending_master_bundles_for_unit(unit, start_dt)
-
-    return JsonResponse({
-        "status": True,
-        "unit_id": unit_id,
-        "unit_name": unit.unitname if unit else unit_id,
-        "count": len(bundle_data),
-        "bundles": bundle_data
-    })
-
-
-def _resolve_unit_for_value(unit_id):
-    unit_code = str(unit_id).strip()
-    unit_number = unit_code.upper().replace("UNIT-", "")
-
-    unit_lookup = Q(unitname__iexact=unit_code)
-    if unit_number.isdigit():
-        unit_lookup |= Q(unitcode=int(unit_number))
-
-    unit = MasUnit.objects.using("main").filter(unit_lookup).first()
-    return unit, unit_code, unit_number
-
-
-def _pending_master_bundles_for_unit(unit, start_dt):
-    pcs21_qs = TrsCdelPcs21.objects.using("demo").filter(
-        mbappr=0
-    ).values(
-        "id",
-        "mbundid",
-        "mbappr"
-    )
-
-    pcs21_by_id = {
-        row["id"]: row
-        for row in pcs21_qs
-    }
-
-    pcs1_qs = TrsCdelPcs1.objects.using("demo").filter(
-        id__in=pcs21_by_id.keys(),
-        unitid=unit.unitcode,
-        dt__gte=start_dt
-    ).values(
-        "id",
-        "dt",
-        "unitid",
-        "jobno",
-        "tbid",
-        "totbdl",
-        "totpcs"
-    ).order_by("-dt")
-
-    tbids = {
-        row["tbid"]
-        for row in pcs1_qs
-        if row["tbid"] is not None
-    }
-
+    tbids = {r["tbid"] for r in pcs1_rows if r.get("tbid")}
     topbottom_map = dict(
         MasTopbottom.objects.using("main")
         .filter(topbottom_id__in=tbids)
         .values_list("topbottom_id", "topbottom_des")
     )
 
-    bundle_data = []
-    for pcs1 in pcs1_qs:
-        pcs21 = pcs21_by_id.get(pcs1["id"])
-        if not pcs21:
+    records = []
+    for p21 in pcs21_rows:
+        p1 = pcs1_map.get(p21["id"])
+        if not p1:
             continue
 
-        bundle_data.append({
-            "id": pcs21["id"],
-            "unit_id": str(pcs1["unitid"]),
-            "mbundle_id": str(pcs21["mbundid"]),
-            "bundle_no": None,
-            "job_no": pcs1["jobno"],
-            "tb_name": topbottom_map.get(pcs1["tbid"], pcs1["tbid"]),
-            "total_bundles": pcs1["totbdl"],
-            "pcs_count": pcs1["totpcs"],
-            "scan": int(pcs21["mbappr"] or 0),
-            "S_date": pcs1["dt"].strftime("%Y-%m-%d %H:%M:%S") if pcs1["dt"] else None,
+        records.append({
+            "id": p21["id"],
+            "mbundid": p21["mbundid"],
+            "mbappr": p21["mbappr"],
+            "dt": p1.get("dt"),
+            "unitid": p1.get("unitid"),
+            "jobno": p1.get("jobno"),
+            "tbid": topbottom_map.get(p1.get("tbid")),
+            "totbdl": p1.get("totbdl"),
+            "totpcs": p1.get("totpcs"),
+            "del_remarks": p1.get("del_remarks"),
         })
 
-    return bundle_data
+    dc_counts = Counter(r["id"] for r in records)
+
+    return JsonResponse({
+        "status": True,
+        "unitname": unit_name,
+        "unitid": unit_code,
+        "count": len(records),
+        "total_dc": len(dc_counts),
+        "records": records,
+        "dc_counts": dict(dc_counts)
+    })
 
 
 @csrf_exempt
-def fetch_bundle_details(request):
-    if request.method == "POST":
-        mbundid = request.POST.get("mbundid")
-        unit_id = request.POST.get("unit_id")
-        start_dt = datetime(2026, 10, 1, 0, 0, 0)
-      
-
-        print("mbundid, unit_id", mbundid, unit_id)
-
-        unit, unit_code, unit_number = _resolve_unit_for_value(unit_id)
-
-        # 1️⃣ CHECK BundleReport FIRST
-        exists = Bundlereport.objects.using("app").filter(
-            mbundle_id=mbundid,
-            scan=0
-        ).filter(
-            Q(unit_id=unit_code) | Q(unit_id=unit_number)
-        ).exists()
-
-        # 2️⃣ GET PCS21
-        try:
-            pcs21 = TrsCdelPcs21.objects.using("demo").get(mbundid=mbundid)
-        except TrsCdelPcs21.DoesNotExist:
-            return JsonResponse({
-                "status": "error",
-                "message": "Bundle not found in PCS21"
-            })
-
-        # 3️⃣ GET PCS3 ROWS
-        pcs3_qs = TrsMcutstickerprod.objects.using("demo").filter(mbud=pcs21.mbundid)
-
-        if not pcs3_qs.exists():
-            return JsonResponse({
-                "status": "error",
-                "message": "No PCS3 data found"
-            })
-
-        data = list(pcs3_qs.values(
-            "bund_id",
-            "sizid",
-            "lotno",
-            "bdl",
-            "pc",
-            "comboclr",
-            "bundid",
-            "scan",
-        ))
-
-        # Fetch IDs first, then query Msizes on its own database.
-        size_ids = {row["sizid"] for row in data if row["sizid"] is not None}
-        size_names = dict(
-            Msizes.objects.using("test")
-            .filter(id__in=size_ids)
-            .values_list("id", "name")
-        )
-
-        for row in data:
-            row["sizname"] = size_names.get(row["sizid"])
-
-        return JsonResponse({
-            "status": "success",
-            "mbundid": mbundid,
-            "rows": data,
-        })
-
-    return JsonResponse({"status": "error", "message": "Invalid request"})
-
-
-def _resolve_unit_for_value(unit_id):
-    unit_code = str(unit_id).strip()
-
-    # 1. First, prioritize exact name match (e.g., "UNIT-4")
-    unit = MasUnit.objects.using("main").filter(unitname__iexact=unit_code).first()
-
-    # 2. Fallback: If it's a pure number (e.g., "55"), look up by unitcode
-    if not unit and unit_code.isdigit():
-        unit = MasUnit.objects.using("main").filter(unitcode=int(unit_code)).first()
-
-    # 3. Get the true database ID if the unit was found
-    unit_number = str(unit.unitcode) if unit else unit_code
-
-    return unit, unit_code, unit_number
-
-def _pending_master_bundles_for_unit(unit, start_dt):
-    pcs21_qs = TrsCdelPcs21.objects.using("demo").filter(
-        mbappr=0
-    ).values("id", "mbundid", "mbappr")
-
-    pcs21_by_id = {row["id"]: row for row in pcs21_qs}
-
-    pcs1_qs = TrsCdelPcs1.objects.using("demo").filter(
-        id__in=pcs21_by_id.keys(),
-        unitid=unit.unitcode,
-        dt__gte=start_dt
-    ).values("id", "dt", "unitid", "jobno", "tbid", "totbdl", "totpcs").order_by("-dt")
-
-    mbund_ids = [row["mbundid"] for row in pcs21_qs if row.get("mbundid")]
-    completed_mbuds = _get_completed_mbud_set(mbund_ids)
-
-    bundle_data = []
-    for pcs1 in pcs1_qs:
-        pcs21 = pcs21_by_id.get(pcs1["id"])
-        if not pcs21:
-            continue
-
-        clean_mb_id = str(pcs21["mbundid"]).strip()
-        # BACKEND VALIDATION: Skip if completed
-        if clean_mb_id in completed_mbuds:
-            continue
-
-        bundle_data.append({
-            "id": pcs21["id"],
-            "unit_id": str(pcs1["unitid"]),
-            "mbundle_id": str(pcs21["mbundid"]),
-            "bundle_no": None,
-            "job_no": pcs1["jobno"],
-            "tb_name": str(pcs1["tbid"]),
-            "total_bundles": pcs1["totbdl"],
-            "pcs_count": pcs1["totpcs"],
-            "scan": int(pcs21["mbappr"] or 0),
-            "S_date": pcs1["dt"].strftime("%Y-%m-%d %H:%M:%S") if pcs1["dt"] else None,
-        })
-
-    return bundle_data
-
-@csrf_exempt
-def update_child_bundle_scan(request):
+def approve_bundle(request):
+    """
+    Receives Master Bundle barcode into unit:
+    1. Validates that the bundle belongs to the given unit code.
+    2. Updates TrsCdelPcs21.mbappr = 1.
+    3. Resets child stickers in TrsMcutstickerprod to scan = '0' so they require scanning!
+    4. Creates Bundlereport entry with scan = 0.
+    """
     if request.method != "POST":
-        return JsonResponse({"status": "error", "message": "Invalid request"})
+        return JsonResponse({"status": "error", "message": "POST method required"}, status=405)
 
-    bundid = request.POST.get("bundid")
     mbundid = request.POST.get("mbundid")
-    unit_id = request.POST.get("unit_id")
+    raw_unitid = request.POST.get("unitid")
 
-    if not bundid or not mbundid or not unit_id:
-        return JsonResponse({"status": "error", "message": "Missing data"}, status=400)
+    if not mbundid or not raw_unitid:
+        return JsonResponse({"status": "error", "message": "mbundid and unitid are required"}, status=400)
+
+    try:
+        _, current_unit_code, _ = resolve_unit(raw_unitid)
+    except ValueError as e:
+        return JsonResponse({"status": "error", "message": str(e)}, status=400)
 
     try:
         pcs21 = TrsCdelPcs21.objects.using("demo").get(mbundid=mbundid)
     except TrsCdelPcs21.DoesNotExist:
+        return JsonResponse({"status": "error", "message": f"Bundle {mbundid} not found"}, status=404)
+
+    try:
+        pcs1 = TrsCdelPcs1.objects.using("demo").get(id=pcs21.id)
+    except TrsCdelPcs1.DoesNotExist:
+        return JsonResponse({"status": "error", "message": "Matching DC record not found in PCS1"}, status=404)
+
+    if pcs1.unitid != current_unit_code:
+        expected_unit = MasUnit.objects.using("main").filter(unitcode=pcs1.unitid).first()
+        expected_name = expected_unit.unitname if expected_unit else str(pcs1.unitid)
+        return JsonResponse({
+            "status": "error",
+            "message": f"Bundle {mbundid} belongs to {expected_name}, not this unit."
+        }, status=400)
+
+    if pcs21.mbappr == 1:
+        return JsonResponse({
+            "status": "warning",
+            "message": f"Bundle {mbundid} is already approved"
+        }, status=200)
+
+    pcs21.mbappr = 1
+    pcs21.save(using="demo")
+
+    # IMPORTANT: Ensure all sub-stickers under this master bundle are ready with scan = '0'
+    # so they are NOT treated as already completed!
+    search_mbuds = [pcs21.id, pcs21.mbundid, str(pcs21.id), str(pcs21.mbundid)]
+    TrsMcutstickerprod.objects.using("demo").filter(mbud__in=search_mbuds).update(scan="0")
+
+    # Create tracking row in Bundlereport
+    Bundlereport.objects.using("app").create(
+        s_date=timezone.now(),
+        job_no=pcs1.jobno,
+        unit_id=str(pcs1.unitid),
+        mbundle_id=str(pcs21.mbundid),
+        tb_name=str(pcs1.tbid),
+        total_bundles=pcs1.totbdl,
+        pcs_count=pcs1.totpcs,
+        r_date=None,
+        scan=0  # Must be 0
+    )
+
+    return JsonResponse({"status": "success", "message": f"Bundle {mbundid} approved successfully"})
+
+
+def sub_bundle_report(request, unit_id):
+    """
+    Returns pending master bundles for sub-bundle scanning.
+    ONLY bundles with scan=0 are returned.
+    Does NOT auto-update unit_bundlereport to scan=1.
+    """
+    try:
+        unit, unit_code, unit_name = resolve_unit(unit_id)
+    except ValueError as e:
+        return JsonResponse({"status": False, "message": str(e)}, status=400)
+
+    bundles_qs = Bundlereport.objects.using("app").filter(
+        Q(unit_id=str(unit_code)) | Q(unit_id=unit_name),
+        scan=0,
+        s_date__gte=SYSTEM_START_DATE
+    ).order_by("-s_date")
+
+    bundle_data = []
+    for bundle in bundles_qs:
+        bundle_data.append({
+            "id": bundle.id,
+            "unit_id": str(bundle.unit_id),
+            "mbundle_id": bundle.mbundle_id,
+            "bundle_no": bundle.mbundle_id,
+            "job_no": bundle.job_no,
+            "tb_name": bundle.tb_name,
+            "total_bundles": bundle.total_bundles,
+            "pcs_count": bundle.pcs_count,
+            "scan": int(bundle.scan or 0),
+            "S_date": bundle.s_date.strftime("%Y-%m-%d %H:%M:%S") if bundle.s_date else None,
+        })
+
+    return JsonResponse({
+        "status": True,
+        "unit_id": unit_code,
+        "unit_name": unit_name,
+        "count": len(bundle_data),
+        "bundles": bundle_data
+    })
+
+
+@csrf_exempt
+def fetch_bundle_details(request):
+    if request.method != "POST":
+        return JsonResponse({"status": "error", "message": "POST required"}, status=405)
+
+    mbundid = request.POST.get("mbundid")
+    if not mbundid:
+        return JsonResponse({"status": "error", "message": "mbundid is required"}, status=400)
+
+    clean_mbundid = str(mbundid).strip()
+    pcs21, pcs1 = _get_bundle_context(clean_mbundid)
+
+    # 1. Search strictly by mbundid first
+    pcs3_qs = TrsMcutstickerprod.objects.using("demo").filter(mbud=clean_mbundid)
+
+    # 2. If no direct match by mbud, filter with jobno context to prevent cross-contamination
+    if not pcs3_qs.exists() and pcs1 and pcs1.jobno:
+        # Check if stickers match by jobno and master bundle id or sticker prefix
+        pcs3_qs = TrsMcutstickerprod.objects.using("demo").filter(
+            Q(mbud=clean_mbundid) | Q(bundid__icontains=clean_mbundid)
+        )
+
+    # If still not found, search with fallback but never use small integers like pcs21.id blindly
+    if not pcs3_qs.exists():
+        return JsonResponse({
+            "status": "error", 
+            "message": f"No child bundle records found for Master Bundle {clean_mbundid}"
+        })
+
+    data = list(pcs3_qs.values(
+        "bund_id",
+        "sizid",
+        "lotno",
+        "bdl",
+        "pc",
+        "comboclr",
+        "bundid",
+        "scan"
+    ))
+
+    size_ids = {row["sizid"] for row in data if row.get("sizid") is not None}
+    size_names = dict(
+        Msizes.objects.using("test")
+        .filter(id__in=size_ids)
+        .values_list("id", "name")
+    )
+
+    for row in data:
+        row["sizname"] = size_names.get(row["sizid"], str(row.get("sizid", "")))
+        row["scan"] = 1 if str(row.get("scan")).strip() in ["1", "True"] else 0
+
+    return JsonResponse({
+        "status": "success",
+        "mbundid": clean_mbundid,
+        "rows": data
+    })
+
+
+# ==============================================================================
+# Fixed update_child_bundle_scan
+# ==============================================================================
+
+@csrf_exempt
+def update_child_bundle_scan(request):
+    if request.method != "POST":
+        return JsonResponse({"status": "error", "message": "POST required"}, status=405)
+
+    bundid = request.POST.get("bundid")
+    mbundid = request.POST.get("mbundid")
+
+    if not bundid or not mbundid:
+        return JsonResponse({"status": "error", "message": "bundid and mbundid required"}, status=400)
+
+    clean_mbundid = str(mbundid).strip()
+    clean_bundid = str(bundid).strip()
+
+    pcs21, pcs1 = _get_bundle_context(clean_mbundid)
+    if not pcs21:
         return JsonResponse({"status": "error", "message": "Invalid master bundle"}, status=404)
 
-    # Update child row
+    target_unit_id = pcs1.unitid if pcs1 else None
+
+    # Handle ~0 format variants
+    possible_ids = [clean_bundid]
+    if clean_bundid.endswith("~0"):
+        possible_ids.append(clean_bundid[:-2])
+    else:
+        possible_ids.append(clean_bundid + "~0")
+
+    # Update only the child sticker belonging to this master bundle
     updated = TrsMcutstickerprod.objects.using("demo").filter(
-        mbud=pcs21.mbundid,
-        bundid=bundid
-    ).update(scan=1)
+        mbud=clean_mbundid,
+        bundid__in=possible_ids
+    ).update(
+        scan="1",
+        unit_id=target_unit_id
+    )
 
     if updated == 0:
-        return JsonResponse({"status": "error", "message": "Child bundle not found"}, status=404)
+        # Fallback if mbud is stored differently in TrsMcutstickerprod
+        updated = TrsMcutstickerprod.objects.using("demo").filter(
+            bundid__in=possible_ids
+        ).update(
+            scan="1",
+            unit_id=target_unit_id
+        )
 
-    total_count = TrsMcutstickerprod.objects.using("demo").filter(
-        mbud=pcs21.mbundid
-    ).count()
+    if updated == 0:
+        return JsonResponse({"status": "error", "message": f"Child bundle {bundid} not found"}, status=404)
 
+    # Check sibling completion strictly under this master bundle
+    total_count = TrsMcutstickerprod.objects.using("demo").filter(mbud=clean_mbundid).count()
     scanned_count = TrsMcutstickerprod.objects.using("demo").filter(
-        mbud=pcs21.mbundid,
+        mbud=clean_mbundid,
         scan__in=[1, "1", True]
     ).count()
 
     all_done = (total_count == scanned_count and total_count > 0)
 
     if all_done:
-        unit, unit_code, unit_number = _resolve_unit_for_value(unit_id)
-        Bundlereport.objects.using("app").filter(
-            mbundle_id=mbundid
-        ).filter(
-            Q(unit_id=unit_code) | Q(unit_id=unit_number)
-        ).update(
+        Bundlereport.objects.using("app").filter(mbundle_id=clean_mbundid).update(
             scan=1,
+            unit_id=str(target_unit_id),
             r_date=timezone.now().date()
         )
 
@@ -699,5 +452,6 @@ def update_child_bundle_scan(request):
         "status": "success",
         "all_done": all_done,
         "total": total_count,
-        "scanned": scanned_count
+        "scanned": scanned_count,
+        "unit_id": target_unit_id
     })

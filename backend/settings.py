@@ -32,6 +32,7 @@ DEBUG = os.getenv('DJANGO_DEBUG', 'False').lower() in ('1', 'true', 'yes')
 ALLOWED_HOSTS = ['*']
 
 CORS_ALLOWED_ORIGINS = [
+    "http://10.1.21.154:3000",
     "http://localhost:3000",
     "https://hf.herofashion.com",
     "https://hf.herofashion.com",
@@ -47,6 +48,7 @@ CORS_ALLOWED_ORIGINS = [
 ]
 
 CSRF_TRUSTED_ORIGINS = [
+    "http://10.1.21.154:3000",
     "http://10.1.21.158:3000",
     "http://localhost:3000",
     "http://10.1.21.110:7003",
@@ -135,7 +137,7 @@ MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.middleware.gzip.GZipMiddleware', # ADD THIS LINE HERE
     'django.contrib.sessions.middleware.SessionMiddleware',
-    'django.middleware.csrf.CsrfViewMiddleware',
+    # 'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',

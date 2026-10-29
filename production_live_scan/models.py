@@ -55,6 +55,7 @@ class Assembly_data(models.Model):
     entry_mode = models.CharField(max_length=20, blank=True, null=True)
     unit_transfer = models.BooleanField(default=False)
     edit_data = models.BooleanField(default=False)
+    allocate_id = models.IntegerField()
     # process_des = models.CharField(max_length=500)
 
 
@@ -247,3 +248,10 @@ class VueCutPlnStat(models.Model):
     class Meta:
         managed = False
         db_table = 'vue_cut_pln_stat'
+
+
+class sub_bundle_unit_transfer(models.Model):
+    bundle_id=models.CharField(max_length=50)
+    from_unit = models.IntegerField()
+    to_unit = models.IntegerField()
+    date = models.DateTimeField()
