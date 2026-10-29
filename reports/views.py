@@ -536,10 +536,19 @@ def GetAprodDetails(request):
 
 def RepCutPending(request):
     jobno = request.GET.get("jobno")
+    topbottom_des = request.GET.get("topbottom_des")
+    clrcombo = request.GET.get("clrcombo")
+
     queryset = VueRepCutPend.objects.using("demo").all()
 
     if jobno:
         queryset = queryset.filter(jobno=jobno)
+
+    if topbottom_des:
+        queryset = queryset.filter(topbottom_des=topbottom_des)
+
+    if clrcombo:
+        queryset = queryset.filter(clrcombo=clrcombo)
 
     data = list(queryset.values())
 
