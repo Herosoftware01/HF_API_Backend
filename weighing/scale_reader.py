@@ -3,7 +3,8 @@ import time
 import threading
 from datetime import datetime
 
-SCALE_IP = "192.168.1.101"
+# SCALE_IP = "192.168.1.101"
+SCALE_IP = "10.1.21.132"
 SCALE_PORT = 8080
 
 RECONNECT_DELAY = 3
