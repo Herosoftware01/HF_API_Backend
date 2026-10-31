@@ -581,7 +581,10 @@ class EndUnitInputAPIView(APIView):
                             pc=item.get('pc'),
                             lot=item.get('lot'),
                             date=final_date,
-                            emp_id=item.get('emp_id', '')
+                            emp_id=item.get('emp_id', ''),
+                            reject_pcs=item.get('reject_pc'),
+                            rework_pcs=item.get('rework_pc'),
+                            ok_pcs=item.get('ok_pc'),
                         )
                     )
 

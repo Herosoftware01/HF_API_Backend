@@ -136,6 +136,9 @@ class end_line_data(models.Model):
     scan = models.BooleanField(default=False)
     lot = models.CharField(max_length=50)
     emp_id = models.CharField(max_length=20, blank=True, null=True)
+    reject_pcs = models.IntegerField(default=0)
+    rework_pcs = models.IntegerField(default=0)
+    ok_pcs = models.IntegerField(default=0)
 
 
 class PreporatoryEntry(models.Model):
