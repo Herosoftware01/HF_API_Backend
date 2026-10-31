@@ -758,10 +758,6 @@ def emp_payslip(request):
     queryset = ViewEmployeeSalaryDetails.objects.using("demo").all()
 
     # 2. Dynamically determine the current financial year (April to March)
-    # ``datetime`` is imported above with ``from datetime import datetime``,
-    # so it is the class (not the datetime module).  Calling
-    # ``datetime.date.today()`` therefore tries to use the class's ``date``
-    # method descriptor as though it were the date class.
     today = datetime.today().date()
     if today.month >= 4:
         start_year = today.year
@@ -770,17 +766,30 @@ def emp_payslip(request):
         start_year = today.year - 1
         end_year = today.year
 
-    # Apply the dynamic filter
-    queryset = queryset.filter(
+    # Apply the dynamic financial year filter (Base Queryset)
+    base_queryset = queryset.filter(
         Q(yr=start_year, mon__gte=4) | Q(yr=end_year, mon__lte=3)
     )
 
-    # 3. Extract additional query parameters
+    # 3. GENERATE FILTER OPTIONS FROM BACKEND
+    # Get distinct companies
+    distinct_companies = list(base_queryset.values_list("company", flat=True).distinct())
+    available_companies = [{"value": c, "label": c} for c in distinct_companies if c]
+
+    # Get distinct months
+    distinct_months = base_queryset.values("mon", "monthname").distinct().order_by("mon")
+    available_months = []
+    for m in distinct_months:
+        if m.get("mon"):
+            label = m["monthname"][:3] if m.get("monthname") else f"Month {m['mon']}"
+            available_months.append({"value": m["mon"], "label": label})
+
+    # 4. Extract query parameters
     emp_code = request.GET.get("code")
     month = request.GET.get("month")
     company = request.GET.get("company")
 
-    # 4. Apply dynamic filters matching the exact model field names
+    # 5. Apply user filters matching the exact model field names
     filters = {}
     if emp_code:
         filters["code"] = emp_code
@@ -789,20 +798,28 @@ def emp_payslip(request):
     if company:
         filters["company"] = company
 
-    if filters:
-        queryset = queryset.filter(**filters)
-
-    # 5. Fetch all matching records without pagination
-    data = list(queryset.values())
+    # 6. FETCH DATA ONLY IF FILTERS ARE APPLIED
+    if not filters:
+        # Initial load: Do not fetch all records. Just send options.
+        data = []
+    else:
+        # Filter applied: Fetch specific data.
+        filtered_queryset = base_queryset.filter(**filters)
+        data = list(filtered_queryset.values())
 
     return JsonResponse(
         {
+            "options": {
+                "companies": available_companies,
+                "months": available_months,
+            },
             "total_records": len(data),
             "data": data,
         },
         safe=False,
     )
-    
+
+
 @csrf_exempt
 def get_employee_attendance(request):
     if request.method == 'GET':
