@@ -23,6 +23,7 @@ from .models import (
     StickerHour,
     TrsPoDtls1New,
     UnitPoVerify,
+    Vech,
 )
 from django.http import JsonResponse
 import os
@@ -42,6 +43,7 @@ import calendar
 from django.core.paginator import Paginator
 from django.views.decorators.http import require_GET
 from collections import OrderedDict
+from django.forms.models import model_to_dict
 
 # dt_timezone = timezone.make_aware(timezone.datetime(2012, 1, 1), timezone=timezone.UTC)
 
@@ -811,3 +813,16 @@ def Fab_Details(request):
         "has_next": page_obj.has_next(),
         "has_previous": page_obj.has_previous(),
     })
+
+
+def vech_list(request):
+    if request.method == 'GET':
+        vech_records = (
+            Vech.objects.using('test')
+            .all()
+            .order_by('date')
+        )
+
+        data = [model_to_dict(v) for v in vech_records]
+
+        return JsonResponse(data, safe=False)

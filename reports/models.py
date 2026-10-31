@@ -2,6 +2,22 @@ from datetime import datetime
 
 from django.db import models
 
+
+class Vech(models.Model):
+    date = models.DateTimeField(db_column='Date')  # Field name made lowercase.
+    billno = models.CharField(db_column='BillNo', max_length=50)  # Field name made lowercase.
+    party = models.CharField(max_length=35, blank=True, null=True)
+    slno = models.BigIntegerField(primary_key=True)
+    exp = models.CharField(max_length=50)
+    itemname = models.CharField(max_length=35)
+    mcno = models.CharField(max_length=70)
+    grp = models.CharField(max_length=35)
+    amount = models.DecimalField(db_column='Amount', max_digits=19, decimal_places=4)  # Field name made lowercase.
+    des = models.CharField(max_length=500)
+
+    class Meta:
+        managed = False
+        db_table = 'vue_vech'
    
 
 class LaySp(models.Model):

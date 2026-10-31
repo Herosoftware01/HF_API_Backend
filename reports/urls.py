@@ -13,6 +13,7 @@ urlpatterns = [
     path('bitcheckhour/', views.bitcheckhour, name='bitcheckhour'),
     path('stickerhour/', views.stickerHour, name='stickerHour'),
     path('measurement_report/', views.measurement_report, name='measurement_report'),
+    path('vechile/', views.vech_list, name='vechile'),
 
     # HR Reports
     path('empwisesal/', views.empwisesal, name='empwisesal'),

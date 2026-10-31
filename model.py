@@ -8,29 +8,24 @@
 from django.db import models
 
 
-class TrsMcutstickerprod(models.Model):
-    dt = models.DateTimeField(db_column='Dt')  # Field name made lowercase.
-    empid = models.IntegerField(db_column='EmpID')  # Field name made lowercase.
-    mbud = models.IntegerField(db_column='Mbud')  # Field name made lowercase.
-    bundid = models.CharField(db_column='BundID', primary_key=True, max_length=200, db_collation='SQL_Latin1_General_CP1_CI_AS')  # Field name made lowercase.
-    jobno = models.CharField(db_column='JobNo', max_length=50, db_collation='SQL_Latin1_General_CP1_CI_AS')  # Field name made lowercase.
-    tbid = models.IntegerField(db_column='TBID')  # Field name made lowercase.
-    comboclr = models.CharField(db_column='Comboclr', max_length=50, db_collation='SQL_Latin1_General_CP1_CI_AS')  # Field name made lowercase.
-    sizid = models.IntegerField(db_column='SIZID')  # Field name made lowercase.
-    bdl = models.IntegerField(db_column='Bdl')  # Field name made lowercase.
-    pc = models.IntegerField(db_column='Pc')  # Field name made lowercase.
-    porid = models.IntegerField(db_column='PorID')  # Field name made lowercase.
-    weight = models.DecimalField(max_digits=18, decimal_places=3, blank=True, null=True)
-    bund_id = models.IntegerField(blank=True, null=True)
-    lotno = models.CharField(max_length=10, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)
-    hempid = models.IntegerField(blank=True, null=True)
-    frmbc = models.CharField(max_length=1, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)
-    scan = models.CharField(max_length=1, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)
-    livescan = models.CharField(max_length=1, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)
-    old = models.CharField(max_length=1, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)
-    assembly_complected = models.CharField(max_length=1, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)
-    unit_id = models.IntegerField(blank=True, null=True)
+class Timecard(models.Model):
+    slno = models.BigIntegerField(db_column='SlNo', blank=True, null=True)  # Field name made lowercase.
+    company = models.CharField(db_column='Company', max_length=50, blank=True, null=True)  # Field name made lowercase.
+    id = models.IntegerField(db_column='ID')  # Field name made lowercase.
+    name = models.CharField(db_column='Name', max_length=100, blank=True, null=True)  # Field name made lowercase.
+    month = models.CharField(db_column='Month', max_length=8, blank=True, null=True)  # Field name made lowercase.
+    doj = models.DateTimeField(db_column='DOJ', blank=True, null=True)  # Field name made lowercase.
+    department = models.CharField(db_column='Department', max_length=80, blank=True, null=True)  # Field name made lowercase.
+    designation = models.CharField(db_column='Designation', max_length=80, blank=True, null=True)  # Field name made lowercase.
+    dt = models.DateTimeField(db_column='DT', blank=True, null=True)  # Field name made lowercase.
+    morningintime = models.CharField(db_column='MorningInTime', max_length=5, blank=True, null=True)  # Field name made lowercase.
+    outtime = models.CharField(db_column='OutTime', max_length=5, blank=True, null=True)  # Field name made lowercase.
+    hrs = models.IntegerField(db_column='Hrs')  # Field name made lowercase.
+    otintime = models.CharField(db_column='OTInTime', max_length=5, blank=True, null=True)  # Field name made lowercase.
+    otouttime = models.CharField(db_column='OTOutTime', max_length=5, blank=True, null=True)  # Field name made lowercase.
+    otshift = models.DecimalField(db_column='OTShift', max_digits=38, decimal_places=2, blank=True, null=True)  # Field name made lowercase.
+    des = models.CharField(db_column='Des', max_length=150, blank=True, null=True)  # Field name made lowercase.
 
     class Meta:
         managed = False
-        db_table = 'Trs_MCutStickerProd'
+        db_table = 'timecard'

@@ -19,6 +19,7 @@ from .models import (
     Leavempabsent,
     TrsHrRsgnDtls,
     ViewActshiftDay,
+    Timecard,
     ViewActshift,
 )
 from django.http import JsonResponse
@@ -32,8 +33,7 @@ from django.db.models import (
 )
 from django.db import connections
 from django.core.serializers.json import DjangoJSONEncoder
-from django.db.models import OuterRef, Subquery
-from datetime import datetime, timedelta, date
+from datetime import datetime, timedelta, date, timezone as datetime_timezone
 from django.utils import timezone
 from django.conf import settings
 from django.db.models.functions import TruncDate, TruncDay
@@ -43,6 +43,8 @@ from django.views.decorators.csrf import csrf_exempt
 import calendar
 from collections import OrderedDict
 from reports .models import Empwisesal,Employeeworking
+import calendar
+from datetime import datetime
 
 
 def get_emp_shift_summary(request):
@@ -1895,9 +1897,8 @@ def _fill_months(counts_by_month, months):
 
 
 def _to_js_ts(d):
-    """Convert Python date to JavaScript timestamp (milliseconds since epoch)."""
-    dt = datetime(d.year, d.month, getattr(d, "day", 1), tzinfo=timezone.utc)
-    return int(dt.timestamp() * 1000)
+    dt = datetime(d.year, d.month, d.day)
+    return calendar.timegm(dt.timetuple()) * 1000
 
 
 def _day_range(start, end):
@@ -1916,7 +1917,7 @@ def _fill_days(counts_by_day, days):
 
 def _to_js_ts(d):
     if isinstance(d, (datetime, date)):
-        dt = datetime(d.year, d.month, getattr(d, "day", 1), tzinfo=timezone.utc)
+        dt = datetime(d.year, d.month, getattr(d, "day", 1), tzinfo=datetime_timezone.utc)
         return int(dt.timestamp() * 1000)
 
     if isinstance(d, str):
@@ -1929,7 +1930,7 @@ def _to_js_ts(d):
                 d = datetime.strptime(d.split(" ")[0], "%Y-%m-%d").date()
             except Exception:
                 return None
-        dt = datetime(d.year, d.month, d.day, tzinfo=timezone.utc)
+        dt = datetime(d.year, d.month, d.day, tzinfo=datetime_timezone.utc)
         return int(dt.timestamp() * 1000)
 
     return None
@@ -2372,3 +2373,63 @@ def Staff_OT_Amount(request):
     ))
     
     return JsonResponse(data, safe=False)   
+
+
+def emp_timecard(request):
+    if request.method != "GET":
+        return JsonResponse({
+            "status": False,
+            "message": "Method not allowed"
+        }, status=405)
+
+    # Get employee code
+    emp_code = request.GET.get("code")
+
+    if not emp_code:
+        return JsonResponse({
+            "status": False,
+            "message": "Employee code is required."
+        }, status=400)
+
+    try:
+        employee_id = int(emp_code)
+    except (ValueError, TypeError):
+        return JsonResponse({
+            "status": False,
+            "message": "Employee code must be an integer."
+        }, status=400)
+
+    # Base Timecard queryset
+    queryset = Timecard.objects.using("demo").filter(
+        id=employee_id
+    )
+
+    # Optional month filter
+    month = request.GET.get("month")
+
+    if month:
+        try:
+            month = int(month)
+
+            if not 1 <= month <= 12:
+                raise ValueError
+
+            queryset = queryset.filter(dt__month=month)
+
+        except (ValueError, TypeError):
+            return JsonResponse({
+                "status": False,
+                "message": "Month must be between 1 and 12."
+            }, status=400)
+
+    # Fetch records
+    data = list(
+        queryset.order_by("-dt", "-slno").values()
+    )
+
+    return JsonResponse({
+        "status": True,
+        "employee_code": employee_id,
+        "total_records": len(data),
+        "data": data
+    }, encoder=DjangoJSONEncoder)
