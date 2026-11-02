@@ -2,7 +2,9 @@
 import socket
 from django.http import JsonResponse
 
-SCALE_IP = "192.168.1.101"
+
+# SCALE_IP = "192.168.1.101"
+SCALE_IP = "10.1.21.132"
 SCALE_PORT = 8080
 
 

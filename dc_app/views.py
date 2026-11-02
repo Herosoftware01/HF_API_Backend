@@ -118,7 +118,7 @@ def acc_prod_del_print(request, no=None):
         prod_options = (
             queryset.values("no", "supplier", "orderno")
             .distinct()
-            .order_by("no")
+            .order_by("-no")
         )
         data = [
             {
@@ -153,7 +153,7 @@ def acc_proc_del_print(request, no=None):
         proc_options = (
             queryset.values("no", "supplier", "orderno")
             .distinct()
-            .order_by("no")
+            .order_by("-no")
         )
         data = [
             {
@@ -170,7 +170,6 @@ def acc_proc_del_print(request, no=None):
         "count": len(data),
         "data": data,
     })
-
 
 
 def acc_inhouse_transfer(request, no=None):
@@ -191,8 +190,9 @@ def acc_inhouse_transfer(request, no=None):
         transfer_options = (
             queryset.values("no", "orderno", "frmdpt", "todept")
             .distinct()
-            .order_by("no")
+            .order_by("-no")  # Descending order
         )
+
         data = [
             {
                 "no": option["no"],
@@ -264,7 +264,7 @@ def fabric_process_delivery(request, no=None):
         delivery_options = (
             queryset.values("no", "su_name", "orderno", "del_unit")
             .distinct()
-            .order_by("no")
+            .order_by("-no")
         )
         data = [
             {
@@ -301,7 +301,7 @@ def mistake_qty_print(request, dcno=None):
         dc_options = (
             queryset.values("dcno", "jobno", "toad", "frm")
             .distinct()
-            .order_by("dcno")
+            .order_by("-dcno")
         )
         data = [
             {
@@ -354,7 +354,7 @@ def rib_delivery_print(request, dc=None):
         dc_options = (
             queryset.values("dc", "jobno", "deladd", "topbottom_des")
             .distinct()
-            .order_by("dc")
+            .order_by("-dc")
         )
         data = [
             {
@@ -392,7 +392,7 @@ def godown_fabric_delivery_plan(request, dcno=None):
         dc_options = (
             queryset.values("dcno", "jobno", "frm", "todept")
             .distinct()
-            .order_by("dcno")
+            .order_by("-dcno")
         )
         data = [
             {
@@ -430,7 +430,7 @@ def fabric_delivery_repl(request, dcno=None):
         dc_options = (
             queryset.values("dcno", "jobno", "frm", "todept")
             .distinct()
-            .order_by("dcno")
+            .order_by("-dcno")
         )
         data = [
             {
@@ -485,7 +485,7 @@ def general_delivery_type1(request, dcno=None):
         dc_options = (
             queryset.values("no", "suppliername", "department","ty")
             .distinct()
-            .order_by("no")
+            .order_by("-no")
         )
         data = [
             {
@@ -529,7 +529,7 @@ def gen_stock_issue(request, no=None):
         issue_options = (
             queryset.values("no", "frm_dept", "to_dept", "reqno")
             .distinct()
-            .order_by("no")
+            .order_by("-no")
         )
         data = [
             {
@@ -1506,7 +1506,7 @@ def dc_receiver_crud_api(request, record_id=None):
                 return JsonResponse({'status': 'error', 'message': 'Record not found.'}, status=404)
 
         # Optional query filters
-        queryset = Dc_Reciver_Verify.objects.all().order_by('-received_at')
+        queryset = Dc_Reciver_Verify.objects.all().order_by('-DCNo', '-received_at')
         dc_no = request.GET.get('DCNo')
         job_no = request.GET.get('jobno')
         if dc_no:

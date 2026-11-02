@@ -36,7 +36,7 @@ def staff_full_details(request):
         if getattr(staff, 'photo', None):
             filename = os.path.basename(staff.photo)
             if getattr(settings, 'DEBUG', False):
-                photo_url = f"https://app.herofashion.com/staff_images/{filename}"
+                photo_url = f"https://hfapi.herofashion.com/staff_images/{filename}"
             else:
                 photo_url = None
         else:

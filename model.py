@@ -8,29 +8,33 @@
 from django.db import models
 
 
-class TrsMcutstickerprod(models.Model):
-    dt = models.DateTimeField(db_column='Dt')  # Field name made lowercase.
-    empid = models.IntegerField(db_column='EmpID')  # Field name made lowercase.
-    mbud = models.IntegerField(db_column='Mbud')  # Field name made lowercase.
-    bundid = models.CharField(db_column='BundID', primary_key=True, max_length=200, db_collation='SQL_Latin1_General_CP1_CI_AS')  # Field name made lowercase.
-    jobno = models.CharField(db_column='JobNo', max_length=50, db_collation='SQL_Latin1_General_CP1_CI_AS')  # Field name made lowercase.
-    tbid = models.IntegerField(db_column='TBID')  # Field name made lowercase.
-    comboclr = models.CharField(db_column='Comboclr', max_length=50, db_collation='SQL_Latin1_General_CP1_CI_AS')  # Field name made lowercase.
-    sizid = models.IntegerField(db_column='SIZID')  # Field name made lowercase.
-    bdl = models.IntegerField(db_column='Bdl')  # Field name made lowercase.
-    pc = models.IntegerField(db_column='Pc')  # Field name made lowercase.
-    porid = models.IntegerField(db_column='PorID')  # Field name made lowercase.
-    weight = models.DecimalField(max_digits=18, decimal_places=3, blank=True, null=True)
-    bund_id = models.IntegerField(blank=True, null=True)
-    lotno = models.CharField(max_length=10, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)
-    hempid = models.IntegerField(blank=True, null=True)
-    frmbc = models.CharField(max_length=1, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)
-    scan = models.CharField(max_length=1, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)
-    livescan = models.CharField(max_length=1, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)
-    old = models.CharField(max_length=1, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)
-    assembly_complected = models.CharField(max_length=1, db_collation='SQL_Latin1_General_CP1_CI_AS', blank=True, null=True)
-    unit_id = models.IntegerField(blank=True, null=True)
+class ViewEmployeePayslipDetails(models.Model):
+    from_date = models.DateTimeField(db_column='From_Date')  # Field name made lowercase.
+    to_date = models.DateTimeField(db_column='To_Date', blank=True, null=True)  # Field name made lowercase.
+    un = models.CharField(max_length=50, blank=True, null=True)
+    esino = models.CharField(db_column='ESINO', max_length=50, blank=True, null=True)  # Field name made lowercase.
+    pfno = models.CharField(db_column='PFNO', max_length=100, blank=True, null=True)  # Field name made lowercase.
+    uanno = models.CharField(db_column='Uanno', max_length=50, blank=True, null=True)  # Field name made lowercase.
+    doj = models.DateTimeField(blank=True, null=True)
+    code = models.IntegerField(blank=True, null=True)
+    empname = models.CharField(db_column='EmpName', max_length=100, blank=True, null=True)  # Field name made lowercase.
+    fname = models.CharField(db_column='Fname', max_length=1)  # Field name made lowercase.
+    sex = models.CharField(max_length=6)
+    category = models.CharField(db_column='Category', max_length=50, blank=True, null=True)  # Field name made lowercase.
+    day = models.DecimalField(max_digits=24, decimal_places=2, blank=True, null=True)
+    ot = models.IntegerField(blank=True, null=True)
+    ipaysalary = models.DecimalField(max_digits=18, decimal_places=2, blank=True, null=True)
+    paidh = models.DecimalField(max_digits=38, decimal_places=20, blank=True, null=True)
+    onehr_wag = models.DecimalField(max_digits=22, decimal_places=6, blank=True, null=True)
+    dobwag = models.DecimalField(max_digits=24, decimal_places=6, blank=True, null=True)
+    ot_amt = models.DecimalField(max_digits=35, decimal_places=6, blank=True, null=True)
+    sum_ofwage = models.DecimalField(max_digits=38, decimal_places=6, blank=True, null=True)
+    hra = models.DecimalField(max_digits=38, decimal_places=6, blank=True, null=True)
+    earned = models.DecimalField(max_digits=38, decimal_places=6, blank=True, null=True)
+    nesi = models.DecimalField(db_column='nESI', max_digits=18, decimal_places=2, blank=True, null=True)  # Field name made lowercase.
+    npf = models.DecimalField(db_column='nPF', max_digits=18, decimal_places=2, blank=True, null=True)  # Field name made lowercase.
+    nnetamt = models.DecimalField(db_column='nNetamt', max_digits=23, decimal_places=2, blank=True, null=True)  # Field name made lowercase.
 
     class Meta:
         managed = False
-        db_table = 'Trs_MCutStickerProd'
+        db_table = 'view_employee_payslip_details'
