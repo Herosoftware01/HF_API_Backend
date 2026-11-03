@@ -19,7 +19,9 @@ from .models import (
     Leavempabsent,
     TrsHrRsgnDtls,
     ViewActshiftDay,
+    Timecard,
     ViewActshift,
+    ViewEmployeePayslipDetails,
 )
 from django.http import JsonResponse
 import os
@@ -32,8 +34,7 @@ from django.db.models import (
 )
 from django.db import connections
 from django.core.serializers.json import DjangoJSONEncoder
-from django.db.models import OuterRef, Subquery
-from datetime import datetime, timedelta, date
+from datetime import datetime, timedelta, date, timezone as datetime_timezone
 from django.utils import timezone
 from django.conf import settings
 from django.db.models.functions import TruncDate, TruncDay
@@ -43,6 +44,8 @@ from django.views.decorators.csrf import csrf_exempt
 import calendar
 from collections import OrderedDict
 from reports .models import Empwisesal,Employeeworking
+import calendar
+from datetime import datetime
 
 
 def get_emp_shift_summary(request):
@@ -1895,9 +1898,8 @@ def _fill_months(counts_by_month, months):
 
 
 def _to_js_ts(d):
-    """Convert Python date to JavaScript timestamp (milliseconds since epoch)."""
-    dt = datetime(d.year, d.month, getattr(d, "day", 1), tzinfo=timezone.utc)
-    return int(dt.timestamp() * 1000)
+    dt = datetime(d.year, d.month, d.day)
+    return calendar.timegm(dt.timetuple()) * 1000
 
 
 def _day_range(start, end):
@@ -1916,7 +1918,7 @@ def _fill_days(counts_by_day, days):
 
 def _to_js_ts(d):
     if isinstance(d, (datetime, date)):
-        dt = datetime(d.year, d.month, getattr(d, "day", 1), tzinfo=timezone.utc)
+        dt = datetime(d.year, d.month, getattr(d, "day", 1), tzinfo=datetime_timezone.utc)
         return int(dt.timestamp() * 1000)
 
     if isinstance(d, str):
@@ -1929,7 +1931,7 @@ def _to_js_ts(d):
                 d = datetime.strptime(d.split(" ")[0], "%Y-%m-%d").date()
             except Exception:
                 return None
-        dt = datetime(d.year, d.month, d.day, tzinfo=timezone.utc)
+        dt = datetime(d.year, d.month, d.day, tzinfo=datetime_timezone.utc)
         return int(dt.timestamp() * 1000)
 
     return None
@@ -2372,3 +2374,143 @@ def Staff_OT_Amount(request):
     ))
     
     return JsonResponse(data, safe=False)   
+
+
+def emp_timecard(request):
+    if request.method != "GET":
+        return JsonResponse({
+            "status": False,
+            "message": "Method not allowed"
+        }, status=405)
+
+    # Get employee code
+    emp_code = request.GET.get("code")
+
+    if not emp_code:
+        return JsonResponse({
+            "status": False,
+            "message": "Employee code is required."
+        }, status=400)
+
+    try:
+        employee_id = int(emp_code)
+    except (ValueError, TypeError):
+        return JsonResponse({
+            "status": False,
+            "message": "Employee code must be an integer."
+        }, status=400)
+
+    # Base Timecard queryset
+    queryset = Timecard.objects.using("demo").filter(
+        id=employee_id
+    )
+
+    # Optional month filter
+    month = request.GET.get("month")
+
+    if month:
+        try:
+            month = int(month)
+
+            if not 1 <= month <= 12:
+                raise ValueError
+
+            queryset = queryset.filter(dt__month=month)
+
+        except (ValueError, TypeError):
+            return JsonResponse({
+                "status": False,
+                "message": "Month must be between 1 and 12."
+            }, status=400)
+
+    # Fetch records
+    data = list(
+        queryset.order_by("-dt", "-slno").values()
+    )
+
+    return JsonResponse({
+        "status": True,
+        "employee_code": employee_id,
+        "total_records": len(data),
+        "data": data
+    }, encoder=DjangoJSONEncoder)
+
+
+def emp_weekly_payslip(request):
+
+    if request.method != "GET":
+        return JsonResponse({
+            "status": False,
+            "message": "Only GET method is allowed."
+        }, status=405)
+
+    from_date = request.GET.get("from_date")
+    to_date = request.GET.get("to_date")
+
+    # Validate parameters
+    if not from_date or not to_date:
+        return JsonResponse({
+            "status": False,
+            "message": "from_date and to_date are required."
+        }, status=400)
+
+    try:
+        start_date = datetime.strptime(from_date, "%Y-%m-%d").date()
+        end_date = datetime.strptime(to_date, "%Y-%m-%d").date()
+
+    except ValueError:
+        return JsonResponse({
+            "status": False,
+            "message": "Invalid date format. Use YYYY-MM-DD."
+        }, status=400)
+
+    if start_date > end_date:
+        return JsonResponse({
+            "status": False,
+            "message": "from_date cannot be greater than to_date."
+        }, status=400)
+
+    queryset = ViewEmployeePayslipDetails.objects.using("demo").filter(
+        from_date__date__gte=start_date,
+        from_date__date__lte=end_date
+    ).order_by("from_date", "code")
+
+    data = []
+
+    for item in queryset:
+        data.append({
+            "from_date": item.from_date.strftime("%Y-%m-%d %H:%M:%S") if item.from_date else None,
+            "to_date": item.to_date.strftime("%Y-%m-%d %H:%M:%S") if item.to_date else None,
+            "un": item.un,
+            "esino": item.esino,
+            "pfno": item.pfno,
+            "uanno": item.uanno,
+            "doj": item.doj.strftime("%Y-%m-%d") if item.doj else None,
+            "code": item.code,
+            "empname": item.empname,
+            "fname": item.fname,
+            "sex": item.sex,
+            "category": item.category,
+            "day": str(item.day) if item.day is not None else None,
+            "ot": item.ot,
+            "ipaysalary": str(item.ipaysalary) if item.ipaysalary is not None else None,
+            "paidh": str(item.paidh) if item.paidh is not None else None,
+            "onehr_wag": str(item.onehr_wag) if item.onehr_wag is not None else None,
+            "dobwag": str(item.dobwag) if item.dobwag is not None else None,
+            "ot_amt": str(item.ot_amt) if item.ot_amt is not None else None,
+            "sum_ofwage": str(item.sum_ofwage) if item.sum_ofwage is not None else None,
+            "hra": str(item.hra) if item.hra is not None else None,
+            "earned": str(item.earned) if item.earned is not None else None,
+            "nesi": str(item.nesi) if item.nesi is not None else None,
+            "npf": str(item.npf) if item.npf is not None else None,
+            "nnetamt": str(item.nnetamt) if item.nnetamt is not None else None,
+        })
+
+    return JsonResponse({
+        "status": True,
+        "message": "Employee payslip details fetched successfully.",
+        "count": len(data),
+        "from_date": from_date,
+        "to_date": to_date,
+        "data": data
+    }, safe=False)
