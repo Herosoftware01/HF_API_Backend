@@ -31,7 +31,7 @@ from qcapp.models import Unit
 from django.db.models import Sum, IntegerField, Value
 from django.db.models.functions import Cast, Coalesce
 import json
-
+from django.db import connection, transaction
 
 
 # @require_GET
@@ -1261,7 +1261,7 @@ class GetUnitAssemply(APIView):
             ).order_by('-date')
 
         results = list(data.values(
-            'bundle_id', 'bdl_no', 'job_no', 'seq', 'pc', 'color', 'date'
+            'bundle_id', 'bdl_no', 'job_no', 'seq', 'pc', 'color', 'date','tb_name',
         ))
         return Response({"status": True, "data": results})
     
@@ -1499,6 +1499,13 @@ class SaveAssemblyAPIView(APIView):
                     process_des,
                 )
             ])
+            # with connections['demo'].cursor() as cursor:
+            #     for bundle_id in unique_ids:
+            #         cursor.execute(
+            #             "EXEC dbo.sp_CheckBundleProcessScan @BDLID = %s",
+            #             [str(bundle_id)]
+            #         )
+            #         print(f"Executed sp_CheckBundleProcessScan for bundle {bundle_id}.")
             input_bundle_ids = {
                 bundle.bundle_id
                 for bundle in input_bundles
@@ -2843,7 +2850,134 @@ def get_stock_summary_python(request):
     return JsonResponse(results, safe=False, status=200, json_dumps_params={'ensure_ascii': False})
 
 
-from django.db.models import Min
+# from django.db.models import Min
+
+# def get_dependency_pc(request):
+#     job_no = request.GET.get('job_no')
+#     tb_name = request.GET.get('tb_name')
+#     color = request.GET.get('color')
+
+#     if not job_no or not tb_name or not color:
+#         return JsonResponse({
+#             "error": "job_no, tb_name and color are required"
+#         }, status=400)
+       
+#     processes = list(
+#         dependency.objects.filter(
+#             job_no=job_no,
+#             tb_name=tb_name
+#         )
+#         .values('process_des')
+#         .annotate(first_id=Min('id'))
+#         .order_by('first_id')
+#         .values_list('process_des', flat=True)
+#     )
+
+#     assembly_data = (
+#         Assembly_data.objects.filter(
+#             job_no=job_no,
+#             tb_name=tb_name,
+#             color=color
+#         )
+#         .values('tb_id', 'size', 'seq')
+#         .annotate(
+#             total_pc=Coalesce(
+#                 Sum(Cast('pc', output_field=IntegerField())),
+#                 Value(0),
+#                 output_field=IntegerField()
+#             )
+#         )
+#     )
+
+#     size_data = {}
+#     tb_ids = set()
+
+#     for row in assembly_data:
+#         size = row['size']
+#         seq = row['seq']
+#         tb_id = row['tb_id']
+
+#         tb_ids.add(tb_id)
+
+#         if size not in size_data:
+#             size_data[size] = {}
+
+#         size_data[size][seq] = row['total_pc']
+
+#     cut_data = {}
+
+#     for tb_id in tb_ids:
+#         cut_rows = (
+#             VueCutPlnStat.objects.using('demo').filter(
+#                 ordno=job_no,
+#                 topbottom_id=tb_id,
+#                 clr=color
+#             )
+#             .values('siz')
+#             .annotate(
+#                 total_cut=Coalesce(
+#                     Sum('ord2'),
+#                     Value(0),
+#                     output_field=IntegerField()
+#                 )
+#             )
+#         )
+
+#         for row in cut_rows:
+#             cut_data[row['siz']] = (
+#                 cut_data.get(row['siz'], 0)
+#                 + (row['total_cut'] or 0)
+#             )
+
+#     # 4. Size list
+#     sizes = list(
+#         Assembly_data.objects.filter(
+#             job_no=job_no,
+#             tb_name=tb_name,
+#             color=color
+#         )
+#         .values_list('size', flat=True)
+#         .distinct()
+#     )
+
+#     # Cut table-la mattum irukkira size-um include pannuvom
+#     for size in cut_data:
+#         if size not in sizes:
+#             sizes.append(size)
+
+#     # 5. Final response
+#     result_data = []
+
+#     for size in sizes:
+#         cut_qty = cut_data.get(size, 0)
+#         seq_data = {}
+
+#         for process in processes:
+#             pc = size_data.get(size, {}).get(process, 0)
+
+#             seq_data[process] = {
+#                 # "cut_qty": cut_qty,
+#                 "pc": pc,
+#                 "bal": cut_qty - pc
+#             }
+
+#         result_data.append({
+#             "size": size,
+#             "cut_qty": cut_qty,
+#             "seq": seq_data
+#         })
+
+#     return JsonResponse({
+#         "job_no": job_no,
+#         "tb_name": tb_name,
+#         "color": color,
+#         "data": result_data
+#     })
+
+
+from django.db.models import Sum, Min, IntegerField, Value
+from django.db.models.functions import Coalesce, Cast
+from django.http import JsonResponse
 
 def get_dependency_pc(request):
     job_no = request.GET.get('job_no')
@@ -2855,6 +2989,7 @@ def get_dependency_pc(request):
             "error": "job_no, tb_name and color are required"
         }, status=400)
        
+    # 1. Fetch distinct processes in correct order using Min(id)
     processes = list(
         dependency.objects.filter(
             job_no=job_no,
@@ -2866,7 +3001,8 @@ def get_dependency_pc(request):
         .values_list('process_des', flat=True)
     )
 
-    assembly_data = (
+    # 2. Fetch all assembly data in ONE query instead of multiple
+    assembly_qs = (
         Assembly_data.objects.filter(
             job_no=job_no,
             tb_name=tb_name,
@@ -2884,26 +3020,29 @@ def get_dependency_pc(request):
 
     size_data = {}
     tb_ids = set()
+    sizes_set = set()
 
-    for row in assembly_data:
+    for row in assembly_qs:
         size = row['size']
         seq = row['seq']
         tb_id = row['tb_id']
 
         tb_ids.add(tb_id)
+        sizes_set.add(size)
 
         if size not in size_data:
             size_data[size] = {}
+        
+        # Aggregate totals if multiple rows exist for same size & seq
+        size_data[size][seq] = size_data[size].get(seq, 0) + row['total_pc']
 
-        size_data[size][seq] = row['total_pc']
-
+    # 3. Optimize Cut Data: Fetch ALL tb_ids in a SINGLE query using `__in` filter
     cut_data = {}
-
-    for tb_id in tb_ids:
+    if tb_ids:
         cut_rows = (
             VueCutPlnStat.objects.using('demo').filter(
                 ordno=job_no,
-                topbottom_id=tb_id,
+                topbottom_id__in=tb_ids,  # Single query for all tb_ids!
                 clr=color
             )
             .values('siz')
@@ -2917,39 +3056,39 @@ def get_dependency_pc(request):
         )
 
         for row in cut_rows:
-            cut_data[row['siz']] = (
-                cut_data.get(row['siz'], 0)
-                + (row['total_cut'] or 0)
-            )
+            size_val = row['siz']
+            cut_data[size_val] = cut_data.get(size_val, 0) + (row['total_cut'] or 0)
+            sizes_set.add(size_val)  # Include sizes found in cut table
 
-    # 4. Size list
-    sizes = list(
-        Assembly_data.objects.filter(
-            job_no=job_no,
-            tb_name=tb_name,
-            color=color
-        )
-        .values_list('size', flat=True)
-        .distinct()
-    )
+    # Convert sizes set to list
+    # sizes = list(sizes_set)
 
-    # Cut table-la mattum irukkira size-um include pannuvom
-    for size in cut_data:
-        if size not in sizes:
-            sizes.append(size)
+    size_order = {
+        'XS': 1, 
+        'S': 2, 
+        'M': 3, 
+        'L': 4, 
+        'XL': 5, 
+        'XXL': 6, '2XL': 6, 
+        'XXXL': 7, '3XL': 7,
+        'XXXXL': 8, '4XL': 8
+    }
 
-    # 5. Final response
+    def get_size_rank(size_name):
+        cleaned = str(size_name).strip().upper()
+        return size_order.get(cleaned, 99) # Unknown sizes-ah kadasiyil kondu vara 99 kodukkirom
+
+    sizes = sorted(list(sizes_set), key=get_size_rank)
+
+    # 4. Build Final Response Efficiently
     result_data = []
-
     for size in sizes:
         cut_qty = cut_data.get(size, 0)
         seq_data = {}
 
         for process in processes:
             pc = size_data.get(size, {}).get(process, 0)
-
             seq_data[process] = {
-                "cut_qty": cut_qty,
                 "pc": pc,
                 "bal": cut_qty - pc
             }
@@ -2966,7 +3105,6 @@ def get_dependency_pc(request):
         "color": color,
         "data": result_data
     })
-
 
 @api_view(['GET'])
 def bundle_detail_api(request):
