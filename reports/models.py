@@ -777,3 +777,20 @@ class UnitPoVerify(models.Model):
         managed = False
         db_table = 'unit_po_verify'
         unique_together = (('order_no', 'type', 'description'),)
+
+class VueYftrsdt(models.Model):
+    rowno = models.BigIntegerField(db_column='RowNo', primary_key=True) 
+    type = models.CharField(max_length=6, db_column='t')
+    desc = models.CharField(max_length=86, blank=True, null=True, db_column='clr')
+    date = models.DateTimeField(db_column='DATE')
+    orderno = models.CharField(max_length=50, blank=True, null=True)
+    kg = models.DecimalField(max_digits=20, decimal_places=4, blank=True, null=True)
+    qty = models.IntegerField(blank=True, null=True)
+    gsm = models.IntegerField(blank=True, null=True)
+    rls = models.IntegerField(blank=True, null=True)
+    field_o = models.CharField(db_column='_o', max_length=50, blank=True, null=True)
+    trn = models.CharField(max_length=6)
+
+    class Meta:
+        managed = False
+        db_table = 'vue_yftrsdt'
