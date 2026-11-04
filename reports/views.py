@@ -24,6 +24,7 @@ from .models import (
     TrsPoDtls1New,
     UnitPoVerify,
     Vech,
+    VueYftrsdt,
 )
 from django.http import JsonResponse
 import os
@@ -777,6 +778,40 @@ def Fab_Details(request):
 
     data = list(datas)
     return JsonResponse(data, safe=False)
+
+@csrf_exempt
+def fabyarn_transaction(request):
+    type = request.GET.get('type')
+    desc = request.GET.get('desc')
+    orderno = request.GET.get('orderno')
+
+    if not (type and desc and orderno):
+        return JsonResponse({"error": "Missing parameters"}, status=400)
+    
+    data = list(VueYftrsdt.objects.using('test')
+            .filter(type=type, desc=desc, orderno=orderno)
+            .values("date","kg", "qty", "gsm", "rls", "field_o", "trn")
+            .order_by("date"))
+
+    return JsonResponse(data, safe=False)
+
+@csrf_exempt
+def save_verification(request):
+    if request.method == "POST":
+        data = json.loads(request.body)
+        order_no = data.get("order_no")
+        type_ = data.get("type")
+        description = data.get("description")
+        verify = data.get("verify", False)
+
+        obj, created = UnitPoVerify.objects.using('app').update_or_create(
+            order_no=order_no,
+            type=type_,
+            description=description,
+            defaults={"verify": verify},
+        )
+        return JsonResponse({"success": True, "created": created, "verify": obj.verify})
+    return JsonResponse({"success": False, "error": "Invalid request method"})
 
 
 def vech_list(request):
