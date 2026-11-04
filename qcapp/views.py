@@ -594,7 +594,6 @@ class MachineAllocationAPIView(APIView):
     def get(self, request):
         unit_id = request.GET.get("unit")
         line_id = request.GET.get("line")
-        print("unit_id:", unit_id, "line_id:", line_id)
         selected_date = parse_date(request.GET.get("date", "") or "")
         if request.GET.get("date") and selected_date is None:
             return Response({"error": "date must use YYYY-MM-DD format"}, status=400)
@@ -634,15 +633,53 @@ class MachineAllocationAPIView(APIView):
             absent_count=Count('code', filter=Q(prab='Absent'))
         )
 
+        # -------------------------------------------------------------
+        # ✅ TODAY ALLOCATED UNIQUE EMPLOYEES COUNT (Optimized Query)
+        # -------------------------------------------------------------
+        # 1. MachineAllocation-il irukkira machine IDs-ah eduthukolla vom
+        filtered_machine_ids = allocations.values_list('machine_id', flat=True)
+
+        # 2. Antha machines-ku selected_date-il allocate aana latest employee records-ah filter seiyvom
+        # Subquery or efficient grouping moolam active allocations count edukkalam
+        active_emp_subquery = (
+            emp_allocate.objects
+            .filter(
+                machine_id__in=filtered_machine_ids,
+                date__date=selected_date
+            )
+        )
+        if unit_id:
+            active_emp_subquery = active_emp_subquery.filter(unit=unit_id)
+        if line_id:
+            active_emp_subquery = active_emp_subquery.filter(line=line_id)
+
+        # Ovvoru machine-kkum antha date-il ulla latest allocation record-ah eduthu, 
+        # athil status=True (or active) irukkura unique employees count-ai kandu pidikkirathu.
+        latest_emp_ids_per_machine = (
+            active_emp_subquery
+            .values('machine_id')
+            .annotate(max_id=Max('id'))
+            .values_list('max_id', flat=True)
+        )
+
+        today_allocated_emp_count = (
+            emp_allocate.objects
+            .filter(id__in=latest_emp_ids_per_machine, status=True)  # status active-ah iruppavargal mattum
+            .values('emp_code')
+            .distinct()
+            .count()
+        )
+        # -------------------------------------------------------------
+
         serializer = MachineAllocationSerializer(
             allocations,
             many=True,
             context={"selected_date": selected_date},
         )
         
-
-        # return Response(serializer.data)
         return Response({
+            "allocate_emp_count": allocations.count(), 
+            "today_allocated_employee_count": today_allocated_emp_count, 
             "allocations": serializer.data,
             "present_count": details["present_count"],
             "absent_count": details["absent_count"],
