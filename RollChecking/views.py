@@ -344,6 +344,7 @@ def RollChecking_Defect(request):
                 inches=data.get('inches'),
                 counts=data.get('counts'),
                 tcounts=data.get('tcounts'),
+                meter=data.get('meter'),
                 tpoints=data.get('tpoints'),
                 entrytype=data.get('entrytype')
             )
@@ -365,7 +366,7 @@ def RollChecking_Defect(request):
 
         for field in [
             'rlno', 'colour', 'dcno', 'defectcode', 'inches', 'counts', 'entrytype',
-            'defectname', 'subname', 'points', 'tpoints', 'tcounts', 'holes'
+            'defectname', 'subname', 'points', 'tpoints', 'tcounts', 'holes', 'meter'
         ]:
             if field in data:
                 setattr(obj, field, data[field])
