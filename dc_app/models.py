@@ -672,3 +672,13 @@ class Dc_Reciver_Verify(models.Model):
     def __str__(self):
         return (f"DCNo: {self.DCNo},"f"JobNo: {self.jobno},"f"Date: {self.date},"f"TrsType: {self.trstype}")
 
+
+class DC_inch_Verify_module_pre(models.Model):
+    id = models.AutoField(db_column='id', primary_key=True)
+    modules = models.CharField(db_column='Modules', max_length=100)
+    status = models.BooleanField(db_column='Status', default=False)
+    created_at = models.DateTimeField(db_column='CreatedAt', auto_now_add=True)
+    updated_at = models.DateTimeField(db_column='UpdatedAt', auto_now=True)
+
+    class Meta:
+        db_table = 'dc_inch_verify_module_pre'
