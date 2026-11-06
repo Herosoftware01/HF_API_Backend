@@ -146,6 +146,16 @@ def Roll_Checking(request):
         
         data = list(queryset.order_by("-dt").values('rlno', 'dc', 'colour'))
 
+        # Exclude records already submitted
+        filtered_data = []
+        for item in data:
+            detail = RollCheckingDetails.objects.using("default").filter(rlno=item['rlno'], dcno=item['dc'], colour=item['colour'], submit=1).exists()
+
+            if not detail:
+                filtered_data.append(item)
+
+        data = filtered_data
+
     else:
         data = list(queryset.order_by("-dt").values())
 
