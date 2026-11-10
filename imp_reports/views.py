@@ -1,5 +1,5 @@
 from django.http import JsonResponse
-from .models import LaySp, MasterFinalMistake, UnitBundlereport, FinalPlans,Corarlck1,CoraRollcheck,BuntrackReport,LaySpreadingLayemployee,VueAdGrid1,VueStPunch,StAtt
+from .models import LaySp, MasterFinalMistake, UnitBundlereport, FinalPlans,Corarlck1,CoraRollcheck,BuntrackReport,LaySpreadingLayemployee,VueAdGrid1
 from .models import QcappQcPieceFinal
 from django.db.models import Q
 from django.views.decorators.csrf import csrf_exempt
@@ -237,17 +237,4 @@ def qcroving(request):
         return JsonResponse(data_list, safe=False)
 
 
-def sta(request):
-    if request.method == 'GET':
-
-        today = date.today()
-
-        data = StAtt.objects.using('demo1').filter(
-            date=today
-        )
-
-        return JsonResponse(
-            list(data.values()),
-            safe=False
-        )
 
