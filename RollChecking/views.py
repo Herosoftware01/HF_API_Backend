@@ -146,6 +146,16 @@ def Roll_Checking(request):
         
         data = list(queryset.order_by("-dt").values('rlno', 'dc', 'colour'))
 
+        # Exclude records already submitted
+        filtered_data = []
+        for item in data:
+            detail = RollCheckingDetails.objects.using("default").filter(rlno=item['rlno'], dcno=item['dc'], colour=item['colour'], submit=1).exists()
+
+            if not detail:
+                filtered_data.append(item)
+
+        data = filtered_data
+
     else:
         data = list(queryset.order_by("-dt").values())
 
@@ -344,6 +354,7 @@ def RollChecking_Defect(request):
                 inches=data.get('inches'),
                 counts=data.get('counts'),
                 tcounts=data.get('tcounts'),
+                meter=data.get('meter'),
                 tpoints=data.get('tpoints'),
                 entrytype=data.get('entrytype')
             )
@@ -365,7 +376,7 @@ def RollChecking_Defect(request):
 
         for field in [
             'rlno', 'colour', 'dcno', 'defectcode', 'inches', 'counts', 'entrytype',
-            'defectname', 'subname', 'points', 'tpoints', 'tcounts', 'holes'
+            'defectname', 'subname', 'points', 'tpoints', 'tcounts', 'holes', 'meter'
         ]:
             if field in data:
                 setattr(obj, field, data[field])

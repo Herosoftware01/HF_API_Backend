@@ -98,6 +98,7 @@ class RollCheckingDefect(models.Model):
     tpoints = models.IntegerField(blank=True, null=True)
     entrytype = models.CharField(max_length=30, blank=True, null=True)
     date = models.DateTimeField(auto_now_add=True)
+    meter= models.DecimalField(max_digits=18, decimal_places=2, blank=True, null=True)
 
 
 class MasterMistakes(models.Model):
