@@ -11,7 +11,6 @@ urlpatterns = [
     path('lay_sal/',views.lay_sp_sal,name='lay_sal'),
     path('qc_first/', views.qcfirst, name='qc_first'),
     path('qc_roving/', views.qcroving, name='qc_roving'),
-    path('sta/',views.sta,name='sta'),
 ]  
 
 

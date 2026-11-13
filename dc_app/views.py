@@ -7,7 +7,7 @@ ViewYarnProcessDelivery,VueAccProcDel,
 ViewAccinwardVerification,ViewFabricDeliveryProcess,
 ViewMistakeqtyPrint,ViewUnitPcdelivery,VueRibDeliveryDetails,ViewGdwnFabricDeliveryPlan,
 TrsApidtls,ViewFabricDeliveryRepl,HerofashionUser,Holiday,RoleModulePermission,
-Dc_Reciver_Verify,ViewGeneralDeiveryType1,ViewGenStockIssue,ModuleMaster)
+Dc_Reciver_Verify,ViewGeneralDeiveryType1,ViewGenStockIssue,ModuleMaster,DC_inch_Verify_module_pre)
 import json
 from django.views.decorators.csrf import csrf_exempt
 from django.forms.models import model_to_dict
@@ -1090,20 +1090,36 @@ def module_detail(request, module_id):
 
 
 @csrf_exempt
-@require_http_methods(["GET", "POST", "DELETE"])
 def manage_role_permissions(request, role_param=None):
-    """
-    GET    /dcapp/dc_permissions/<role>/
-    POST   /dcapp/dc_permissions/save/
-    DELETE /dcapp/dc_permissions/<role>/
-    """
-
+ 
     if request.method == "GET":
+
         role = role_param or request.GET.get("role")
 
-        if not isinstance(role, str) or not role.strip():
-            return error_response("Role is required")
+        # GET all data without role parameter
+        if not role:
 
+            data = list(
+                RoleModulePermission.objects.all()
+                .order_by("id")
+                .values(
+                    "id",
+                    "role",
+                    "module_id",
+                    "is_enabled",
+                    "created_at",
+                    "updated_at",
+                )
+            )
+
+            return JsonResponse({
+                "status": True,
+                "message": "All role module permissions retrieved successfully",
+                "count": len(data),
+                "data": data,
+            })
+
+        # GET data for specific role
         role = role.strip()
 
         modules = list(
@@ -1114,7 +1130,9 @@ def manage_role_permissions(request, role_param=None):
         )
 
         stored_permissions = dict(
-            RoleModulePermission.objects.filter(role=role).values_list(
+            RoleModulePermission.objects.filter(
+                role=role
+            ).values_list(
                 "module_id",
                 "is_enabled",
             )
@@ -1124,13 +1142,20 @@ def manage_role_permissions(request, role_param=None):
 
         for module in modules:
             module_data = serialize_module(module)
+
             module_data["is_enabled"] = stored_permissions.get(
                 module.module_id,
                 False,
             )
+
             response.append(module_data)
 
-        return JsonResponse(response, safe=False)
+        return JsonResponse({
+            "status": True,
+            "message": "Role permissions retrieved successfully",
+            "count": len(response),
+            "data": response,
+        })
 
     if request.method == "POST":
         data, error = read_json(request)
@@ -1631,3 +1656,233 @@ def dc_receiver_crud_api(request, record_id=None):
             return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
 
     return JsonResponse({'status': 'error', 'message': f'Method {request.method} not allowed.'}, status=405)
+
+
+@csrf_exempt
+def dc_inch_verify_module_pre_api(request, id=None):
+
+    # -------------------- GET --------------------
+    if request.method == "GET":
+
+        selected_id = id if id is not None else request.GET.get("id")
+
+        if selected_id not in (None, ""):
+            try:
+                selected_id = int(selected_id)
+                obj = DC_inch_Verify_module_pre.objects.get(id=selected_id)
+
+                data = {
+                    "id": obj.id,
+                    "modules": obj.modules,
+                    "status": obj.status,
+                    "created_at": obj.created_at,
+                    "updated_at": obj.updated_at,
+                }
+
+                return JsonResponse({
+                    "status": True,
+                    "message": "Module fetched successfully.",
+                    "count": 1,
+                    "data": data
+                })
+
+            except ValueError:
+                return JsonResponse({
+                    "status": False,
+                    "message": "id must be an integer."
+                }, status=400)
+
+            except DC_inch_Verify_module_pre.DoesNotExist:
+                return JsonResponse({
+                    "status": False,
+                    "message": "Module not found."
+                }, status=404)
+
+        queryset = DC_inch_Verify_module_pre.objects.all().order_by("-id")
+
+        data = list(queryset.values(
+            "id",
+            "modules",
+            "status",
+            "created_at",
+            "updated_at"
+        ))
+
+        return JsonResponse({
+            "status": True,
+            "message": "Modules fetched successfully.",
+            "count": len(data),
+            "data": data
+        })
+
+    # -------------------- POST --------------------
+    elif request.method == "POST":
+
+        try:
+            body = json.loads(request.body.decode("utf-8"))
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            return JsonResponse({
+                "status": False,
+                "message": "Invalid JSON format."
+            }, status=400)
+
+        modules = body.get("modules")
+        status_value = body.get("status", False)
+
+        if not modules or not isinstance(modules, str) or not modules.strip():
+            return JsonResponse({
+                "status": False,
+                "message": "modules is required."
+            }, status=400)
+
+        if not isinstance(status_value, bool):
+            return JsonResponse({
+                "status": False,
+                "message": "status must be a boolean."
+            }, status=400)
+
+        if len(modules.strip()) > 100:
+            return JsonResponse({
+                "status": False,
+                "message": "modules cannot exceed 100 characters."
+            }, status=400)
+
+        obj = DC_inch_Verify_module_pre.objects.create(
+            modules=modules.strip(),
+            status=status_value
+        )
+
+        return JsonResponse({
+            "status": True,
+            "message": "Module created successfully.",
+            "data": {
+                "id": obj.id,
+                "modules": obj.modules,
+                "status": obj.status,
+                "created_at": obj.created_at,
+                "updated_at": obj.updated_at
+            }
+        }, status=201)
+
+    # -------------------- PUT / PATCH --------------------
+    elif request.method in ["PUT", "PATCH"]:
+
+        selected_id = id if id is not None else request.GET.get("id")
+
+        if selected_id in (None, ""):
+            return JsonResponse({
+                "status": False,
+                "message": "id is required for update."
+            }, status=400)
+
+        try:
+            selected_id = int(selected_id)
+            obj = DC_inch_Verify_module_pre.objects.get(id=selected_id)
+
+        except ValueError:
+            return JsonResponse({
+                "status": False,
+                "message": "id must be an integer."
+            }, status=400)
+
+        except DC_inch_Verify_module_pre.DoesNotExist:
+            return JsonResponse({
+                "status": False,
+                "message": "Module not found."
+            }, status=404)
+
+        try:
+            body = json.loads(request.body.decode("utf-8"))
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            return JsonResponse({
+                "status": False,
+                "message": "Invalid JSON format."
+            }, status=400)
+
+        if "modules" in body:
+
+            modules = body["modules"]
+
+            if not isinstance(modules, str) or not modules.strip():
+                return JsonResponse({
+                    "status": False,
+                    "message": "modules must be a non-empty string."
+                }, status=400)
+
+            if len(modules.strip()) > 100:
+                return JsonResponse({
+                    "status": False,
+                    "message": "modules cannot exceed 100 characters."
+                }, status=400)
+
+            obj.modules = modules.strip()
+
+        if "status" in body:
+
+            status_value = body["status"]
+
+            if not isinstance(status_value, bool):
+                return JsonResponse({
+                    "status": False,
+                    "message": "status must be a boolean."
+                }, status=400)
+
+            obj.status = status_value
+
+        obj.save()
+
+        return JsonResponse({
+            "status": True,
+            "message": "Module updated successfully.",
+            "data": {
+                "id": obj.id,
+                "modules": obj.modules,
+                "status": obj.status,
+                "created_at": obj.created_at,
+                "updated_at": obj.updated_at
+            }
+        })
+
+    # -------------------- DELETE --------------------
+    elif request.method == "DELETE":
+
+        selected_id = id if id is not None else request.GET.get("id")
+
+        if selected_id in (None, ""):
+            return JsonResponse({
+                "status": False,
+                "message": "id is required for delete."
+            }, status=400)
+
+        try:
+            selected_id = int(selected_id)
+            obj = DC_inch_Verify_module_pre.objects.get(id=selected_id)
+
+        except ValueError:
+            return JsonResponse({
+                "status": False,
+                "message": "id must be an integer."
+            }, status=400)
+
+        except DC_inch_Verify_module_pre.DoesNotExist:
+            return JsonResponse({
+                "status": False,
+                "message": "Module not found."
+            }, status=404)
+
+        obj.delete()
+
+        return JsonResponse({
+            "status": True,
+            "message": "Module deleted successfully.",
+            "data": {
+                "id": selected_id
+            }
+        })
+    
+    # -------------------- INVALID METHOD --------------------
+    else:
+        return JsonResponse({
+            "status": False,
+            "message": "Method not allowed. Use GET, POST, PUT, PATCH, or DELETE."
+        }, status=405)

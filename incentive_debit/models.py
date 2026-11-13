@@ -40,59 +40,6 @@ class Empwisesal(models.Model):
 
 
 
-
-class Staffdtls(models.Model):
-    code = models.IntegerField(primary_key=True)
-    name = models.CharField(max_length=70,db_collation='SQL_Latin1_General_CP1_CI_AS',blank=True,null=True)
-    photo = models.CharField(max_length=400,db_collation='SQL_Latin1_General_CP1_CI_AS',blank=True,null=True)
-
-    class Meta:
-        managed = False
-        db_table = 'staffdtls'
-
-
-class Staffodtls(models.Model):
-    code = models.OneToOneField(
-        Staffdtls,
-        to_field='code',
-        db_column='code',
-        primary_key=True,
-        on_delete=models.DO_NOTHING,
-        related_name='office_details'
-    )
-
-    name = models.CharField(
-        max_length=70,
-        db_collation='SQL_Latin1_General_CP1_CI_AS'
-    )
-    dept = models.CharField(
-        max_length=70,
-        blank=True,
-        null=True,
-        db_column='wunit',
-        db_collation='SQL_Latin1_General_CP1_CI_AS'
-    )
-    Designation = models.CharField(
-        max_length=70,
-        blank=True,
-        null=True,
-        db_column='cat',
-        db_collation='SQL_Latin1_General_CP1_CI_AS'
-    )
-    status = models.CharField(
-        max_length=20,
-        blank=True,
-        null=True,
-        db_collation='SQL_Latin1_General_CP1_CI_AS'
-    )
-
-    class Meta:
-        managed = False
-        db_table = 'staffodtls'
-
-
-
-
 class IncdebStatus(models.Model):
     req_id = models.AutoField(db_column='Req_ID', primary_key=True)  # Field name made lowercase.
     req_dt = models.DateField(db_column='Req_Dt', blank=True, null=True)  # Field name made lowercase.

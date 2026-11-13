@@ -3,19 +3,6 @@ from django.db import models
 
 
 
-class VueStPunch(models.Model):
-    slno = models.BigIntegerField(primary_key=True)
-    name = models.CharField(max_length=70)
-    code = models.IntegerField()
-    date = models.DateField(db_column='Date', blank=True, null=True)  # Field name made lowercase.
-    cat = models.CharField(max_length=70, blank=True, null=True)
-    photo = models.CharField(max_length=400, blank=True, null=True)
-    intime = models.TimeField(blank=True, null=True)
-    outtime = models.TimeField(blank=True, null=True)
-
-    class Meta:
-        managed = False
-        db_table = 'vue_st_punch'
 
 class LaySp(models.Model):
     date = models.DateField()
@@ -290,17 +277,3 @@ class QcappQcPieceFinal(models.Model):
 
 
 
-
-class StAtt(models.Model):
-    slno = models.BigIntegerField(primary_key=True)
-    name = models.CharField(max_length=70)
-    code = models.IntegerField()
-    date = models.DateField(db_column='Date', blank=True, null=True)  # Field name made lowercase.
-    cat = models.CharField(max_length=70, blank=True, null=True)
-    intime = models.TimeField(blank=True, null=True)
-    outtime = models.TimeField(blank=True, null=True)
-    duration = models.CharField(db_column='Duration', max_length=10, blank=True, null=True)  # Field name made lowercase.
-
-    class Meta:
-        managed = False
-        db_table = 'st_att'

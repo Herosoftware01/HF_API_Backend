@@ -43,10 +43,13 @@ urlpatterns = [
     
     # For GET by role name (e.g., /dcapp/dc_permissions/Admin/)
     path('dc_permissions/<str:role_param>/', views.manage_role_permissions, name='get_role_permissions'),
+    path('dc_permissions/', views.manage_role_permissions, name='manage_role_permissions'),
     path('dc_permissions/save/', views.manage_role_permissions, name='save_role_permissions'),
     path('dc_receiver/', views.dc_receiver_crud_api, name='dc_receiver_list_create'),
     path('dc_receiver/<int:record_id>/', views.dc_receiver_crud_api, name='dc_receiver_detail'),
     path("dc_modules/",views.module_collection,name="dc-module-collection",),
     path("dc_modules/<str:module_id>/",views.module_detail,name="dc-module-detail"),
+    path("dc_inch_verify_module_pre/",views.dc_inch_verify_module_pre_api,name="dc_inch_verify_module_pre_api"), 
+    path("dc_inch_verify_module_pre/<int:id>/",views.dc_inch_verify_module_pre_api,name="dc_inch_verify_module_pre_api_by_id"),
 
 ]

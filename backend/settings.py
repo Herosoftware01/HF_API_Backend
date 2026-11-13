@@ -112,6 +112,7 @@ INSTALLED_APPS = [
     'GateInward',
     'incentive_debit',
     'weighing',
+    'cutting_module',
 
 ]
 

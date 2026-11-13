@@ -31,6 +31,7 @@ urlpatterns = [
     path('master_repcut/', views.Master_Repcut, name='Master_Repcut'),
     path('master_repcut_details/', views.Master_Repcut_Details, name='Master_Repcut_Details'),
     path('fab_details_api/', views.Fab_Details, name='Fabric Details'),
+    path('save_verification/', views.save_verification, name='save_verification'),
 
    
 ] 

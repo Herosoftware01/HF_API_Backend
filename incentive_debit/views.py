@@ -1,7 +1,7 @@
 from django.http import JsonResponse
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
-from .models import Staffodtls,Empwisesal,IncdebStatus,Employeeworking,IncdebPurpose,IncdebUsers
+from .models import Empwisesal,IncdebStatus,Employeeworking,IncdebPurpose,IncdebUsers
 from rest_framework import status
 from django.conf import settings
 import os
@@ -15,83 +15,26 @@ from rest_framework.permissions import AllowAny
 
 
 
-@api_view(['GET'])
-def staff_full_details(request):
-    qs = (
-        Staffodtls.objects.using('main')
-        .filter(status='Working')
-        .exclude(Designation__in=[
-            'Security',
-            'Warehouse Associate',
-            'Driver'
-        ])
-        .select_related('code')
-    )
-
-    data = []
-    for rec in qs:
-        staff = rec.code  # OneToOne FK → Staffdtls
-
-        # PHOTO CONVERSION (unchanged)
-        if getattr(staff, 'photo', None):
-            filename = os.path.basename(staff.photo)
-            if getattr(settings, 'DEBUG', False):
-                photo_url = f"https://hfapi.herofashion.com/staff_images/{filename}"
-            else:
-                photo_url = None
-        else:
-            photo_url = None
-
-        data.append({
-            "code": staff.code,
-            "name": staff.name,
-            "photo": photo_url,
-            "dept": rec.dept,
-            "designation": rec.Designation,
-            "status": rec.status
-        })
-
-    return Response(data)
-
 
 
 @api_view(['GET'])
 def empwise_salary_api(request):
-
-    category_subquery = Employeeworking.objects.using('main').filter(
-        code=OuterRef('code')
-    ).values('category')[:1]
-
-    qs = (
-        Empwisesal.objects.using('main')
-        .filter(status='Working')
-        .annotate(
-            final_designation=Coalesce(
-                F('designation'),
-                Subquery(category_subquery)
-            )
-        )
-    )
+    qs = Empwisesal.objects.using('main').filter(status='Working')
 
     data = []
-
     for rec in qs:
-        # PHOTO LOGIC (UNCHANGED)
-        if rec.photo:
+        # Photo handling
+        photo_url = None
+        if rec.photo and getattr(settings, 'DEBUG', False):
             filename = os.path.basename(rec.photo)
-            if settings.DEBUG:
-                photo_url = f"https://app.herofashion.com/staff_images/{filename}"
-            else:
-                photo_url = None
-        else:
-            photo_url = None
+            photo_url = f"https://hfapi.herofashion.com/staff_images/{filename}"
 
         data.append({
             "code": rec.code,
             "name": rec.name,
             "dept": rec.dept,
             "status": rec.status,
-            "designation": rec.final_designation,
+            "designation": rec.designation,  # mapped from db_column='mcategory'
             "photo": photo_url
         })
 
