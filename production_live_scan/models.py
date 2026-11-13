@@ -258,3 +258,23 @@ class sub_bundle_unit_transfer(models.Model):
     from_unit = models.IntegerField()
     to_unit = models.IntegerField()
     date = models.DateTimeField()
+
+
+
+class ViewOrderdetails(models.Model):
+    orderno = models.CharField(db_column='OrderNo', max_length=50, primary_key=True)  # Field name made lowercase.
+    prdsl = models.IntegerField(blank=True, null=True)
+    product = models.CharField(max_length=50, blank=True, null=True)
+    clr = models.CharField(db_column='Clr', max_length=8000, blank=True, null=True)  # Field name made lowercase.
+    sizename = models.TextField(db_column='SizeName', blank=True, null=True)  # Field name made lowercase.
+    ordqty = models.IntegerField(blank=True, null=True)
+    merch = models.CharField(max_length=35, blank=True, null=True)
+    buyer = models.CharField(max_length=15, blank=True, null=True)
+    prdnunit = models.CharField(max_length=35, blank=True, null=True)
+    finaldelvdate = models.CharField(max_length=4000, blank=True, null=True)
+    style = models.CharField(max_length=35, blank=True, null=True)
+    img1 = models.CharField(max_length=94, blank=True, null=True)
+
+    class Meta:
+        managed = False
+        db_table = 'view_orderdetails'
