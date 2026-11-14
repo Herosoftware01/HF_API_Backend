@@ -3010,7 +3010,7 @@ def get_dependency_pc(request):
             tb_name=tb_name,
             color=color
         )
-        .values('tb_id', 'size', 'bundle_id', 'seq')
+        .values('tb_id', 'size', 'bundle_id', 'bdl_no', 'seq')
         .annotate(
             total_pc=Coalesce(
                 Sum(Cast('pc', output_field=IntegerField())),
@@ -3021,7 +3021,12 @@ def get_dependency_pc(request):
     )
     for row in stock_rows:
         bundle_key = (row['tb_id'], row['size'], row['bundle_id'])
-        bundle = bundle_data.setdefault(bundle_key, {'sequences': set(), 'pc': 0})
+        bundle = bundle_data.setdefault(bundle_key, {
+            'bundle_id': row['bundle_id'],
+            'bundle_no': row['bdl_no'],
+            'sequences': set(),
+            'pc': 0
+        })
         bundle['pc'] = max(bundle['pc'], row['total_pc'])
         bundle['sequences'].update(
             description.strip().casefold()
@@ -3029,6 +3034,7 @@ def get_dependency_pc(request):
         )
 
     stock_data = {}
+    stock_bundles = {}
     for (tb_id, size, _), bundle in bundle_data.items():
         for (dependency_tb_id, process_name), (and_sequences, or_sequences) in process_rules.items():
             if dependency_tb_id != tb_id:
@@ -3042,6 +3048,11 @@ def get_dependency_pc(request):
                 stock_data[size][process_name] = (
                     stock_data[size].get(process_name, 0) + bundle['pc']
                 )
+                stock_bundles.setdefault(size, {}).setdefault(process_name, []).append({
+                    'bundle_id': bundle['bundle_id'],
+                    'bundle_no': bundle['bundle_no'],
+                    'pc': bundle['pc']
+                })
 
     # 3. Optimize Cut Data: Fetch ALL tb_ids in a SINGLE query using `__in` filter
     # Get Cut Qty from Stored Procedure
@@ -3084,7 +3095,8 @@ def get_dependency_pc(request):
             seq_data[process] = {
                 "pc": pc,
                 "bal": cut_qty - pc,
-                "stock": stock_data.get(size, {}).get(process, 0)
+                "stock": stock_data.get(size, {}).get(process, 0),
+                "stock_bundles": stock_bundles.get(size, {}).get(process, [])
             }
 
         result_data.append({
