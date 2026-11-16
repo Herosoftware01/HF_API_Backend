@@ -10,7 +10,7 @@ from django.http import JsonResponse
 from datetime import date
 from django.db.models import OuterRef, Subquery
 
-from .models import RollEmployee, RollEmpDetails, RollChecking, RollCheckingDetails, RollCheckingDefect, MasterMistakes, DefectCategory, DefectMaster
+from .models import RollEmployee, RollEmpDetails, RollChecking, RollCheckingDetails, RollCheckingDefect, MasterMistakes, DefectCategory, DefectMaster, RollCheckingImage
 
 def Roll_Employee(request):
 
@@ -147,14 +147,31 @@ def Roll_Checking(request):
         data = list(queryset.order_by("-dt").values('rlno', 'dc', 'colour'))
 
         # Exclude records already submitted
-        filtered_data = []
+        # filtered_data = []
+        # for item in data:
+        #     detail = RollCheckingDetails.objects.using("default").filter(rlno=item['rlno'], dcno=item['dc'], colour=item['colour'], submit=1).exists()
+
+        #     if not detail:
+        #         filtered_data.append(item)
+
+        # data = filtered_data
+
+        result = []
         for item in data:
-            detail = RollCheckingDetails.objects.using("default").filter(rlno=item['rlno'], dcno=item['dc'], colour=item['colour'], submit=1).exists()
+            detail = RollCheckingDetails.objects.using("default").filter(rlno=item['rlno'], dcno=item['dc'], colour=item['colour']).values('submit').first()
 
-            if not detail:
-                filtered_data.append(item)
+            if detail:
+                if detail['submit'] == 1:
+                    status = "Roll Already Scanning"
+                else:
+                    status = "Roll Checking Progress"
+            else:
+                status = "Ready to Roll Checking"
+                
+            item['status'] = status
+            result.append(item)
 
-        data = filtered_data
+        data = result
 
     else:
         data = list(queryset.order_by("-dt").values())
@@ -275,46 +292,83 @@ def RollChecking_Details(request):
 
     
 @csrf_exempt
-@require_POST
+@require_http_methods(["GET", "POST"])
 def RollChecking_ImageUpload(request):
-    rlno = request.POST.get('rlno')
-    dcno = request.POST.get('dcno')
-    colour = request.POST.get('colour')
-    image = request.FILES.get('c_img')
 
-    if not rlno or not dcno or not colour or not image:
-        return JsonResponse(
-            {'error': 'rlno, dcno, colour, and c_img are required'},
-            status=400
-        )
+    if request.method == 'GET':
 
-    try:
-        obj = RollCheckingDetails.objects.using('default').get(rlno=rlno, dcno=dcno, colour=colour)
-    except RollCheckingDetails.DoesNotExist:
-        return JsonResponse({'error': 'Roll number not found'}, status=404)
-    except RollCheckingDetails.MultipleObjectsReturned:
-        return JsonResponse({'error': 'Multiple matching records found'}, status=409)
+        queryset = RollCheckingImage.objects.using('default').all().order_by('-sl')
 
-    os.makedirs(settings.ROLL_CHECKING_IMAGES_ROOT, exist_ok=True)
+        rlno = request.GET.get('rlno')
+        dcno = request.GET.get('dcno')
+        colour = request.GET.get('colour')
+        jobno = request.GET.get('jobno')
 
-    filename = f"{uuid.uuid4().hex}_{os.path.basename(image.name)}"
-    filepath = os.path.join(settings.ROLL_CHECKING_IMAGES_ROOT, filename)
+        if rlno:
+            queryset = queryset.filter(rlno=rlno)
 
-    with open(filepath, 'wb+') as destination:
-        for chunk in image.chunks():
-            destination.write(chunk)
+        if dcno:
+            queryset = queryset.filter(dcno=dcno)
 
-    obj.c_img = f"{settings.ROLL_CHECKING_IMAGES_URL}{filename}"
-    obj.save(using='default', update_fields=['c_img'])
+        if colour:
+            queryset = queryset.filter(colour=colour)
 
-    return JsonResponse({
-        'message': 'Image uploaded successfully',
-        'rlno': obj.rlno,
-        'dcno': obj.dcno,
-        'colour': obj.colour,
-        'c_img': obj.c_img
-    }, status=200)
+        if jobno:
+            queryset = queryset.filter(jobno=jobno)
 
+        data = []
+
+        for obj in queryset:
+            data.append({
+                'sl': obj.sl,
+                'rlno': obj.rlno,
+                'jobno': obj.jobno,
+                'colour': obj.colour,
+                'dcno': obj.dcno,
+                'image': request.build_absolute_uri(obj.image.url)
+                if obj.image else None,
+            })
+
+        return JsonResponse(data, safe=False)
+    
+    elif request.method == 'POST':
+
+        rlno = request.POST.get('rlno')
+        jobno = request.POST.get('jobno')
+        colour = request.POST.get('colour')
+        dcno = request.POST.get('dcno')
+        image = request.FILES.get('image')
+
+        if not rlno or not dcno or not colour or not image:
+            return JsonResponse(
+                {'error': 'rlno, dcno, colour, and image are required'},
+                status=400
+            )
+
+        try:
+            obj = RollCheckingImage.objects.using('default').create(
+                rlno=rlno,
+                jobno=jobno,
+                colour=colour,
+                dcno=dcno,
+                image=image
+            )
+
+            return JsonResponse({
+                'message': 'Image uploaded successfully',
+                'sl': obj.sl,
+                'rlno': obj.rlno,
+                'jobno': obj.jobno,
+                'colour': obj.colour,
+                'dcno': obj.dcno,
+                'image': request.build_absolute_uri(obj.image.url)
+            }, status=201)
+
+        except Exception as e:
+            return JsonResponse(
+                {'error': str(e)},
+                status=500
+            )
 
 @csrf_exempt
 def RollChecking_Defect(request):
