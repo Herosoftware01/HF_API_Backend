@@ -47,6 +47,7 @@ urlpatterns = [
     path('hr_module/', include('hr_module.urls')) ,
     path('incentive_debit/', include('incentive_debit.urls')) ,
     path('weighing/', include('weighing.urls')),
+    path('cutting_module/', include('cutting_module.urls')),
 
 ] 
 
