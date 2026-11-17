@@ -1971,9 +1971,9 @@ def get_allocate_live(request):
             if minutes <= 0:
                 return ""
 
-            operation_seconds = minutes * 60 * 1.15
+            operation_seconds = minutes * 1.15
 
-            return int(3600 / operation_seconds)
+            return int(round((60*0.75) / operation_seconds))
 
         except (TypeError, ValueError, ZeroDivisionError):
             return ""

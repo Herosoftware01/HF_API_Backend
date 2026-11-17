@@ -36,6 +36,7 @@ urlpatterns = [
     path('api/bundle-detail/', views.bundle_detail_api, name='bundle-detail'),
     path("api/bundle/transfer/",views.transfer_bundles,name="transfer_bundles",),
     path('api/bundle/<str:bundid>/', views.get_bundle_detail, name='get_bundle_detail'),
+    path('order_details_api/', views.order_details_api, name='order_details_api'),
 
     path(
         "users/",
