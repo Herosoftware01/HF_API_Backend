@@ -1,4 +1,7 @@
 from django.db import models
+from django.core.files.storage import FileSystemStorage
+from django.conf import settings
+import os, re
 
 class RollEmployee(models.Model):
     code = models.IntegerField(primary_key=True)
@@ -62,14 +65,13 @@ class RollCheckingDetails(models.Model):
     type = models.CharField(max_length=10, blank=True, null=True)
     fabric = models.CharField(max_length=50, blank=True, null=True)
     weight = models.CharField(max_length=20, blank=True, null=True)
-    meter = models.CharField(max_length=20, blank=True, null=True)
+    meter = models.CharField(max_length=50, blank=True, null=True)
     gsm = models.CharField(max_length=20, blank=True, null=True)
     a_gsm = models.CharField(max_length=20, blank=True, null=True)
-    f_dia = models.CharField(max_length=20, blank=True, null=True)
+    f_dia = models.CharField(max_length=50, blank=True, null=True)
     remark = models.CharField(max_length=200, blank=True, null=True)
     timer = models.CharField(db_column='Timer',max_length=50, blank=True, null=True) 
     image = models.CharField(max_length=100, blank=True, null=True)
-    c_img = models.CharField(max_length=100, blank=True, null=True)
     submit = models.BooleanField(default=False)
     submit_date =  models.DateTimeField(blank=True, null=True)    
 
@@ -81,6 +83,32 @@ class RollCheckingDetails(models.Model):
             )
         ]
 
+roll_checking_image_storage = FileSystemStorage(
+    location=settings.ROLL_CHECKING_IMAGES_ROOT,
+    base_url=settings.ROLL_CHECKING_IMAGES_URL
+)
+
+def roll_checking_image_filename(instance, filename):
+    ext = os.path.splitext(filename)[1].lower()
+
+    rlno = re.sub(r'[^a-zA-Z0-9_-]', '_', instance.rlno or '')
+    dcno = re.sub(r'[^a-zA-Z0-9_-]', '_', instance.dcno or '')
+    colour = re.sub(r'[^a-zA-Z0-9_-]', '_', instance.colour or '')
+
+    count = RollCheckingImage.objects.filter(
+        rlno=instance.rlno,
+        dcno=instance.dcno,
+        colour=instance.colour
+    ).count() + 1
+
+    return f"{rlno}_{dcno}_{colour}_img{count}{ext}"
+
+class RollCheckingImage(models.Model):
+    sl = models.AutoField(primary_key=True)
+    rlno = models.CharField(max_length=20)
+    colour = models.CharField(max_length=50, blank=True, null=True)
+    dcno = models.CharField(max_length=30, blank=True, null=True)
+    image = models.ImageField(upload_to=roll_checking_image_filename, storage=roll_checking_image_storage, blank=True, null=True)
 
 class RollCheckingDefect(models.Model):
     sl = models.AutoField(primary_key=True)
@@ -181,19 +209,23 @@ class MasterMistakes(models.Model):
     mist12_img = models.ImageField(upload_to='mistake_images/', blank=True, null=True)
     mist13_img = models.ImageField(upload_to='mistake_images/', blank=True, null=True)
 
-    m1 = models.IntegerField(blank=True, null=True)
-    m2 = models.IntegerField(blank=True, null=True)
-    m3 = models.IntegerField(blank=True, null=True)
-    m4 = models.IntegerField(blank=True, null=True)
-    m5 = models.IntegerField(blank=True, null=True)
-    m6 = models.IntegerField(blank=True, null=True)
-    m7 = models.IntegerField(blank=True, null=True)
-    m8 = models.IntegerField(blank=True, null=True)
-    m9 = models.IntegerField(blank=True, null=True)
-    m10 = models.IntegerField(blank=True, null=True)
-    m11 = models.IntegerField(blank=True, null=True)
-    m12 = models.IntegerField(blank=True, null=True)
-    m13 = models.IntegerField(blank=True, null=True)
+    m1 = models.CharField(max_length=10, blank=True, null=True)
+    m2 = models.CharField(max_length=10, blank=True, null=True)
+    m3 = models.CharField(max_length=10, blank=True, null=True)
+    m4 = models.CharField(max_length=10, blank=True, null=True)
+    m5 = models.CharField(max_length=10, blank=True, null=True)
+    m6 = models.CharField(max_length=10, blank=True, null=True)
+    m7 = models.CharField(max_length=10, blank=True, null=True)
+    m8 = models.CharField(max_length=10, blank=True, null=True)
+    m9 = models.CharField(max_length=10, blank=True, null=True)
+    m10 = models.CharField(max_length=10, blank=True, null=True)
+    m11 = models.CharField(max_length=10, blank=True, null=True)
+    m12 = models.CharField(max_length=10, blank=True, null=True)
+    m13 = models.CharField(max_length=10, blank=True, null=True)
+
+    class Meta:
+        managed = False
+        db_table = 'RollChecking_mastermistakes'
 
 
 class DefectCategory(models.Model):
