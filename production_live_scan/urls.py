@@ -68,5 +68,33 @@ urlpatterns = [
     path('api/sizes/', GetSizesView.as_view(), name='get-sizes'),
     path('api/sequences/', GetSequencesView.as_view(), name='get-sequences'),
     path('api/assembly/save/', SaveAssemblySelectionView.as_view(), name='save-assembly'),
-    path('get-dependency-pc/',views.get_dependency_pc,name='get_dependency_pc')
+    path('get-dependency-pc/',views.get_dependency_pc,name='get_dependency_pc'),
+    path('elastic/orders/',
+         views.elastic_order_list),
+
+    path('elastic/topbottom/',views.elastic_topbottom_list),
+
+    path('elastic/colours/', views.elastic_colour_list),
+
+    path('elastic/sizes/',
+         views.elastic_size_details),
+
+    path('elastic/cons/save/',
+         views.save_elastic_cons),
+
+    path('elastic/save/',
+         views.save_elastic_cutting_entry),
+
+    path('elastic/previous/',
+         views.elastic_previous_cutting),
+
+    path('elastic/description/',
+         views.elastic_description),
+    path('elastic/accessory_qty/', views.elastic_accessory_qty),
+    path('api/job-nos/', views.get_job_nos, name='get_job_nos'),
+    path('api/top-bottoms/', views.get_top_bottoms, name='get_top_bottoms'),
+    path('api/elastic/colors/', views.get_colors, name='get_colors'),
+    path('api/elastic-units/', views.get_elastic_units, name='get_elastic_units'),
+    path('api/bundle-details/', views.get_bundle_details, name='get_bundle_details'),
+    path('api/delivery/save/', views.save_elastic_delivery, name='save_elastic_delivery'),
 ]  

@@ -6,10 +6,11 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from django.db import transaction
+from django.core.exceptions import ValidationError
 from imp_reports.models import UnitBundlereport
 from bundle_tracking.models import TrsMcutstickerprod,MasUnit,MasTopbottom
 from qcapp.models import Unit,Line,machine_details,emp_allocate,Empwisesal
-from .models import Assembly_data,bundle_transfer,end_line_data, unit_input,ViewOrderdetails,sub_bundle_unit_transfer, Msizes,dependency,dependency_data,PreporatoryEntry,ViewRibdelPreparatory,RibdelEntry,VueCutPlnStat
+from .models import Assembly_data,ViewElasticCons,ViewCuttingQtyDetailsUnit,ViewOrdersummaryUnit,ViewCuttingQtyDetails,ViewOrdersummary,ViewAccessoryorderqtyElastic,elastic_cons,bundle_transfer,end_line_data, unit_input,ViewOrderdetails,sub_bundle_unit_transfer, Msizes,dependency,dependency_data,PreporatoryEntry,ViewRibdelPreparatory,RibdelEntry,VueCutPlnStat,Elastic_cutting_qty,Elastic_cutting_qty_details,ElasticDelivery,ElasticDeliveryDetails
 from django.utils.dateparse import parse_date, parse_datetime
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
@@ -32,6 +33,7 @@ from django.db.models import Sum, IntegerField, Value
 from django.db.models.functions import Cast, Coalesce
 import json
 from django.db import connection, transaction
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
 
 # @require_GET
@@ -751,6 +753,23 @@ def assembly_dependencies_satisfied(completed_sequences, and_sequences, or_seque
         not or_sequences or not completed_sequences.isdisjoint(or_sequences)
     )
     return and_requirements_met and or_requirements_met
+
+
+def assembly_process_stock_available(
+    completed_sequences,
+    process_name,
+    and_sequences,
+    or_sequences,
+):
+    process_is_complete = str(process_name or '').strip().casefold() in completed_sequences
+    return (
+        not process_is_complete
+        and assembly_dependencies_satisfied(
+            completed_sequences,
+            and_sequences,
+            or_sequences,
+        )
+    )
 
 
 def split_process_descriptions(process_des):
@@ -3039,8 +3058,9 @@ def get_dependency_pc(request):
         for (dependency_tb_id, process_name), (and_sequences, or_sequences) in process_rules.items():
             if dependency_tb_id != tb_id:
                 continue
-            if not assembly_dependencies_satisfied(
+            if assembly_process_stock_available(
                 bundle['sequences'],
+                process_name,
                 and_sequences,
                 or_sequences
             ):
@@ -3204,3 +3224,782 @@ def order_details_api(request):
             {"error": str(e)},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
+
+
+
+# 1. Order No Dropdown
+@api_view(['GET'])
+def elastic_order_list(request):
+
+    data = (
+        ViewOrdersummary.objects.using('demo')
+        .values_list('ordno', flat=True)
+        .distinct()
+        .order_by('ordno')
+    )
+
+    return Response(list(data))
+
+
+# 2. Top/Bottom Dropdown
+@api_view(['GET'])
+def elastic_topbottom_list(request):
+
+    ordno = request.GET.get('ordno')
+
+    data = (
+        ViewOrdersummary.objects.using('demo')
+        .filter(ordno=ordno)
+        .values_list('topbottom_des', flat=True)
+        .distinct()
+        .order_by('topbottom_des')
+    )
+
+    return Response(list(data))
+
+
+# 3. Colour Dropdown
+@api_view(['GET'])
+def elastic_colour_list(request):
+
+    ordno = request.GET.get('ordno')
+    topbottom = request.GET.get('topbottom')
+
+    data = (
+        ViewOrdersummary.objects.using('demo')
+        .filter(
+            ordno=ordno,
+            topbottom_des=topbottom
+        )
+        .values_list('clr', flat=True)
+        .distinct()
+        .order_by('clr')
+    )
+
+    return Response(list(data))
+
+
+# 4. Size and Order Qty
+@api_view(['GET'])
+def elastic_size_details(request):
+    ordno = request.GET.get('ordno')
+    jobno = request.GET.get('jobno')
+    topbottom = request.GET.get('topbottom')
+    colour = request.GET.get('colour')
+
+    print(f"DEBUG REQ -> ordno: {ordno}, jobno: {jobno}, topbottom: {topbottom}, colour: {colour}")
+
+    # 1. Get size and order_qty from ViewOrdersummary
+    order_data = (
+        ViewOrdersummary.objects.using('demo')
+        .filter(
+            ordno=ordno,
+            topbottom_des=topbottom,
+            clr=colour
+        )
+        .values('siz')
+        .annotate(qty=Sum('qty'))
+        .order_by('siz')
+    )
+
+    result = []
+    for row in order_data:
+        size_name = row['siz']
+        order_qty = row['qty'] or 0
+
+        # Prefer editable consumption values, then fall back to the source view.
+        saved_cons_query = elastic_cons.objects.filter(
+            color__iexact=colour,
+            sizedescr__iexact=size_name,
+            topbott__iexact=topbottom
+        ).order_by('id')
+        if jobno:
+            saved_cons_query = saved_cons_query.filter(jobno__iexact=jobno)
+            cons_obj = saved_cons_query.first()
+            if not cons_obj:
+                cons_obj = elastic_cons.objects.filter(
+                    jobno='',
+                    color__iexact=colour,
+                    sizedescr__iexact=size_name,
+                    topbott__iexact=topbottom
+                ).order_by('id').first()
+        else:
+            cons_obj = saved_cons_query.filter(jobno='').first()
+            if not cons_obj:
+                cons_obj = saved_cons_query.first()
+
+        cons_source = 'elastic_cons' if cons_obj else 'none'
+        if not cons_obj:
+            cons_query = ViewElasticCons.objects.using('demo').filter(
+                color__iexact=colour,
+                sizedescr__iexact=size_name,
+                topbott__iexact=topbottom
+            ).order_by('sl1')
+            if jobno:
+                cons_query = cons_query.filter(jobno__iexact=jobno)
+            cons_obj = cons_query.first()
+            if cons_obj:
+                cons_source = 'view_elastic_cons'
+
+        len_cms = str(cons_obj.cons) if cons_obj and cons_obj.cons is not None else ""
+
+        # 3. Get total_pcs_cut (noofpcs) from ViewCuttingQtyDetails matching jobno, topbottom_des, clrcombo, and name
+        cutting_query = ViewCuttingQtyDetails.objects.using('demo').filter(
+            topbottom_des__iexact=topbottom,
+            clrcombo__iexact=colour,
+            name__iexact=size_name
+        ).order_by('itemno')  # Ensure consistent ordering
+        if jobno:
+            cutting_query = cutting_query.filter(jobno__iexact=jobno)
+
+        cutting_obj = cutting_query.first()
+        total_pcs_cut = cutting_obj.noofpcs if cutting_obj and cutting_obj.noofpcs is not None else ""
+
+        print(f"Size: {size_name} | Found Cons: {len_cms} | Found Cutting Qty: {total_pcs_cut}")
+
+        # Calculate initial balance
+        balance = order_qty - (int(total_pcs_cut) if total_pcs_cut != "" else 0)
+
+        result.append({
+            'size': size_name,
+            'order_qty': order_qty,
+            'len_cms': len_cms,
+            'cons_source': cons_source,
+            'total_pcs_cut': total_pcs_cut,
+            'balance': balance,
+            'prev_cut_qty': "",
+            'current_cut_qty': "",
+            'estimate_mtr': ""
+        })
+
+    return Response(result)
+
+
+@api_view(['POST'])
+def save_elastic_cons(request):
+    jobno = str(request.data.get('jobno') or '').strip()
+    topbottom = str(request.data.get('topbottom') or '').strip()
+    colour = str(request.data.get('colour') or '').strip()
+    sizes = request.data.get('sizes')
+
+    if not topbottom or not colour or not isinstance(sizes, list) or not sizes:
+        return Response(
+            {'error': 'Top/Bottom, Colour and at least one size are required.'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    if len(jobno) > 50 or len(topbottom) > 50 or len(colour) > 1800:
+        return Response(
+            {'error': 'One or more selection values exceed the allowed length.'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    cons_field = elastic_cons._meta.get_field('cons')
+    validated_sizes = []
+    seen_sizes = set()
+    for row in sizes:
+        if not isinstance(row, dict):
+            return Response(
+                {'error': 'Each size entry must include a size and CMS length.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        size_name = str(row.get('size') or '').strip()
+        if not size_name or len(size_name) > 50 or size_name in seen_sizes:
+            return Response(
+                {'error': 'Size names must be present, unique and no longer than 50 characters.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            consumption = cons_field.clean(row.get('len_cms'), None)
+        except ValidationError as error:
+            return Response(
+                {'error': f'Invalid CMS length for size {size_name}: {error.messages[0]}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        validated_sizes.append((size_name, consumption))
+        seen_sizes.add(size_name)
+
+    with transaction.atomic():
+        for size_name, consumption in validated_sizes:
+            matching_rows = elastic_cons.objects.filter(
+                jobno__iexact=jobno,
+                sizedescr__iexact=size_name,
+                topbott__iexact=topbottom,
+                color__iexact=colour
+            )
+            if matching_rows.exists():
+                matching_rows.update(cons=consumption)
+                continue
+
+            fallback_rows = elastic_cons.objects.filter(
+                jobno='',
+                sizedescr__iexact=size_name,
+                topbott__iexact=topbottom,
+                color__iexact=colour
+            ) if jobno else matching_rows
+
+            if fallback_rows.exists():
+                fallback_rows.update(cons=consumption)
+                continue
+
+            elastic_cons.objects.create(
+                jobno=jobno,
+                sizedescr=size_name,
+                cons=consumption,
+                topbott=topbottom,
+                color=colour
+            )
+
+    return Response(
+        {
+            'saved_count': len(validated_sizes),
+            'saved_sizes': [size_name for size_name, _ in validated_sizes],
+        },
+        status=status.HTTP_200_OK
+    )
+
+
+@api_view(['POST'])
+def save_elastic_cutting_entry(request):
+    def clean_text(model, field_name, value, required=False):
+        text = '' if value is None else str(value).strip()
+        if required and not text:
+            raise ValueError(f'{field_name} is required.')
+        field = model._meta.get_field(field_name)
+        if field.max_length and len(text) > field.max_length:
+            raise ValueError(f'{field_name} exceeds {field.max_length} characters.')
+        return text or None
+
+    def clean_number(model, field_name, value, integer=False, required=False):
+        text = clean_text(model, field_name, value)
+        if text is None:
+            if required:
+                raise ValueError(f'{field_name} is required.')
+            return Decimal('0'), None
+        try:
+            number = Decimal(text)
+        except InvalidOperation as error:
+            raise ValueError(f'{field_name} must be a valid number.') from error
+        if not number.is_finite() or number < 0:
+            raise ValueError(f'{field_name} must be zero or a positive number.')
+        if integer and number != number.to_integral_value():
+            raise ValueError(f'{field_name} must be a whole number.')
+        normalized = format(number.normalize(), 'f')
+        return number, clean_text(model, field_name, normalized)
+
+    payload = request.data
+    sizes = payload.get('sizes')
+    if not isinstance(sizes, list) or not sizes:
+        return Response(
+            {'error': 'At least one size row is required.'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    try:
+        order_no = clean_text(Elastic_cutting_qty, 'order_no', payload.get('order_no'), required=True)
+        topbottom = clean_text(Elastic_cutting_qty, 'topbottom', payload.get('topbottom'), required=True)
+        colour = clean_text(Elastic_cutting_qty, 'color', payload.get('color'), required=True)
+        elastic_description = clean_text(
+            Elastic_cutting_qty, 'elastic_description', payload.get('elastic_description')
+        )
+        inward_mtrs = clean_number(Elastic_cutting_qty, 'inward_mtrs', payload.get('inward_mtrs'))[1]
+        actual_consumption_value, actual_consumption = clean_number(
+            Elastic_cutting_qty, 'actual_consumption', payload.get('actual_consumption'), required=True
+        )
+        _, wastage = clean_number(
+            Elastic_cutting_qty, 'wastage', payload.get('wastage'), required=True
+        )
+
+        entry_date = parse_date(str(payload.get('date') or ''))
+        if not entry_date:
+            raise ValueError('A valid entry date is required.')
+        entry_datetime = timezone.make_aware(
+            datetime.combine(entry_date, datetime.min.time()),
+            timezone.get_current_timezone()
+        )
+
+        validated_rows = []
+        seen_sizes = set()
+        total_cut_qty = Decimal('0')
+        total_estimate_mtrs = Decimal('0')
+
+        for row in sizes:
+            if not isinstance(row, dict):
+                raise ValueError('Each size row must be an object.')
+
+            size_name = clean_text(Elastic_cutting_qty_details, 'size', row.get('size'), required=True)
+            if size_name in seen_sizes:
+                raise ValueError(f'Duplicate size row: {size_name}.')
+            seen_sizes.add(size_name)
+
+            length, length_text = clean_number(
+                Elastic_cutting_qty_details, 'len_cm', row.get('len_cm')
+            )
+            order_qty, order_qty_text = clean_number(
+                Elastic_cutting_qty_details, 'order_qty', row.get('order_qty'), integer=True
+            )
+            pcs_cut, pcs_cut_text = clean_number(
+                Elastic_cutting_qty_details, 'pcs_cut', row.get('pcs_cut'), integer=True
+            )
+            previous_qty, _ = clean_number(
+                Elastic_cutting_qty_details, 'elastic_cutting_qty', row.get('prev_cut_qty'), integer=True
+            )
+            current_qty, _ = clean_number(
+                Elastic_cutting_qty_details, 'elastic_cutting_qty',
+                row.get('elastic_cutting_qty'), integer=True
+            )
+            quantity_limit = max(order_qty, pcs_cut)
+            if previous_qty + current_qty > quantity_limit:
+                raise ValueError(
+                    f'Elastic quantities for size {size_name} exceed the order/cut quantity limit ({quantity_limit}).'
+                )
+
+            bundles = row.get('bundles') or []
+            if not isinstance(bundles, list):
+                raise ValueError(f'Bundle rows for size {size_name} must be a list.')
+            clean_bundles = []
+            bundle_total = Decimal('0')
+            for bundle_index, bundle in enumerate(bundles, start=1):
+                if not isinstance(bundle, dict):
+                    raise ValueError(f'Bundle {bundle_index} for size {size_name} must be an object.')
+                bundle_no = clean_text(
+                    Elastic_cutting_qty_details, 'bdl_no',
+                    bundle.get('bdl_no', bundle_index), required=True
+                )
+                bundle_qty, bundle_qty_text = clean_number(
+                    Elastic_cutting_qty_details, 'bdl_qty', bundle.get('bdl_qty'), integer=True
+                )
+                if bundle_qty <= 0:
+                    raise ValueError(f'Bundle {bundle_index} for size {size_name} must have a positive quantity.')
+                clean_bundles.append((bundle_no, bundle_qty, bundle_qty_text))
+                bundle_total += bundle_qty
+
+            if current_qty > 0 and bundle_total != current_qty:
+                raise ValueError(
+                    f'Bundle quantities for size {size_name} must total {current_qty} pcs.'
+                )
+            if current_qty == 0 and bundle_total:
+                raise ValueError(f'Bundle quantities for size {size_name} must total zero.')
+
+            size_estimate = (length * current_qty / Decimal('100')).quantize(
+                Decimal('0.01'), rounding=ROUND_HALF_UP
+            )
+            if current_qty > 0:
+                detail_rows = []
+                for bundle_no, bundle_qty, bundle_qty_text in clean_bundles:
+                    bundle_estimate = (
+                        length * bundle_qty / Decimal('100')
+                    ).quantize(Decimal('0.0001'))
+                    detail_rows.append({
+                        'size': size_name,
+                        'len_cm': length_text,
+                        'order_qty': order_qty_text,
+                        'pcs_cut': pcs_cut_text,
+                        'elastic_cutting_qty': bundle_qty_text,
+                        'estimate_mtrs': format(bundle_estimate, 'f'),
+                        'bdl_no': bundle_no,
+                        'bdl_qty': bundle_qty_text,
+                    })
+                validated_rows.extend(detail_rows)
+            total_cut_qty += current_qty
+            total_estimate_mtrs += size_estimate
+
+        if total_cut_qty <= 0:
+            raise ValueError('Enter an Elastic Current Cut Qty before saving.')
+
+        lower_bound = max(Decimal('0'), total_estimate_mtrs - Decimal('5'))
+        upper_bound = total_estimate_mtrs + Decimal('5')
+        if actual_consumption_value < lower_bound or actual_consumption_value > upper_bound:
+            raise ValueError(
+                f'Actual Consumption must be between {lower_bound} and {upper_bound} Mtrs.'
+            )
+
+        total_cut_text = format(total_cut_qty.normalize(), 'f')
+        total_estimate_text = format(
+            total_estimate_mtrs.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP), 'f'
+        )
+        clean_text(Elastic_cutting_qty, 'total_cutting_qty', total_cut_text)
+        clean_text(Elastic_cutting_qty, 'estimate_mtrs', total_estimate_text)
+    except (ValueError, InvalidOperation) as error:
+        return Response({'error': str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    with transaction.atomic():
+        entry = Elastic_cutting_qty.objects.create(
+            order_no=order_no,
+            topbottom=topbottom,
+            color=colour,
+            elastic_description=elastic_description,
+            inward_mtrs=inward_mtrs,
+            date=entry_datetime,
+            actual_consumption=actual_consumption,
+            wastage=wastage,
+            total_cutting_qty=total_cut_text,
+            estimate_mtrs=total_estimate_text,
+        )
+        Elastic_cutting_qty_details.objects.bulk_create([
+            Elastic_cutting_qty_details(entry_no=entry, **row)
+            for row in validated_rows
+        ])
+
+    return Response(
+        {'entry_no': entry.entry_no, 'saved_details': len(validated_rows)},
+        status=status.HTTP_201_CREATED
+    )
+
+
+@api_view(['GET'])
+def elastic_previous_cutting(request):
+    order_no = str(request.GET.get('order_no') or '').strip()
+    topbottom = str(request.GET.get('topbottom') or '').strip()
+    colour = str(request.GET.get('color') or '').strip()
+    accessory = str(request.GET.get('elastic_description') or '').strip()
+    if not order_no or not topbottom or not colour:
+        return Response(
+            {'error': 'Order, Top/Bottom and Colour are required.'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    entries_query = Elastic_cutting_qty.objects.filter(
+        order_no__iexact=order_no,
+        topbottom__iexact=topbottom,
+        color__iexact=colour,
+    )
+    if accessory:
+        entries_query = entries_query.filter(elastic_description__iexact=accessory)
+    entries = list(entries_query.order_by('entry_no'))
+
+    def saved_decimal(value, field_name):
+        try:
+            number = Decimal(str(value or '0'))
+        except InvalidOperation as error:
+            raise ValueError(f'Saved {field_name} data is invalid.') from error
+        if not number.is_finite():
+            raise ValueError(f'Saved {field_name} data is invalid.')
+        return number
+
+    try:
+        previous_estimate = sum(
+            (saved_decimal(entry.estimate_mtrs, 'estimate Mtrs') for entry in entries),
+            Decimal('0')
+        )
+        previous_wastage = sum(
+            (saved_decimal(entry.wastage, 'wastage') for entry in entries),
+            Decimal('0')
+        )
+        previous_qty_by_size = {}
+        if entries:
+            details = Elastic_cutting_qty_details.objects.filter(
+                entry_no__in=[entry.entry_no for entry in entries]
+            ).values_list('size', 'elastic_cutting_qty')
+            for size_name, qty in details:
+                if size_name:
+                    size_key = str(size_name).strip().casefold()
+                    previous_qty_by_size[size_key] = (
+                        previous_qty_by_size.get(size_key, Decimal('0'))
+                        + saved_decimal(qty, 'previous cut quantity')
+                    )
+    except ValueError as error:
+        return Response({'error': str(error)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    return Response({
+        'previous_cutting_mtrs': format(previous_estimate.normalize(), 'f'),
+        'previous_wastage_mtrs': format(previous_wastage.normalize(), 'f'),
+        'prev_cut_qty_by_size': {
+            size_name: format(qty.normalize(), 'f')
+            for size_name, qty in previous_qty_by_size.items()
+        },
+    })
+
+
+@api_view(['GET'])
+def elastic_accessory_qty(request):
+    ordno = request.GET.get('ordno')
+    accessory = request.GET.get('accessory')
+
+    data = (
+        ViewAccessoryorderqtyElastic.objects.using('demo')
+        .filter(orderno=ordno, accessory=accessory)
+        .first()
+    )
+
+    qty = data.qty if data else 0
+    return Response({'qty': qty})
+
+
+# 5. Elastic Description
+@api_view(['GET'])
+def elastic_description(request):
+
+    ordno = request.GET.get('ordno')
+
+    data = (
+        ViewAccessoryorderqtyElastic.objects.using('demo')
+        .filter(orderno=ordno)
+        .values_list('accessory', flat=True)
+        .distinct()
+    )
+
+    return Response(list(data))
+
+
+############### Elastic Delivery API ###############
+
+# 1. Get Distinct Order Numbers (JobNos)
+def get_job_nos(request):
+    job_nos = list(Elastic_cutting_qty.objects.values_list('order_no', flat=True).distinct())
+    return JsonResponse(job_nos, safe=False)
+
+def get_top_bottoms(request):
+    ordno = request.GET.get('order_no')
+    top_bottoms = list(Elastic_cutting_qty.objects.filter(order_no=ordno).values_list('topbottom', flat=True).distinct())
+    return JsonResponse(top_bottoms, safe=False)
+
+# 2. Get Colors by OrderNo
+def get_colors(request):
+    print("DEBUG: Fetching colors for order_no", request.GET.get('order_no'))
+    order_no = request.GET.get('order_no')
+    print(f"DEBUG: Fetching colors for order_no: {order_no}")
+    colors = list(Elastic_cutting_qty.objects.filter(order_no=order_no).values_list('color', flat=True).distinct())
+    return JsonResponse(colors, safe=False)
+
+def get_elastic_units(request):
+    ordno = request.GET.get('order_no')
+    topbottom = request.GET.get('topbottom')
+    color = request.GET.get('color')
+    
+    units = list(
+        ViewOrdersummaryUnit.objects.using('demo').filter(
+            ordno=ordno, 
+            topbottom_des=topbottom, 
+            clr=color
+        ).values_list('unitname', flat=True).distinct()
+    )
+    return JsonResponse(units, safe=False)
+
+# 5. Get Bundle Details 
+def get_bundle_details(request):
+    order_no = request.GET.get('order_no')
+    topbottom = request.GET.get('topbottom')
+    color = request.GET.get('color')
+    unitname = request.GET.get('unitname')
+    
+    try:
+        summary_rows = ViewOrdersummaryUnit.objects.using('demo').filter(
+            ordno=order_no,
+            topbottom_des=topbottom,
+            clr=color,
+            unitname=unitname
+        ).values('siz', 'qty')
+
+        # 1. 0 உள்ள சைஸ்களைக் கண்டறிந்து ஒரு லிஸ்ட்டில் சேமிக்கிறோம்
+        skipped_sizes = []
+        preloaded_summary = []
+        
+        for row in summary_rows:
+            size_name = row['siz']
+            order_qty_val = row['qty'] or 0
+
+            cut_summary = ViewCuttingQtyDetailsUnit.objects.using('demo').filter(
+                jobno=order_no,
+                topbottom_des=topbottom,
+                comboclr=color,
+                unitname=unitname,
+                name=size_name
+            ).values('noofpcs').first()
+            
+            pcs_cut_val = cut_summary['noofpcs'] if cut_summary and cut_summary['noofpcs'] is not None else 0
+
+            # Ord Qty மற்றும் Cut Qty இரண்டும் 0 எனில் skip செய்வோம்
+            if order_qty_val == 0 and pcs_cut_val == 0:
+                skipped_sizes.append(size_name)
+                continue
+
+            preloaded_summary.append({
+                "size": size_name,
+                "order_qty": order_qty_val,
+                "pcs_cut": pcs_cut_val,
+            })
+
+        previous_deliveries = {
+            row["size"]: row["total_qty"] or 0
+            for row in ElasticDeliveryDetails.objects.filter(
+                delivery_id__job_no=order_no,
+                delivery_id__topbottom=topbottom,
+                delivery_id__colour=color,
+                delivery_id__unit=unitname
+            ).values("size").annotate(total_qty=Sum("cur_del_qty"))
+        }
+        for row in preloaded_summary:
+            row["prev_del_qty"] = previous_deliveries.get(row["size"], 0)
+
+        # 2. Elastic cutting details லிருந்து bundles எடுக்கும்போது skipped_sizes-ல் உள்ளவை வரக்கூடாது
+        cutting_qty_records = Elastic_cutting_qty.objects.filter(order_no=order_no, topbottom=topbottom, color=color)
+        bundles_list = []
+        for record in cutting_qty_records:
+            details = Elastic_cutting_qty_details.objects.filter(entry_no=record, delivery=False)
+            for d in details:
+                # 0 உள்ள சைஸ் பண்டில்களை வலது பக்க டேபிளில் காட்டாமல் தவிர்க்கிறோம்
+                if d.size in skipped_sizes:
+                    continue
+                    
+                bundles_list.append({
+                    "entry_no": record.entry_no,
+                    "topbottom": record.topbottom,
+                    "bdl_id": d.bdl_id,
+                    "size": d.size,
+                    "len_cm": d.len_cm,
+                    "elastic_cutting_qty": float(d.elastic_cutting_qty or 0),
+                    "bdl_no": d.bdl_no,
+                    "bdl_qty": d.bdl_qty,
+                })
+            
+        return JsonResponse({
+            "preloaded_summary": preloaded_summary,
+            "bundles": bundles_list
+        })
+        
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
+
+
+@api_view(["POST"])
+def save_elastic_delivery(request):
+    job_no = str(request.data.get("job_no") or "").strip()
+    topbottom = str(request.data.get("topbottom") or "").strip()
+    colour = str(request.data.get("colour") or "").strip()
+    unit = str(request.data.get("unit") or "").strip()
+    details = request.data.get("details")
+
+    if not job_no or not topbottom or not colour or not unit:
+        return Response(
+            {"error": "Job number, Top/Bottom, Colour and Unit are required."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    if (
+        len(job_no) > 50 or len(topbottom) > 50
+        or len(colour) > 50 or len(unit) > 100
+    ):
+        return Response(
+            {"error": "One or more selection values exceed the allowed length."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    if not isinstance(details, list) or not details:
+        return Response(
+            {"error": "Scan at least one bundle before saving delivery."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    validated_details = []
+    seen_bundle_ids = set()
+    try:
+        for row in details:
+            if not isinstance(row, dict):
+                raise ValueError("Each delivery detail must be an object.")
+
+            size = str(row.get("size") or "").strip()
+            bundle_ids = row.get("bdl_ids")
+            unit_ord_qty = int(row.get("unit_ord_qty"))
+            unit_cut_qty = int(row.get("unit_cut_qty"))
+            cur_del_qty = int(row.get("cur_del_qty"))
+            total_bdl = int(row.get("total_bdl"))
+
+            if (
+                not size or len(size) > 50
+                or not isinstance(bundle_ids, list) or not bundle_ids
+                or unit_ord_qty < 0 or unit_cut_qty < 0
+                or cur_del_qty <= 0 or total_bdl <= 0
+                or total_bdl != len(bundle_ids)
+            ):
+                raise ValueError(f"Invalid delivery values for size {size or '(blank)'}.")
+
+            normalized_ids = [int(bundle_id) for bundle_id in bundle_ids]
+            if any(bundle_id <= 0 for bundle_id in normalized_ids):
+                raise ValueError("Bundle IDs must be positive integers.")
+            if any(bundle_id in seen_bundle_ids for bundle_id in normalized_ids):
+                raise ValueError("A bundle cannot be included more than once.")
+            seen_bundle_ids.update(normalized_ids)
+            validated_details.append({
+                "size": size,
+                "bdl_ids": normalized_ids,
+                "unit_ord_qty": unit_ord_qty,
+                "unit_cut_qty": unit_cut_qty,
+                "cur_del_qty": cur_del_qty,
+                "total_bdl": total_bdl,
+            })
+    except (TypeError, ValueError, OverflowError) as error:
+        return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    with transaction.atomic():
+        bundle_rows = list(
+            Elastic_cutting_qty_details.objects.select_for_update().filter(
+                bdl_id__in=seen_bundle_ids,
+                delivery=False,
+                entry_no__order_no=job_no,
+                entry_no__topbottom=topbottom,
+                entry_no__color=colour,
+            )
+        )
+        bundles_by_id = {bundle.bdl_id: bundle for bundle in bundle_rows}
+        if set(bundles_by_id) != seen_bundle_ids:
+            return Response(
+                {"error": "One or more scanned bundles are invalid or already delivered."},
+                status=status.HTTP_409_CONFLICT
+            )
+
+        for row in validated_details:
+            matching_bundles = [bundles_by_id[bundle_id] for bundle_id in row["bdl_ids"]]
+            if any(str(bundle.size or "").strip().lower() != row["size"].lower() for bundle in matching_bundles):
+                return Response(
+                    {"error": f"Scanned bundles do not match size {row['size']}."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            try:
+                scanned_qty = sum(Decimal(bundle.elastic_cutting_qty or "0") for bundle in matching_bundles)
+            except (InvalidOperation, TypeError):
+                return Response(
+                    {"error": f"Invalid bundle quantity for size {row['size']}."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            if scanned_qty != Decimal(row["cur_del_qty"]):
+                return Response(
+                    {"error": f"Scanned bundle quantity for size {row['size']} does not match delivery quantity."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+        delivery = ElasticDelivery.objects.create(
+            job_no=job_no,
+            topbottom=topbottom,
+            colour=colour,
+            unit=unit,
+        )
+        saved_details = []
+        for row in validated_details:
+            delivery_detail = ElasticDeliveryDetails.objects.create(
+                delivery_id=delivery,
+                unit_ord_qty=row["unit_ord_qty"],
+                unit_cut_qty=row["unit_cut_qty"],
+                size=row["size"],
+                cur_del_qty=row["cur_del_qty"],
+                total_bdl=row["total_bdl"],
+            )
+            Elastic_cutting_qty_details.objects.filter(
+                bdl_id__in=row["bdl_ids"]
+            ).update(delivery=True, delivery_id=delivery_detail.id)
+            saved_details.append(delivery_detail.id)
+
+    return Response(
+        {
+            "delivery_id": delivery.id,
+            "detail_ids": saved_details,
+            "saved_count": len(saved_details),
+        },
+        status=status.HTTP_201_CREATED
+    )
+
+
+
+############### End of Elastic Delivery API ###############
+
