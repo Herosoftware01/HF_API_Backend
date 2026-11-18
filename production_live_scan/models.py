@@ -278,3 +278,137 @@ class ViewOrderdetails(models.Model):
     class Meta:
         managed = False
         db_table = 'view_orderdetails'
+
+
+class ViewOrdersummary(models.Model):
+    ordno = models.CharField(db_column='OrdNo', max_length=50, primary_key=True)  # Field name made lowercase.
+    topbottom_des = models.CharField(db_column='TopBottom_des', max_length=50, blank=True, null=True)  # Field name made lowercase.
+    clr = models.CharField(db_column='Clr', max_length=50, blank=True, null=True)  # Field name made lowercase.
+    siz = models.CharField(db_column='Siz', max_length=50, blank=True, null=True)  # Field name made lowercase.
+    itemno = models.SmallIntegerField(db_column='ItemNo', blank=True, null=True)
+    qty = models.IntegerField(blank=True, null=True)
+
+    class Meta:
+        managed = False
+        db_table = 'view_OrderSummary'
+
+
+class ViewAccessoryorderqtyElastic(models.Model):
+    orderno = models.CharField(db_column='OrderNo', max_length=50, primary_key=True)  # Field name made lowercase.
+    accessory = models.CharField(db_column='Accessory', max_length=158)  # Field name made lowercase.
+    qty = models.DecimalField(db_column='Qty', max_digits=38, decimal_places=4, blank=True, null=True)  # Field name made lowercase.
+
+    class Meta:
+        managed = False
+        db_table = 'view_AccessoryOrderQty_Elastic'
+
+class ViewElasticCons(models.Model):
+    jobno = models.CharField(db_column='JobNo', max_length=50, primary_key=True)  # Field name made lowercase.
+    sl1 = models.IntegerField(blank=True, null=True)
+    sizedescr = models.CharField(max_length=50)
+    cons = models.DecimalField(max_digits=18, decimal_places=2)
+    topbott = models.CharField(max_length=50)
+    color = models.CharField(max_length=1800, blank=True, null=True)
+
+    class Meta:
+        managed = False
+        db_table = 'view_elastic_cons'
+
+class elastic_cons(models.Model):
+    jobno = models.CharField(max_length=50)
+    sizedescr = models.CharField(max_length=50)
+    cons = models.DecimalField(max_digits=18, decimal_places=2)
+    topbott = models.CharField(max_length=50)
+    color = models.CharField(max_length=1800, blank=True, null=True)
+
+    class Meta:
+        managed = True
+        db_table = 'elastic_cons'
+
+
+class ViewCuttingQtyDetails(models.Model):
+    itemno = models.SmallIntegerField(db_column='ItemNo', blank=True, null=True)
+    jobno = models.CharField(max_length=50,primary_key=True)
+    topbottom_des = models.CharField(db_column='TopBottom_des', max_length=50, blank=True, null=True)  # Field name made lowercase.
+    clrcombo = models.CharField(max_length=50, blank=True, null=True)
+    name = models.CharField(db_column='Name', max_length=35)  # Field name made lowercase.
+    noofpcs = models.IntegerField(blank=True, null=True)
+
+    class Meta:
+        managed = False
+        db_table = 'view_cutting_qty_details'
+
+
+class Elastic_cutting_qty(models.Model):
+    entry_no = models.AutoField(primary_key=True)
+    order_no = models.CharField(max_length=50)
+    topbottom = models.CharField(max_length=50, blank=True, null=True)
+    color = models.CharField(max_length=100, blank=True, null=True)
+    elastic_description = models.CharField(max_length=100, blank=True, null=True)
+    inward_mtrs = models.CharField(max_length=50, blank=True, null=True)
+    date = models.DateTimeField()
+    actual_consumption = models.CharField(max_length=50, blank=True, null=True)
+    wastage = models.CharField(max_length=50, blank=True, null=True)
+    total_cutting_qty = models.CharField(max_length=50, blank=True, null=True)
+    estimate_mtrs = models.CharField(max_length=50, blank=True, null=True)
+
+class Elastic_cutting_qty_details(models.Model):
+    bdl_id = models.AutoField(primary_key=True)
+    entry_no = models.ForeignKey(Elastic_cutting_qty, on_delete=models.CASCADE, related_name='cutting_qty_details')
+    size = models.CharField(max_length=50, blank=True, null=True)
+    len_cm = models.CharField(max_length=50, blank=True, null=True)
+    order_qty = models.CharField(max_length=50, blank=True, null=True)
+    pcs_cut = models.CharField(max_length=50, blank=True, null=True)
+    elastic_cutting_qty = models.CharField(max_length=50, blank=True, null=True)
+    estimate_mtrs = models.CharField(max_length=50, blank=True, null=True)
+    bdl_no = models.CharField(max_length=50, blank=True, null=True)
+    bdl_qty = models.CharField(max_length=50, blank=True, null=True)
+    delivery = models.BooleanField(default=False)
+    delivery_id = models.IntegerField(blank=True, null=True)
+
+
+class ViewOrdersummaryUnit(models.Model):
+    ordno = models.CharField(db_column='OrdNo', max_length=50, primary_key=True)  # Field name made lowercase.
+    topbottom_des = models.CharField(db_column='TopBottom_des', max_length=50, blank=True, null=True)  # Field name made lowercase.
+    clr = models.CharField(db_column='Clr', max_length=50, blank=True, null=True)  # Field name made lowercase.
+    siz = models.CharField(db_column='Siz', max_length=50, blank=True, null=True)  # Field name made lowercase.
+    qty = models.IntegerField(blank=True, null=True)
+    itemno = models.SmallIntegerField(db_column='ItemNo', blank=True, null=True)  # Field name made lowercase.
+    unitname = models.CharField(db_column='UnitName', max_length=50, blank=True, null=True)  # Field name made lowercase.
+
+    class Meta:
+        managed = False
+        db_table = 'view_OrderSummary_unit'
+
+class ViewCuttingQtyDetailsUnit(models.Model):
+    itemno = models.SmallIntegerField(db_column='ItemNo', blank=True, null=True)  # Field name made lowercase.
+    jobno = models.CharField(max_length=50, primary_key=True)
+    topbottom_des = models.CharField(db_column='TopBottom_des', max_length=50, blank=True, null=True)  # Field name made lowercase.
+    comboclr = models.CharField(max_length=50, blank=True, null=True)
+    name = models.CharField(db_column='Name', max_length=35)  # Field name made lowercase.
+    noofpcs = models.IntegerField(blank=True, null=True)
+    unitname = models.CharField(db_column='UnitName', max_length=50, blank=True, null=True)  # Field name made lowercase.
+
+    class Meta:
+        managed = False
+        db_table = 'view_cutting_qty_details_unit'
+    
+class ElasticDelivery(models.Model):
+    id = models.AutoField(primary_key=True)
+    job_no = models.CharField(max_length=50)
+    topbottom = models.CharField(max_length=50)
+    colour = models.CharField(max_length=50)
+    unit = models.CharField(max_length=100)
+    delivery_date = models.DateTimeField(auto_now_add=True)
+
+class ElasticDeliveryDetails(models.Model):
+    id = models.AutoField(primary_key=True)
+    delivery_id = models.ForeignKey(ElasticDelivery, on_delete=models.CASCADE, related_name='details')
+    unit_ord_qty = models.IntegerField()
+    unit_cut_qty = models.IntegerField()
+    size = models.CharField(max_length=50)
+    cur_del_qty = models.IntegerField()
+    total_bdl = models.IntegerField()
+    delivery_date = models.DateTimeField(auto_now_add=True)
+
+

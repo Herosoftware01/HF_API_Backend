@@ -1,14 +1,18 @@
 import json
 from contextlib import nullcontext
 from datetime import datetime, timezone as datetime_timezone
+from decimal import Decimal
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 from django.test import RequestFactory, SimpleTestCase, TestCase
 from rest_framework.test import APIRequestFactory, force_authenticate
 
+from .models import Elastic_cutting_qty as ElasticCuttingQtyModel
+from .models import elastic_cons as ElasticConsModel
 from .views import (
     UserUnitPermissionView,
+    assembly_process_stock_available,
     assembly_dependencies_satisfied,
     bundle_process_pairs,
     get_already_assembled_bundle_ids,
@@ -18,7 +22,12 @@ from .views import (
     get_bundle_last_process,
     GetUnitDataAPIView,
     delete_process_dependency,
+    elastic_size_details,
+    elastic_previous_cutting,
+    save_elastic_delivery,
     SaveAssemblySelectionView,
+    save_elastic_cons,
+    save_elastic_cutting_entry,
     save_process_dependency,
     split_process_descriptions,
     verify_process_dependency,
@@ -26,6 +35,28 @@ from .views import (
 
 
 class AssemblyProcessSequenceTests(SimpleTestCase):
+    def test_stock_requires_dependencies_complete_and_current_process_pending(self):
+        dependency = {"top shoulder attach"}
+
+        self.assertTrue(assembly_process_stock_available(
+            {"top shoulder attach"},
+            "Top Neck Rib Attach",
+            dependency,
+            set(),
+        ))
+        self.assertFalse(assembly_process_stock_available(
+            set(),
+            "Top Neck Rib Attach",
+            dependency,
+            set(),
+        ))
+        self.assertFalse(assembly_process_stock_available(
+            {"top shoulder attach", "top neck rib attach"},
+            "Top Neck Rib Attach",
+            dependency,
+            set(),
+        ))
+
     def test_and_dependency_and_one_or_dependency_are_both_required(self):
         and_dependencies = {"top 2nd shoulder attach"}
         or_dependencies = {
@@ -643,3 +674,425 @@ class UserUnitPermissionTests(SimpleTestCase):
             for permission in bulk_create.call_args.args[0]
         ))
         existing_permissions.assert_called_once_with(user_id=7, app="machine_transfer")
+
+
+class ElasticConsumptionTests(SimpleTestCase):
+    def test_size_details_prefers_saved_consumption(self):
+        order_query = MagicMock()
+        order_query.values.return_value.annotate.return_value.order_by.return_value = [
+            {"siz": "M", "qty": 10}
+        ]
+        saved_query = MagicMock()
+        saved_query.order_by.return_value.filter.return_value.first.return_value = (
+            SimpleNamespace(cons=Decimal("3.25"))
+        )
+        cutting_query = MagicMock()
+        cutting_query.order_by.return_value.first.return_value = None
+
+        request = APIRequestFactory().get(
+            "/elastic/sizes/",
+            {
+                "ordno": "ORD-1",
+                "jobno": "ORD-1",
+                "topbottom": "TOP",
+                "colour": "BLACK",
+            },
+        )
+        with (
+            patch("production_live_scan.views.ViewOrdersummary") as orders,
+            patch("production_live_scan.views.elastic_cons") as saved,
+            patch("production_live_scan.views.ViewElasticCons") as source,
+            patch("production_live_scan.views.ViewCuttingQtyDetails") as cutting,
+        ):
+            orders.objects.using.return_value.filter.return_value = order_query
+            saved.objects.filter.return_value = saved_query
+            cutting.objects.using.return_value.filter.return_value = cutting_query
+
+            response = elastic_size_details(request)
+
+        self.assertEqual(response.data[0]["len_cms"], "3.25")
+        self.assertEqual(response.data[0]["cons_source"], "elastic_cons")
+        source.objects.using.assert_not_called()
+
+    def test_size_details_falls_back_to_view_when_no_saved_value(self):
+        order_query = MagicMock()
+        order_query.values.return_value.annotate.return_value.order_by.return_value = [
+            {"siz": "M", "qty": 10}
+        ]
+        saved_query = MagicMock()
+        saved_ordered_query = saved_query.order_by.return_value
+        saved_ordered_query.filter.return_value.first.return_value = None
+        saved_ordered_query.first.return_value = None
+        source_query = MagicMock()
+        source_query.order_by.return_value.first.return_value = (
+            SimpleNamespace(cons=Decimal("2.50"))
+        )
+        cutting_query = MagicMock()
+        cutting_query.order_by.return_value.first.return_value = None
+
+        request = APIRequestFactory().get(
+            "/elastic/sizes/",
+            {"ordno": "ORD-1", "topbottom": "TOP", "colour": "BLACK"},
+        )
+        with (
+            patch("production_live_scan.views.ViewOrdersummary") as orders,
+            patch("production_live_scan.views.elastic_cons") as saved,
+            patch("production_live_scan.views.ViewElasticCons") as source,
+            patch("production_live_scan.views.ViewCuttingQtyDetails") as cutting,
+        ):
+            orders.objects.using.return_value.filter.return_value = order_query
+            saved.objects.filter.return_value = saved_query
+            source.objects.using.return_value.filter.return_value = source_query
+            cutting.objects.using.return_value.filter.return_value = cutting_query
+
+            response = elastic_size_details(request)
+
+        self.assertEqual(response.data[0]["len_cms"], "2.50")
+        self.assertEqual(response.data[0]["cons_source"], "view_elastic_cons")
+        source.objects.using.assert_called_once_with("demo")
+
+    def test_save_creates_values_for_unset_sizes(self):
+        request = APIRequestFactory().post(
+            "/elastic/cons/save/",
+            {
+                "jobno": "ORD-1",
+                "topbottom": "TOP",
+                "colour": "BLACK",
+                "sizes": [
+                    {"size": "M", "len_cms": "3.25"},
+                    {"size": "L", "len_cms": "3.50"},
+                ],
+            },
+            format="json",
+        )
+        with (
+            patch("production_live_scan.views.elastic_cons") as saved,
+            patch(
+                "production_live_scan.views.transaction.atomic",
+                return_value=nullcontext(),
+            ),
+        ):
+            saved._meta = ElasticConsModel._meta
+            matching_rows = saved.objects.filter.return_value
+            matching_rows.exists.return_value = False
+
+            response = save_elastic_cons(request)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["saved_count"], 2)
+        self.assertEqual(response.data["saved_sizes"], ["M", "L"])
+        self.assertEqual(saved.objects.create.call_count, 2)
+        self.assertEqual(
+            saved.objects.create.call_args_list[0].kwargs,
+            {
+                "jobno": "ORD-1",
+                "sizedescr": "M",
+                "cons": Decimal("3.25"),
+                "topbott": "TOP",
+                "color": "BLACK",
+            },
+        )
+
+    def test_save_updates_existing_values(self):
+        request = APIRequestFactory().post(
+            "/elastic/cons/save/",
+            {
+                "jobno": "ORD-1",
+                "topbottom": "TOP",
+                "colour": "BLACK",
+                "sizes": [{"size": "M", "len_cms": "3.25"}],
+            },
+            format="json",
+        )
+        with (
+            patch("production_live_scan.views.elastic_cons") as saved,
+            patch(
+                "production_live_scan.views.transaction.atomic",
+                return_value=nullcontext(),
+            ),
+        ):
+            saved._meta = ElasticConsModel._meta
+            saved.objects.filter.return_value.exists.return_value = True
+
+            response = save_elastic_cons(request)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["saved_count"], 1)
+        saved.objects.filter.return_value.update.assert_called_once_with(cons=Decimal("3.25"))
+        saved.objects.create.assert_not_called()
+
+
+class ElasticCuttingEntrySaveTests(SimpleTestCase):
+    def setUp(self):
+        self.payload = {
+            "date": "2026-11-17",
+            "order_no": "ORD-1",
+            "topbottom": "TOP",
+            "color": "BLACK",
+            "elastic_description": "Waist Elastic",
+            "inward_mtrs": "100",
+            "actual_consumption": "0.20",
+            "wastage": "0.13",
+            "sizes": [{
+                "size": "M",
+                "len_cm": "3.25",
+                "order_qty": "20",
+                "pcs_cut": "15",
+                "prev_cut_qty": "",
+                "elastic_cutting_qty": "10",
+                "bundles": [
+                    {"bdl_no": 1, "bdl_qty": 4},
+                    {"bdl_no": 2, "bdl_qty": 6},
+                ],
+            }, {
+                "size": "L",
+                "len_cm": "2",
+                "order_qty": "15",
+                "pcs_cut": "10",
+                "prev_cut_qty": "",
+                "elastic_cutting_qty": "",
+                "bundles": [],
+            }],
+        }
+
+    def test_saves_header_and_one_detail_per_bundle(self):
+        request = APIRequestFactory().post(
+            "/elastic/save/", self.payload, format="json"
+        )
+        with (
+            patch("production_live_scan.views.Elastic_cutting_qty.objects.create") as header_create,
+            patch("production_live_scan.views.Elastic_cutting_qty_details.objects.bulk_create") as details_create,
+            patch("production_live_scan.views.transaction.atomic", return_value=nullcontext()),
+        ):
+            header_create.return_value = ElasticCuttingQtyModel(entry_no=42)
+            response = save_elastic_cutting_entry(request)
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data["entry_no"], 42)
+        self.assertEqual(header_create.call_args.kwargs["total_cutting_qty"], "10")
+        self.assertEqual(header_create.call_args.kwargs["estimate_mtrs"], "0.33")
+        saved_details = details_create.call_args.args[0]
+        self.assertEqual(len(saved_details), 2)
+        self.assertEqual(
+            [(row.bdl_no, row.bdl_qty, row.elastic_cutting_qty) for row in saved_details],
+            [("1", "4", "4"), ("2", "6", "6")],
+        )
+
+    def test_rejects_bundle_total_that_differs_from_current_cut_qty(self):
+        self.payload["sizes"][0]["bundles"] = [{"bdl_no": 1, "bdl_qty": 9}]
+        request = APIRequestFactory().post(
+            "/elastic/save/", self.payload, format="json"
+        )
+        with (
+            patch("production_live_scan.views.Elastic_cutting_qty.objects.create") as header_create,
+            patch("production_live_scan.views.Elastic_cutting_qty_details.objects.bulk_create") as details_create,
+        ):
+            response = save_elastic_cutting_entry(request)
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("must total 10 pcs", response.data["error"])
+        header_create.assert_not_called()
+        details_create.assert_not_called()
+
+    def test_rejects_save_when_no_current_cut_qty_is_entered(self):
+        self.payload["sizes"][0]["elastic_cutting_qty"] = ""
+        self.payload["sizes"][0]["bundles"] = []
+        request = APIRequestFactory().post(
+            "/elastic/save/", self.payload, format="json"
+        )
+        with (
+            patch("production_live_scan.views.Elastic_cutting_qty.objects.create") as header_create,
+            patch("production_live_scan.views.Elastic_cutting_qty_details.objects.bulk_create") as details_create,
+        ):
+            response = save_elastic_cutting_entry(request)
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("Elastic Current Cut Qty", response.data["error"])
+        header_create.assert_not_called()
+        details_create.assert_not_called()
+
+    def test_rejects_elastic_cut_qty_above_order_and_cut_limit(self):
+        self.payload["sizes"][0]["elastic_cutting_qty"] = "21"
+        self.payload["sizes"][0]["bundles"] = [{"bdl_no": 1, "bdl_qty": 21}]
+        request = APIRequestFactory().post(
+            "/elastic/save/", self.payload, format="json"
+        )
+        with patch("production_live_scan.views.Elastic_cutting_qty.objects.create") as header_create:
+            response = save_elastic_cutting_entry(request)
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("quantity limit", response.data["error"])
+        header_create.assert_not_called()
+
+    def test_rejects_actual_consumption_outside_estimate_tolerance(self):
+        self.payload["actual_consumption"] = "10"
+        self.payload["wastage"] = "0"
+        request = APIRequestFactory().post(
+            "/elastic/save/", self.payload, format="json"
+        )
+        with patch("production_live_scan.views.Elastic_cutting_qty.objects.create") as header_create:
+            response = save_elastic_cutting_entry(request)
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("Actual Consumption must be between", response.data["error"])
+        header_create.assert_not_called()
+
+    def test_wastage_is_not_part_of_actual_consumption_tolerance(self):
+        self.payload["actual_consumption"] = "0.33"
+        self.payload["wastage"] = "100"
+        request = APIRequestFactory().post(
+            "/elastic/save/", self.payload, format="json"
+        )
+        with (
+            patch("production_live_scan.views.Elastic_cutting_qty.objects.create") as header_create,
+            patch("production_live_scan.views.Elastic_cutting_qty_details.objects.bulk_create"),
+            patch("production_live_scan.views.transaction.atomic", return_value=nullcontext()),
+        ):
+            header_create.return_value = ElasticCuttingQtyModel(entry_no=43)
+            response = save_elastic_cutting_entry(request)
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(header_create.call_args.kwargs["wastage"], "100")
+
+
+class ElasticDeliverySaveTests(SimpleTestCase):
+    def test_saves_delivery_and_links_scanned_bundle_to_delivery_detail(self):
+        request = APIRequestFactory().post(
+            "/api/delivery/save/",
+            {
+                "job_no": "ORD-1",
+                "topbottom": "TOP",
+                "colour": "BLACK",
+                "unit": "UNIT-1",
+                "details": [{
+                    "size": "M",
+                    "unit_ord_qty": 20,
+                    "unit_cut_qty": 15,
+                    "cur_del_qty": 4,
+                    "total_bdl": 1,
+                    "bdl_ids": [101],
+                }],
+            },
+            format="json",
+        )
+        bundle = SimpleNamespace(bdl_id=101, size="M", elastic_cutting_qty="4")
+        with (
+            patch("production_live_scan.views.ElasticDelivery") as delivery_model,
+            patch("production_live_scan.views.ElasticDeliveryDetails") as detail_model,
+            patch("production_live_scan.views.Elastic_cutting_qty_details") as bundle_model,
+            patch("production_live_scan.views.transaction.atomic", return_value=nullcontext()),
+        ):
+            delivery_model.objects.create.return_value = SimpleNamespace(id=12)
+            detail_model.objects.create.return_value = SimpleNamespace(id=34)
+            locked_bundles = bundle_model.objects.select_for_update.return_value.filter.return_value
+            locked_bundles.__iter__.return_value = iter([bundle])
+
+            response = save_elastic_delivery(request)
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data["delivery_id"], 12)
+        self.assertEqual(response.data["detail_ids"], [34])
+        self.assertEqual(
+            detail_model.objects.create.call_args.kwargs,
+            {
+                "delivery_id": delivery_model.objects.create.return_value,
+                "unit_ord_qty": 20,
+                "unit_cut_qty": 15,
+                "size": "M",
+                "cur_del_qty": 4,
+                "total_bdl": 1,
+            },
+        )
+        bundle_model.objects.filter.return_value.update.assert_called_once_with(
+            delivery=True,
+            delivery_id=34,
+        )
+
+    def test_rejects_bundle_that_does_not_match_delivery_size(self):
+        request = APIRequestFactory().post(
+            "/api/delivery/save/",
+            {
+                "job_no": "ORD-1",
+                "topbottom": "TOP",
+                "colour": "BLACK",
+                "unit": "UNIT-1",
+                "details": [{
+                    "size": "M",
+                    "unit_ord_qty": 20,
+                    "unit_cut_qty": 15,
+                    "cur_del_qty": 4,
+                    "total_bdl": 1,
+                    "bdl_ids": [101],
+                }],
+            },
+            format="json",
+        )
+        bundle = SimpleNamespace(bdl_id=101, size="L", elastic_cutting_qty="4")
+        with (
+            patch("production_live_scan.views.ElasticDelivery.objects.create") as delivery_create,
+            patch("production_live_scan.views.ElasticDeliveryDetails.objects.create") as detail_create,
+            patch("production_live_scan.views.Elastic_cutting_qty_details") as bundle_model,
+            patch("production_live_scan.views.transaction.atomic", return_value=nullcontext()),
+        ):
+            locked_bundles = bundle_model.objects.select_for_update.return_value.filter.return_value
+            locked_bundles.__iter__.return_value = iter([bundle])
+
+            response = save_elastic_delivery(request)
+
+        self.assertEqual(response.status_code, 400)
+        delivery_create.assert_not_called()
+        detail_create.assert_not_called()
+
+
+class ElasticPreviousCuttingTests(SimpleTestCase):
+    def test_returns_zero_previous_values_when_no_history_exists(self):
+        request = APIRequestFactory().get(
+            "/elastic/previous/",
+            {"order_no": "ORD-1", "topbottom": "TOP", "color": "BLACK"},
+        )
+        entries_query = MagicMock()
+        entries_query.order_by.return_value = []
+        with (
+            patch("production_live_scan.views.Elastic_cutting_qty.objects.filter", return_value=entries_query),
+            patch("production_live_scan.views.Elastic_cutting_qty_details.objects.filter") as details,
+        ):
+            response = elastic_previous_cutting(request)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data, {
+            "previous_cutting_mtrs": "0",
+            "previous_wastage_mtrs": "0",
+            "prev_cut_qty_by_size": {},
+        })
+        details.assert_not_called()
+
+    def test_returns_prior_estimates_wastage_and_size_cut_totals(self):
+        request = APIRequestFactory().get(
+            "/elastic/previous/",
+            {
+                "order_no": "ORD-1",
+                "topbottom": "TOP",
+                "color": "BLACK",
+                "elastic_description": "Waist Elastic",
+            },
+        )
+        entries_query = MagicMock()
+        entries_query.filter.return_value.order_by.return_value = [
+            SimpleNamespace(entry_no=1, estimate_mtrs="1.25", wastage="0.10"),
+            SimpleNamespace(entry_no=2, estimate_mtrs="0.75", wastage="0.05"),
+        ]
+        with (
+            patch("production_live_scan.views.Elastic_cutting_qty.objects.filter", return_value=entries_query),
+            patch("production_live_scan.views.Elastic_cutting_qty_details.objects.filter") as details,
+        ):
+            details.return_value.values_list.return_value = [
+                ("M", "4"),
+                ("M", "6"),
+                ("L", "3"),
+            ]
+            response = elastic_previous_cutting(request)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["previous_cutting_mtrs"], "2")
+        self.assertEqual(response.data["previous_wastage_mtrs"], "0.15")
+        self.assertEqual(response.data["prev_cut_qty_by_size"], {"m": "10", "l": "3"})
