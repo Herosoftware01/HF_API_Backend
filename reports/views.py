@@ -25,6 +25,7 @@ from .models import (
     UnitPoVerify,
     Vech,
     VueYftrsdt,
+    ViewPayAutoReport,
 )
 from django.http import JsonResponse
 import os
@@ -823,5 +824,47 @@ def vech_list(request):
         )
 
         data = [model_to_dict(v) for v in vech_records]
+
+        return JsonResponse(data, safe=False)
+
+from django.db.models import F, Func, DateField
+
+def AutoPayReport(request):
+
+    if request.method == 'GET':
+
+        name = request.GET.get('name')
+        no = request.GET.get('no')
+        from_date = request.GET.get('from_date')
+        to_date = request.GET.get('to_date')
+
+        queryset = ViewPayAutoReport.objects.using('test').all()
+
+        if name:
+            name_list = [item.strip() for item in name.split(",") if item.strip()]
+            queryset = queryset.filter(name__in=name_list)
+
+        if no:
+            no_list = [item.strip() for item in no.split(",") if item.strip()]
+            queryset = queryset.filter(no__in=no_list)
+
+        if from_date or to_date:
+
+            queryset = queryset.annotate(
+                converted_date=Func(
+                    F('date'),
+                    function='CONVERT',
+                    template="CONVERT(date, LEFT(%(expressions)s, 10), 103)",
+                    output_field=DateField()
+                )
+            )
+
+            if from_date:
+                queryset = queryset.filter(converted_date__gte=from_date)
+
+            if to_date:
+                queryset = queryset.filter(converted_date__lte=to_date)
+
+        data = list(queryset.values())
 
         return JsonResponse(data, safe=False)
