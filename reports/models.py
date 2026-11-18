@@ -794,3 +794,19 @@ class VueYftrsdt(models.Model):
     class Meta:
         managed = False
         db_table = 'vue_yftrsdt'
+
+class ViewPayAutoReport(models.Model):
+    company = models.CharField(max_length=12)
+    companyid = models.IntegerField(db_column='CompanyID')
+    year = models.IntegerField(db_column='Year')
+    no = models.IntegerField(db_column='No', primary_key=True)
+    date = models.CharField(max_length=4000, blank=True, null=True)
+    name = models.CharField(db_column='Name', max_length=35, blank=True, null=True)
+    email = models.CharField(max_length=200, blank=True, null=True)
+    amount = models.DecimalField(db_column='Amount', max_digits=19, decimal_places=4, blank=True, null=True)
+    aw = models.CharField(db_column='AW', max_length=1000, blank=True, null=True)
+    bankreferenceno = models.CharField(db_column='BankReferenceNo', max_length=100, blank=True, null=True)
+
+    class Meta:
+        managed = False
+        db_table = 'view_pay_auto_report'
