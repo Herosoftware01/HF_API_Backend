@@ -522,27 +522,35 @@ class TrsGatemodule(models.Model):
         managed = False
         db_table = 'Trs_Gatemodule'
 
-
 class ViewAccinwardVerification(models.Model):
     slno = models.BigIntegerField(db_column='SlNo', primary_key=True)  # Field name made lowercase.
+    no = models.IntegerField()
     date = models.DateTimeField(db_column='Date')  # Field name made lowercase.
+    grp = models.CharField(max_length=35)
+    des = models.CharField(max_length=35)
+    clr = models.CharField(max_length=50)
+    siz = models.CharField(max_length=50)
     name = models.CharField(db_column='Name', max_length=35, blank=True, null=True)  # Field name made lowercase.
     supplierdcno = models.CharField(db_column='SupplierDCNo', max_length=50)  # Field name made lowercase.
     pono = models.IntegerField(db_column='PONo', blank=True, null=True)  # Field name made lowercase.
-    poqty = models.DecimalField(db_column='PoQty', max_digits=38, decimal_places=4, blank=True, null=True)  # Field name made lowercase.
+    poqty = models.DecimalField(db_column='PoQty', max_digits=18, decimal_places=4)  # Field name made lowercase.
     jobno = models.CharField(db_column='JobNo', max_length=50, blank=True, null=True)  # Field name made lowercase.
     items = models.CharField(db_column='Items', max_length=71, blank=True, null=True)  # Field name made lowercase.
-    clr_siz = models.CharField(max_length=101, blank=True, null=True)
+    clr_siz = models.CharField(max_length=101)
     quantity = models.DecimalField(db_column='Quantity', max_digits=18, decimal_places=4)  # Field name made lowercase.
     uom = models.CharField(db_column='UOM', max_length=25)  # Field name made lowercase.
     bill_rate = models.DecimalField(db_column='Bill_Rate', max_digits=19, decimal_places=4, blank=True, null=True)  # Field name made lowercase.
     gst = models.CharField(db_column='GST', max_length=50, blank=True, null=True)  # Field name made lowercase.
     billno = models.CharField(db_column='BillNo', max_length=50, blank=True, null=True)  # Field name made lowercase.
     billdate = models.DateTimeField(db_column='BillDate', blank=True, null=True)  # Field name made lowercase.
+    porate = models.DecimalField(max_digits=19, decimal_places=4, blank=True, null=True)
+    companyid = models.SmallIntegerField(db_column='CompanyID')  # Field name made lowercase.
+    poyear = models.SmallIntegerField(db_column='POYear', blank=True, null=True)  # Field name made lowercase.
 
     class Meta:
         managed = False
         db_table = 'view_accinward_verification'
+
 
 
 
@@ -682,3 +690,22 @@ class DC_inch_Verify_module_pre(models.Model):
 
     class Meta:
         db_table = 'dc_inch_verify_module_pre'
+
+
+
+class ViewAccBillDetails(models.Model):
+    slno = models.BigIntegerField(db_column='SlNo', blank=True, null=True)  # Field name made lowercase.
+    name = models.CharField(db_column='Name', max_length=35, blank=True, null=True)  # Field name made lowercase.
+    pono = models.IntegerField(db_column='PONo', blank=True, null=True)  # Field name made lowercase.
+    pocompanyid = models.SmallIntegerField(db_column='POCompanyID', blank=True, null=True)  # Field name made lowercase.
+    poyear = models.SmallIntegerField(db_column='POYear', blank=True, null=True)  # Field name made lowercase.
+    billno = models.CharField(db_column='BillNo', max_length=50)  # Field name made lowercase.
+    billdate = models.DateTimeField(db_column='BillDate')  # Field name made lowercase.
+    gst = models.CharField(db_column='GST', max_length=50)  # Field name made lowercase.
+    bpquantity = models.DecimalField(db_column='BPQuantity', max_digits=38, decimal_places=4, blank=True, null=True)  # Field name made lowercase.
+    billrate = models.DecimalField(db_column='BillRate', max_digits=19, decimal_places=4)  # Field name made lowercase.
+    billvalue = models.DecimalField(max_digits=19, decimal_places=4, blank=True, null=True)
+
+    class Meta:
+        managed = False
+        db_table = 'view_acc_bill_details'

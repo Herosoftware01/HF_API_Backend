@@ -7,7 +7,7 @@ ViewYarnProcessDelivery,VueAccProcDel,
 ViewAccinwardVerification,ViewFabricDeliveryProcess,
 ViewMistakeqtyPrint,ViewUnitPcdelivery,VueRibDeliveryDetails,ViewGdwnFabricDeliveryPlan,
 TrsApidtls,ViewFabricDeliveryRepl,HerofashionUser,Holiday,RoleModulePermission,
-Dc_Reciver_Verify,ViewGeneralDeiveryType1,ViewGenStockIssue,ModuleMaster,DC_inch_Verify_module_pre)
+Dc_Reciver_Verify,ViewGeneralDeiveryType1,ViewGenStockIssue,ModuleMaster,DC_inch_Verify_module_pre,ViewAccBillDetails)
 import json
 from django.views.decorators.csrf import csrf_exempt
 from django.forms.models import model_to_dict
@@ -1886,3 +1886,53 @@ def dc_inch_verify_module_pre_api(request, id=None):
             "status": False,
             "message": "Method not allowed. Use GET, POST, PUT, PATCH, or DELETE."
         }, status=405)
+
+
+def acc_bill(request):
+
+    try:
+        bill_no = (request.GET.get('BillNo') or '').strip()
+        po_no = (request.GET.get('PONo') or '').strip()
+
+        queryset = ViewAccBillDetails.objects.using('test').all()
+
+        if bill_no:
+            queryset = queryset.filter(billno__icontains=bill_no)
+
+        if po_no:
+            if not po_no.isdigit():
+                return JsonResponse({
+                    'status': 'error',
+                    'message': 'Invalid PONo. Must be a number.'
+                }, status=400)
+
+            queryset = queryset.filter(pono=int(po_no))
+
+        data = list(
+            queryset.values(
+                'slno',
+                'name',
+                'pono',
+                'pocompanyid',
+                'poyear',
+                'billno',
+                'billdate',
+                'gst',
+                'bpquantity',
+                'billrate',
+                'billvalue'
+            )
+        )
+
+        return JsonResponse({
+            'status': 'success',
+            'count': len(data),
+            'data': data
+        }, safe=False)
+
+    except Exception as e:
+        return JsonResponse({
+            'status': 'error',
+            'message': str(e)
+        }, status=500)
+    

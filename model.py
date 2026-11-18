@@ -8,34 +8,32 @@
 from django.db import models
 
 
-class ViewEmployeePayslipDetails(models.Model):
-    from_date = models.DateTimeField(db_column='From_Date')  # Field name made lowercase.
-    to_date = models.DateTimeField(db_column='To_Date', blank=True, null=True)  # Field name made lowercase.
-    un = models.CharField(max_length=50, blank=True, null=True)
-    esino = models.CharField(db_column='ESINO', max_length=50, blank=True, null=True)  # Field name made lowercase.
-    pfno = models.CharField(db_column='PFNO', max_length=100, blank=True, null=True)  # Field name made lowercase.
-    uanno = models.CharField(db_column='Uanno', max_length=50, blank=True, null=True)  # Field name made lowercase.
-    doj = models.DateTimeField(blank=True, null=True)
-    code = models.IntegerField(blank=True, null=True)
-    empname = models.CharField(db_column='EmpName', max_length=100, blank=True, null=True)  # Field name made lowercase.
-    fname = models.CharField(db_column='Fname', max_length=1)  # Field name made lowercase.
-    sex = models.CharField(max_length=6)
-    category = models.CharField(db_column='Category', max_length=50, blank=True, null=True)  # Field name made lowercase.
-    day = models.DecimalField(max_digits=24, decimal_places=2, blank=True, null=True)
-    ot = models.IntegerField(blank=True, null=True)
-    ipaysalary = models.DecimalField(max_digits=18, decimal_places=2, blank=True, null=True)
-    paidh = models.DecimalField(max_digits=38, decimal_places=20, blank=True, null=True)
-    onehr_wag = models.DecimalField(max_digits=22, decimal_places=6, blank=True, null=True)
-    dobwag = models.DecimalField(max_digits=24, decimal_places=6, blank=True, null=True)
-    ot_amt = models.DecimalField(max_digits=35, decimal_places=6, blank=True, null=True)
-    sum_ofwage = models.DecimalField(max_digits=38, decimal_places=6, blank=True, null=True)
-    hra = models.DecimalField(max_digits=38, decimal_places=6, blank=True, null=True)
-    earned = models.DecimalField(max_digits=38, decimal_places=6, blank=True, null=True)
-    hwage = models.DecimalField(max_digits=18, decimal_places=2, blank=True, null=True)
-    nesi = models.DecimalField(db_column='nESI', max_digits=18, decimal_places=2, blank=True, null=True)  # Field name made lowercase.
-    npf = models.DecimalField(db_column='nPF', max_digits=18, decimal_places=2, blank=True, null=True)  # Field name made lowercase.
-    nnetamt = models.DecimalField(db_column='nNetamt', max_digits=23, decimal_places=2, blank=True, null=True)  # Field name made lowercase.
+class ViewAccinwardVerification(models.Model):
+    slno = models.BigIntegerField(db_column='SlNo', blank=True, null=True)  # Field name made lowercase.
+    no = models.IntegerField()
+    date = models.DateTimeField(db_column='Date')  # Field name made lowercase.
+    pk = models.CharField(max_length=360, blank=True, null=True)
+    grp = models.CharField(max_length=35)
+    des = models.CharField(max_length=35)
+    clr = models.CharField(max_length=50)
+    siz = models.CharField(max_length=50)
+    name = models.CharField(db_column='Name', max_length=35, blank=True, null=True)  # Field name made lowercase.
+    supplierdcno = models.CharField(db_column='SupplierDCNo', max_length=50)  # Field name made lowercase.
+    pono = models.IntegerField(db_column='PONo', blank=True, null=True)  # Field name made lowercase.
+    poqty = models.DecimalField(db_column='PoQty', max_digits=18, decimal_places=4)  # Field name made lowercase.
+    jobno = models.CharField(db_column='JobNo', max_length=50, blank=True, null=True)  # Field name made lowercase.
+    items = models.CharField(db_column='Items', max_length=71, blank=True, null=True)  # Field name made lowercase.
+    clr_siz = models.CharField(max_length=101)
+    quantity = models.DecimalField(db_column='Quantity', max_digits=18, decimal_places=4)  # Field name made lowercase.
+    uom = models.CharField(db_column='UOM', max_length=25)  # Field name made lowercase.
+    bill_rate = models.DecimalField(db_column='Bill_Rate', max_digits=19, decimal_places=4, blank=True, null=True)  # Field name made lowercase.
+    gst = models.CharField(db_column='GST', max_length=50, blank=True, null=True)  # Field name made lowercase.
+    billno = models.CharField(db_column='BillNo', max_length=50, blank=True, null=True)  # Field name made lowercase.
+    billdate = models.DateTimeField(db_column='BillDate', blank=True, null=True)  # Field name made lowercase.
+    porate = models.DecimalField(max_digits=19, decimal_places=4, blank=True, null=True)
+    companyid = models.SmallIntegerField(db_column='CompanyID')  # Field name made lowercase.
+    poyear = models.SmallIntegerField(db_column='POYear', blank=True, null=True)  # Field name made lowercase.
 
     class Meta:
         managed = False
-        db_table = 'view_employee_payslip_details'
+        db_table = 'view_accinward_verification'
