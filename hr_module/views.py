@@ -2504,6 +2504,7 @@ def emp_weekly_payslip(request):
             "nesi": str(item.nesi) if item.nesi is not None else None,
             "npf": str(item.npf) if item.npf is not None else None,
             "nnetamt": str(item.nnetamt) if item.nnetamt is not None else None,
+            "hwage": str(item.hwage) if item.hwage is not None else None,
         })
 
     return JsonResponse({

@@ -197,10 +197,12 @@ class ViewEmployeeSalaryDetails(models.Model):
     esi = models.DecimalField(max_digits=38, decimal_places=0, blank=True, null=True)
     pf = models.DecimalField(max_digits=38, decimal_places=0, blank=True, null=True)
     netamt = models.DecimalField(max_digits=38, decimal_places=0, blank=True, null=True)
+    hwage = models.DecimalField(max_digits=29, decimal_places=2, blank=True, null=True)
 
     class Meta:
         managed = False
         db_table = 'view_employee_salary_details'
+
 
 class ViewEmployeeAtt(models.Model):
     code = models.IntegerField()
@@ -398,6 +400,7 @@ class ViewEmployeePayslipDetails(models.Model):
     sum_ofwage = models.DecimalField(max_digits=38, decimal_places=6, blank=True, null=True)
     hra = models.DecimalField(max_digits=38, decimal_places=6, blank=True, null=True)
     earned = models.DecimalField(max_digits=38, decimal_places=6, blank=True, null=True)
+    hwage = models.DecimalField(max_digits=18, decimal_places=2, blank=True, null=True)
     nesi = models.DecimalField(db_column='nESI', max_digits=18, decimal_places=2, blank=True, null=True)  # Field name made lowercase.
     npf = models.DecimalField(db_column='nPF', max_digits=18, decimal_places=2, blank=True, null=True)  # Field name made lowercase.
     nnetamt = models.DecimalField(db_column='nNetamt', max_digits=23, decimal_places=2, blank=True, null=True)  # Field name made lowercase.

@@ -391,6 +391,9 @@ def update_child_bundle_scan(request):
 
     bundid = request.POST.get("bundid")
     mbundid = request.POST.get("mbundid")
+    
+    # 1. Capture the unit_id sent from the React frontend
+    unit_id_from_client = request.POST.get("unit_id")
 
     if not bundid or not mbundid:
         return JsonResponse({"status": "error", "message": "bundid and mbundid required"}, status=400)
@@ -402,7 +405,8 @@ def update_child_bundle_scan(request):
     if not pcs21:
         return JsonResponse({"status": "error", "message": "Invalid master bundle"}, status=404)
 
-    target_unit_id = pcs1.unitid if pcs1 else None
+    # 2. Prioritize the unit_id from the frontend, fallback to pcs1 context
+    target_unit_id = unit_id_from_client if unit_id_from_client else (pcs1.unitid if pcs1 else None)
 
     # Handle ~0 format variants
     possible_ids = [clean_bundid]
@@ -417,7 +421,7 @@ def update_child_bundle_scan(request):
         bundid__in=possible_ids
     ).update(
         scan="1",
-        unit_id=target_unit_id
+        unit_id=target_unit_id  # Now this will receive the correct unit_id
     )
 
     if updated == 0:
