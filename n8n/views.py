@@ -139,12 +139,14 @@ def html_to_image(request):
             ) as f:
                 f.write(html_content)
 
-            # Convert HTML -> PNG
             result = subprocess.run(
                 [
                     wkhtmltoimage,
-                    "--quality",
-                    "100",
+                    "--format", "png",
+                    "--quality", "100",
+                    "--zoom", "2",
+                    "--width", "1920",
+                    "--disable-smart-width",
                     "--enable-local-file-access",
                     html_file,
                     png_file
@@ -217,6 +219,206 @@ def html_to_image(request):
 
     except Exception as e:
 
+        return JsonResponse(
+            {
+                "status": False,
+                "error": "Internal server error",
+                "details": str(e)
+            },
+            status=500
+        )
+
+
+@csrf_exempt
+def html_to_pdf(request):
+
+    # Only allow POST
+    if request.method != "POST":
+        return JsonResponse(
+            {
+                "status": False,
+                "error": "Only POST method is allowed"
+            },
+            status=405
+        )
+
+    # Check request body
+    if not request.body:
+        return JsonResponse(
+            {
+                "status": False,
+                "error": "Request body is empty"
+            },
+            status=400
+        )
+
+    # Parse JSON
+    try:
+        data = json.loads(request.body.decode("utf-8"))
+
+    except json.JSONDecodeError as e:
+        return JsonResponse(
+            {
+                "status": False,
+                "error": "Invalid JSON",
+                "details": str(e)
+            },
+            status=400
+        )
+
+    # Get HTML
+    html_content = data.get("html")
+
+    if not isinstance(html_content, str) or not html_content.strip():
+        return JsonResponse(
+            {
+                "status": False,
+                "error": "html field is required"
+            },
+            status=400
+        )
+
+    # wkhtmltopdf path
+    wkhtmltopdf = r"C:\Program Files\wkhtmltopdf\bin\wkhtmltopdf.exe"
+
+    if not os.path.exists(wkhtmltopdf):
+        return JsonResponse(
+            {
+                "status": False,
+                "error": "wkhtmltopdf.exe not found",
+                "path": wkhtmltopdf
+            },
+            status=500
+        )
+
+    try:
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+
+            html_file = os.path.join(temp_dir, "input.html")
+            pdf_file = os.path.join(temp_dir, "output.pdf")
+
+            # Write HTML file
+            with open(
+                html_file,
+                "w",
+                encoding="utf-8"
+            ) as f:
+                f.write(html_content)
+
+            # Convert HTML -> PDF
+            # result = subprocess.run(
+            #     [
+            #         wkhtmltopdf,
+            #         "--page-size", "A4",
+            #         "--orientation", "Portrait",
+            #         "--margin-top", "10mm",
+            #         "--margin-bottom", "10mm",
+            #         "--margin-left", "10mm",
+            #         "--margin-right", "10mm",
+            #         "--encoding", "UTF-8",
+            #         "--enable-local-file-access",
+            #         "--print-media-type",
+            #         html_file,
+            #         pdf_file
+            #     ],
+            #     capture_output=True,
+            #     text=True,
+            #     check=False,
+            #     timeout=60
+            # )
+
+            result = subprocess.run(
+                [
+                    wkhtmltopdf,
+                    "--page-size", "A4",
+                    "--orientation", "Portrait",
+
+                    "--margin-top", "5mm",
+                    "--margin-bottom", "5mm",
+                    "--margin-left", "5mm",
+                    "--margin-right", "5mm",
+
+                    "--encoding", "UTF-8",
+                    "--print-media-type",
+
+                    "--disable-smart-shrinking",
+                    "--enable-local-file-access",
+
+                    "--javascript-delay", "500",
+
+                    html_file,
+                    pdf_file
+                ],
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=60
+            )
+
+            # Check conversion error
+            if result.returncode != 0:
+
+                return JsonResponse(
+                    {
+                        "status": False,
+                        "error": "HTML to PDF conversion failed",
+                        "details": result.stderr.strip()
+                    },
+                    status=500
+                )
+
+            # Check generated PDF
+            if not os.path.exists(pdf_file):
+
+                return JsonResponse(
+                    {
+                        "status": False,
+                        "error": "PDF file was not generated"
+                    },
+                    status=500
+                )
+
+            # Read PDF
+            with open(pdf_file, "rb") as f:
+                pdf_data = f.read()
+
+            # PDF size
+            size_mb = len(pdf_data) / (1024 * 1024)
+
+            if size_mb > 5:
+
+                return JsonResponse(
+                    {
+                        "status": False,
+                        "error": "PDF size exceeds 5 MB",
+                        "size_mb": round(size_mb, 2)
+                    },
+                    status=400
+                )
+
+        # Return PDF
+        response = HttpResponse(
+            pdf_data,
+            content_type="application/pdf"
+        )
+
+        response["Content-Disposition"] = (
+            'inline; filename="output.pdf"'
+        )
+
+        return response
+
+    except subprocess.TimeoutExpired:
+        return JsonResponse(
+            {
+                "status": False,
+                "error": "PDF conversion timeout"
+            },
+            status=500
+        )
+
+    except Exception as e:
         return JsonResponse(
             {
                 "status": False,

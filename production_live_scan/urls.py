@@ -97,4 +97,11 @@ urlpatterns = [
     path('api/elastic-units/', views.get_elastic_units, name='get_elastic_units'),
     path('api/bundle-details/', views.get_bundle_details, name='get_bundle_details'),
     path('api/delivery/save/', views.save_elastic_delivery, name='save_elastic_delivery'),
+    path('api/delivery/print/', views.get_elastic_delivery_print, name='get_elastic_delivery_print'),
+    path('api/winding/units/', views.get_winding_units, name='winding_units'),
+    path('api/winding/jobs/', views.get_winding_jobs, name='winding_jobs'),
+    path('api/winding/topbottom/', views.get_winding_topbottom, name='winding_topbottom'),
+    path('api/winding/summary/', views.get_winding_summary_details, name='winding_summary'),
+    path('api/winding/available-rolls/', views.get_available_rolls, name='winding_available_rolls'),
+    path('api/winding/save/', views.save_winding_entry, name='save_winding_entry'),
 ]  
