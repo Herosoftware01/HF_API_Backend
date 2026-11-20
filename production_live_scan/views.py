@@ -10,7 +10,7 @@ from django.core.exceptions import ValidationError
 from imp_reports.models import UnitBundlereport
 from bundle_tracking.models import TrsMcutstickerprod,MasUnit,MasTopbottom
 from qcapp.models import Unit,Line,machine_details,emp_allocate,Empwisesal
-from .models import Assembly_data,ViewElasticCons,ViewCuttingQtyDetailsUnit,ViewOrdersummaryUnit,ViewCuttingQtyDetails,ViewOrdersummary,ViewAccessoryorderqtyElastic,elastic_cons,bundle_transfer,end_line_data, unit_input,ViewOrderdetails,sub_bundle_unit_transfer, Msizes,dependency,dependency_data,PreporatoryEntry,ViewRibdelPreparatory,RibdelEntry,VueCutPlnStat,Elastic_cutting_qty,Elastic_cutting_qty_details,ElasticDelivery,ElasticDeliveryDetails
+from .models import Assembly_data,ViewFabricfoldingRibdetails,ViewUnitFoldDeliveryDetails,ViewElasticCons,ViewCuttingQtyDetailsUnit,ViewOrdersummaryUnit,ViewCuttingQtyDetails,ViewOrdersummary,ViewAccessoryorderqtyElastic,elastic_cons,bundle_transfer,end_line_data, unit_input,ViewOrderdetails,sub_bundle_unit_transfer, Msizes,dependency,dependency_data,PreporatoryEntry,ViewRibdelPreparatory,RibdelEntry,VueCutPlnStat,Elastic_cutting_qty,Elastic_cutting_qty_details,ElasticDelivery,ElasticDeliveryDetails
 from django.utils.dateparse import parse_date, parse_datetime
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
@@ -34,6 +34,7 @@ from django.db.models.functions import Cast, Coalesce
 import json
 from django.db import connection, transaction
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
+from .models import folding_data, folding_data_details
 
 
 # @require_GET
@@ -4000,6 +4001,387 @@ def save_elastic_delivery(request):
     )
 
 
+@api_view(["GET"])
+def get_elastic_delivery_print(request):
+    job_no = str(request.query_params.get("job_no") or "").strip()
+    topbottom = str(request.query_params.get("topbottom") or "").strip()
+    colour = str(request.query_params.get("colour") or "").strip()
+    unit = str(request.query_params.get("unit") or "").strip()
+
+    if not job_no or not topbottom or not colour or not unit:
+        return Response(
+            {"error": "Job number, Top/Bottom, Colour and Unit are required."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    deliveries = ElasticDelivery.objects.filter(
+        job_no=job_no,
+        topbottom=topbottom,
+        colour=colour,
+        unit=unit,
+    ).order_by("delivery_date", "id")
+
+    result = []
+    for delivery in deliveries:
+        details = list(
+            ElasticDeliveryDetails.objects.filter(delivery_id=delivery).order_by("id")
+        )
+        detail_ids = [detail.id for detail in details]
+        bundles = Elastic_cutting_qty_details.objects.filter(
+            delivery=True,
+            delivery_id__in=detail_ids,
+        ).order_by("bdl_id")
+
+        result.append({
+            "delivery_id": delivery.id,
+            "job_no": delivery.job_no,
+            "topbottom": delivery.topbottom,
+            "colour": delivery.colour,
+            "unit": delivery.unit,
+            "delivery_date": delivery.delivery_date.isoformat(),
+            "bundles": [
+                {
+                    "bdl_id": bundle.bdl_id,
+                    "size": bundle.size,
+                    "qty": bundle.elastic_cutting_qty,
+                    "len_cm": bundle.len_cm,
+                }
+                for bundle in bundles
+            ],
+        })
+
+    return Response({"deliveries": result}, status=status.HTTP_200_OK)
+
+
 
 ############### End of Elastic Delivery API ###############
+
+
+############## Rip Entry API ##############
+
+@require_GET
+def get_winding_units(request):
+    qs = (
+        ViewFabricfoldingRibdetails.objects.using('demo')
+        .exclude(unitname__isnull=True)
+        .exclude(unitname='')
+        .values_list('unitname', flat=True)
+        .distinct()
+        .order_by('unitname')
+    )
+    units = [u.strip() for u in qs if u and u.strip()]
+    return JsonResponse({'units': list(dict.fromkeys(units))})
+
+
+@require_GET
+def get_winding_jobs(request):
+    unit = request.GET.get('unit', '').strip()
+    if not unit:
+        return JsonResponse({'jobs': []})
+
+    qs = (
+        ViewFabricfoldingRibdetails.objects.using('demo')
+        .filter(unitname__iexact=unit)
+        .exclude(jobno__isnull=True)
+        .exclude(jobno='')
+        .values_list('jobno', flat=True)
+        .distinct()
+        .order_by('jobno')
+    )
+    jobs = [j.strip() for j in qs if j and j.strip()]
+    return JsonResponse({'jobs': list(dict.fromkeys(jobs))})
+
+
+@require_GET
+def get_winding_topbottom(request):
+    unit = request.GET.get('unit', '').strip()
+    jobno = request.GET.get('jobno', '').strip()
+    if not unit or not jobno:
+        return JsonResponse({'topbottoms': []})
+
+    qs = (
+        ViewFabricfoldingRibdetails.objects.using('demo')
+        .filter(unitname__iexact=unit, jobno__iexact=jobno)
+        .exclude(topbottom_des__isnull=True)
+        .exclude(topbottom_des='')
+        .values_list('topbottom_des', flat=True)
+        .distinct()
+        .order_by('topbottom_des')
+    )
+    topbottoms = [tb.strip() for tb in qs if tb and tb.strip()]
+    return JsonResponse({'topbottoms': list(dict.fromkeys(topbottoms))})
+
+
+@require_GET
+def get_winding_summary_details(request):
+    unit = request.GET.get('unit', '').strip()
+    jobno = request.GET.get('jobno', '').strip()
+    topbottom = request.GET.get('topbottom', '').strip()
+
+    if not (unit and jobno and topbottom):
+        return JsonResponse({'rows': []})
+
+    qs = (
+        ViewFabricfoldingRibdetails.objects.using('demo')
+        .filter(
+            unitname__iexact=unit,
+            jobno__iexact=jobno,
+            topbottom_des__iexact=topbottom,
+        )
+        .values('comboclr', 'portion_des','fabclr', 'lotno', 'siz', 'kg', 'mtr')
+        .order_by('comboclr', 'portion_des', 'lotno', 'siz')
+    )
+
+    previous_rows = (
+        folding_data.objects.filter(
+            unitname__iexact=unit,
+            jobno__iexact=jobno,
+            topbottom_des__iexact=topbottom,
+        )
+        .values('color', 'folding_part', 'fabclr', 'lotno', 'size')
+        .annotate(
+            previous_kg=Sum('current_kg'),
+            previous_mtr=Sum('current_mtr'),
+        )
+    )
+
+    def summary_key(color, folding_part, fabclr, lotno, size):
+        return tuple(
+            (value or '').strip().casefold()
+            for value in (color, folding_part, fabclr, lotno, size)
+        )
+
+    previous_by_key = {}
+    for previous in previous_rows:
+        key = summary_key(
+            previous.get('color'),
+            previous.get('folding_part'),
+            previous.get('fabclr'),
+            previous.get('lotno'),
+            previous.get('size'),
+        )
+        totals = previous_by_key.setdefault(key, [Decimal('0'), Decimal('0')])
+        totals[0] += previous.get('previous_kg') or Decimal('0')
+        totals[1] += previous.get('previous_mtr') or Decimal('0')
+
+    rows = []
+    for idx, item in enumerate(qs, start=1):
+        clr = (item.get('comboclr') or '').strip()
+        previous_kg, previous_mtr = previous_by_key.get(
+            summary_key(
+                item.get('comboclr'),
+                item.get('portion_des'),
+                item.get('fabclr'),
+                item.get('lotno'),
+                item.get('siz'),
+            ),
+            (Decimal('0'), Decimal('0')),
+        )
+        rows.append({
+            'id': idx,
+            'clrCombo': clr,
+            'foldingParts': (item.get('portion_des') or '').strip(),
+            'fabricColour': (item.get('fabclr') or '').strip(),
+            'lotNo': (item.get('lotno') or '').strip(),
+            'size': (item.get('siz') or '').strip(),
+            'reqKg': (item.get('kg') or 0),
+            'reqMtr': (item.get('mtr') or 0),
+            'prevKg': previous_kg,
+            'prevMtr': previous_mtr,
+        })
+
+    return JsonResponse({'rows': rows})
+
+
+@require_GET
+def get_available_rolls(request):
+    unit = request.GET.get('unit', '').strip()
+    jobno = request.GET.get('jobno', '').strip()
+    topbottom = request.GET.get('topbottom', '').strip()
+    lotno = request.GET.get('lotno', '').strip()
+    clr_name = request.GET.get('clr_name', '').strip()
+
+    if not unit or not jobno:
+        return JsonResponse({'rolls': []})
+
+    qs = ViewUnitFoldDeliveryDetails.objects.using('demo').filter(
+        unitname__iexact=unit,
+        jobno__iexact=jobno,
+    )
+
+    # Filter by topbottom_des if field exists on ViewUnitFoldDeliveryDetails
+    model_fields = [f.name for f in ViewUnitFoldDeliveryDetails._meta.get_fields()]
+    if topbottom and 'topbottom_des' in model_fields:
+        qs = qs.filter(topbottom_des__iexact=topbottom)
+
+    if lotno:
+        qs = qs.filter(lotno__iexact=lotno)
+
+    if clr_name:
+        qs = qs.filter(clr_name__iexact=clr_name)
+
+    items = qs.values(
+        'rlno',
+        'clr_name',
+        'lotno',
+        'fab',
+        'fabid',
+        'wgtkgs',
+        'mtr',
+    ).order_by('rlno')
+
+    rolls = [
+        {
+            'rollNo': (item.get('rlno') or '').strip(),
+            'colour': (item.get('clr_name') or '').strip(),
+            'lotNo': (item.get('lotno') or '').strip(),
+            'fabric': (item.get('fab') or '').strip(),
+            'fabId': item.get('fabid') or 0,
+            'dia': '',
+            'kgs': float(item.get('wgtkgs') or 0),
+            'mtrs': float(item.get('mtr') or 0),
+        }
+        for item in items
+    ]
+
+    return JsonResponse({'rolls': rolls})
+
+
+@csrf_exempt
+def save_winding_entry(request):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST method required.'}, status=405)
+
+    try:
+        data = json.loads(request.body)
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return JsonResponse({'error': 'Invalid JSON payload.'}, status=400)
+
+    if not isinstance(data, dict):
+        return JsonResponse({'error': 'Invalid request payload.'}, status=400)
+
+    emp_id = str(data.get('emp_id') or '').strip()
+    if not emp_id:
+        return JsonResponse({'error': 'Employee ID is required to save.'}, status=400)
+    if len(emp_id) > 20:
+        return JsonResponse({'error': 'Employee ID cannot exceed 20 characters.'}, status=400)
+
+    def text_value(value, field_name, max_length, required=False):
+        text = str(value or '').strip()
+        if required and not text:
+            raise ValueError(f'{field_name} is required.')
+        if len(text) > max_length:
+            raise ValueError(f'{field_name} cannot exceed {max_length} characters.')
+        return text or None
+
+    def decimal_value(value, field_name):
+        if value in (None, ''):
+            return Decimal('0')
+        try:
+            number = Decimal(str(value))
+            quantized = number.quantize(Decimal('0.0001'))
+        except (InvalidOperation, ValueError, TypeError):
+            raise ValueError(f'{field_name} must be a valid number with up to 4 decimal places.')
+        if not number.is_finite() or number < 0 or number != quantized:
+            raise ValueError(f'{field_name} must be non-negative with up to 4 decimal places.')
+        return number
+
+    try:
+        jobno = text_value(data.get('jobNo'), 'Job No', 50, required=True)
+        topbottom = text_value(data.get('topBott'), 'Top/Bottom', 50, required=True)
+        unitname = text_value(data.get('unit'), 'Unit', 50, required=True)
+        color = text_value(data.get('colourCombo'), 'Colour Combo', 100)
+        folding_part = text_value(data.get('foldingParts'), 'Folding Part', 100)
+        fabclr = text_value(data.get('fabricColour'), 'Fabric Colour', 50)
+        lotno = text_value(data.get('lotNo'), 'Lot No', 10, required=True)
+        size = text_value(data.get('size'), 'Size', 35, required=True)
+        req_kg = decimal_value(data.get('reqKg'), 'Required Kg')
+        req_mtr = decimal_value(data.get('reqMtr'), 'Required Mtr')
+        prev_kg = decimal_value(data.get('prevKg'), 'Previous Kg')
+
+        scanned_roll = data.get('scannedRoll')
+        if not isinstance(scanned_roll, dict):
+            raise ValueError('Scan a roll before saving.')
+        roll_no = text_value(scanned_roll.get('rollNo'), 'Roll No', 50, required=True)
+        roll_color = text_value(scanned_roll.get('colour'), 'Roll Colour', 100)
+        roll_lotno = text_value(scanned_roll.get('lot'), 'Roll Lot No', 10)
+        fabric = text_value(
+            scanned_roll.get('fabricType') or scanned_roll.get('fabric'),
+            'Fabric',
+            100,
+        )
+        stock_kg = decimal_value(scanned_roll.get('stockKg'), 'Stock Kg')
+        stock_mtr = decimal_value(scanned_roll.get('stockMtr'), 'Stock Mtr')
+
+        requested_rows = data.get('windingDetails')
+        if not isinstance(requested_rows, list):
+            raise ValueError('Winding details are required.')
+
+        details = []
+        total_kg = Decimal('0')
+        total_mtr = Decimal('0')
+        for row_index, row in enumerate(requested_rows, start=1):
+            if not isinstance(row, dict):
+                raise ValueError('Each winding detail must be an object.')
+            w_id = row.get('w_id', row_index)
+            if isinstance(w_id, bool) or not isinstance(w_id, int) or w_id < 1:
+                raise ValueError('Winding S.No must be a positive whole number.')
+            wgt_kg = decimal_value(row.get('wgtKg'), 'Wgt Kg')
+            current_mtr = decimal_value(row.get('mtrs'), 'Mtrs')
+            if wgt_kg == 0 and current_mtr == 0:
+                continue
+            details.append((w_id, wgt_kg, current_mtr))
+            total_kg += wgt_kg
+            total_mtr += current_mtr
+
+        if not details:
+            raise ValueError('Enter at least one winding weight or meter value.')
+        if total_kg > max(Decimal('0'), req_kg - prev_kg):
+            raise ValueError('Total Wgt Kg cannot exceed the remaining Required Kg.')
+        if total_kg > stock_kg:
+            raise ValueError('Total Wgt Kg cannot exceed the scanned roll Stock Kg.')
+    except ValueError as error:
+        return JsonResponse({'error': str(error)}, status=400)
+
+    with transaction.atomic():
+        entry = folding_data.objects.create(
+            jobno=jobno,
+            topbottom_des=topbottom,
+            unitname=unitname,
+            color=color,
+            folding_part=folding_part,
+            lotno=lotno,
+            size=size,
+            req_mtr=req_mtr,
+            req_kg=req_kg,
+            fabclr=fabclr,
+            emp_id=emp_id,
+            current_kg=total_kg,
+            current_mtr=total_mtr,
+        )
+        folding_data_details.objects.bulk_create(
+            [
+                folding_data_details(
+                    folding_data_id=entry,
+                    roll_no=roll_no,
+                    color=roll_color,
+                    lotno=roll_lotno,
+                    fabric=fabric,
+                    kgs=stock_kg,
+                    mtr=stock_mtr,
+                    wgt_kg=wgt_kg,
+                    current_mtr=current_mtr,
+                    w_id=w_id,
+                )
+                for w_id, wgt_kg, current_mtr in details
+            ]
+        )
+
+    return JsonResponse(
+        {'success': True, 'id': entry.id, 'detailCount': len(details)},
+        status=201,
+    )
+
+
+############## End of Rip Entry API ##############
 
