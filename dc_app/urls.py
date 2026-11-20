@@ -23,6 +23,7 @@ urlpatterns = [
     path('acc_inhouse_transfer/', views.acc_inhouse_transfer, name='acc_inhouse_transfer'),
     path('acc_inhouse_transfer/<int:no>/', views.acc_inhouse_transfer, name='acc_inhouse_transfer'),
     path('acc_inward_verification/', views.acc_inward_verification, name='acc_inward_verification'),
+    path('acc_bill/', views.acc_bill, name='acc_bill'),
     path('fabric_process_delivery/', views.fabric_process_delivery, name='FabricProcessDelivery'),
     path('fabric_process_delivery/<int:dcno>/', views.fabric_process_delivery, name='FabricProcessDelivery'),
     path('unit_pc_del/<int:dcno>/', views.unit_pc_delivery, name='UnitPCDelivery'),
