@@ -59,3 +59,22 @@ class ViewCuttingOcr(models.Model):
     class Meta:
         managed = False
         db_table = 'view_cutting_ocr'
+
+
+class MaunualStock(models.Model):
+    sno = models.BigIntegerField(db_column='SNo', primary_key=True)  # Field name made lowercase.
+    jobno = models.CharField(db_column='JobNo', max_length=50)  # Field name made lowercase.
+    colour = models.IntegerField(db_column='Colour')  # Field name made lowercase.
+    lotno = models.CharField(db_column='LotNo', max_length=50, blank=True, null=True)  # Field name made lowercase.
+    fabdescr = models.IntegerField(db_column='Fabdescr')  # Field name made lowercase.
+    diaid = models.IntegerField(db_column='DiaID')  # Field name made lowercase.
+    rls = models.IntegerField()
+    kgs = models.DecimalField(max_digits=38, decimal_places=3)
+    mtr = models.DecimalField(max_digits=38, decimal_places=2)
+    clr_name = models.CharField(max_length=50, blank=True, null=True)
+    fab_name = models.CharField(max_length=35, blank=True, null=True)
+    dia_name = models.CharField(max_length=35, blank=True, null=True)
+
+    class Meta:
+
+        db_table = 'ocr_maunual_stock'
