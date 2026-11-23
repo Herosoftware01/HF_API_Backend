@@ -9,12 +9,12 @@ from django.db import models
 
 
 class ViewAccinwardVerification(models.Model):
-    slno = models.BigIntegerField(db_column='SlNo', blank=True, null=True)  # Field name made lowercase.
-    no = models.IntegerField()
+    sno = models.BigIntegerField(db_column='SNo', blank=True, null=True)  # Field name made lowercase.
+    no = models.IntegerField(db_column='No')  # Field name made lowercase.
     date = models.DateTimeField(db_column='Date')  # Field name made lowercase.
     pk = models.CharField(max_length=360, blank=True, null=True)
-    grp = models.CharField(max_length=35)
-    des = models.CharField(max_length=35)
+    grp = models.CharField(max_length=35, blank=True, null=True)
+    des = models.CharField(max_length=35, blank=True, null=True)
     clr = models.CharField(max_length=50)
     siz = models.CharField(max_length=50)
     name = models.CharField(db_column='Name', max_length=35, blank=True, null=True)  # Field name made lowercase.
@@ -24,8 +24,8 @@ class ViewAccinwardVerification(models.Model):
     jobno = models.CharField(db_column='JobNo', max_length=50, blank=True, null=True)  # Field name made lowercase.
     items = models.CharField(db_column='Items', max_length=71, blank=True, null=True)  # Field name made lowercase.
     clr_siz = models.CharField(max_length=101)
-    quantity = models.DecimalField(db_column='Quantity', max_digits=18, decimal_places=4)  # Field name made lowercase.
-    uom = models.CharField(db_column='UOM', max_length=25)  # Field name made lowercase.
+    quantity = models.DecimalField(db_column='Quantity', max_digits=18, decimal_places=4, blank=True, null=True)  # Field name made lowercase.
+    uom = models.CharField(db_column='UOM', max_length=25, blank=True, null=True)  # Field name made lowercase.
     bill_rate = models.DecimalField(db_column='Bill_Rate', max_digits=19, decimal_places=4, blank=True, null=True)  # Field name made lowercase.
     gst = models.CharField(db_column='GST', max_length=50, blank=True, null=True)  # Field name made lowercase.
     billno = models.CharField(db_column='BillNo', max_length=50, blank=True, null=True)  # Field name made lowercase.
