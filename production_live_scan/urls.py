@@ -101,7 +101,13 @@ urlpatterns = [
     path('api/winding/units/', views.get_winding_units, name='winding_units'),
     path('api/winding/jobs/', views.get_winding_jobs, name='winding_jobs'),
     path('api/winding/topbottom/', views.get_winding_topbottom, name='winding_topbottom'),
+    path('api/winding/colours/', views.get_winding_colours, name='winding_colours'),
+    path('api/winding/lots/', views.get_winding_lots, name='winding_lots'),
+    path('api/winding/folding-parts/', views.get_winding_folding_parts, name='winding_folding_parts'),
+    path('api/winding/sizes/', views.get_winding_cutting_sizes, name='winding_cutting_sizes'),
     path('api/winding/summary/', views.get_winding_summary_details, name='winding_summary'),
     path('api/winding/available-rolls/', views.get_available_rolls, name='winding_available_rolls'),
+    path('api/winding/folding-rolls/', views.get_rope_cutting_available_rolls, name='rope_cutting_available_rolls'),
+    path('api/winding/rope-cutting/save/', views.save_rope_cutting_entry, name='save_rope_cutting_entry'),
     path('api/winding/save/', views.save_winding_entry, name='save_winding_entry'),
 ]  

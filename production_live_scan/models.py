@@ -474,4 +474,46 @@ class folding_data_details(models.Model):
     wgt_kg = models.DecimalField(max_digits=38, decimal_places=4, blank=True, null=True)
     current_mtr = models.DecimalField(max_digits=38, decimal_places=4, blank=True, null=True)
     w_id = models.IntegerField(blank=True, null=True)
+    rope_cutting = models.IntegerField(blank=True, null=True)
+
+
+class ViewCuttingQtyDetailsLotUnit(models.Model):
+    itemno = models.SmallIntegerField(db_column='ItemNo', blank=True, null=True)  # Field name made lowercase.
+    jobno = models.CharField(max_length=50)
+    topbottom_des = models.CharField(db_column='TopBottom_des', max_length=50, blank=True, null=True)  # Field name made lowercase.
+    comboclr = models.CharField(max_length=50, blank=True, null=True)
+    name = models.CharField(db_column='Name', max_length=35)  # Field name made lowercase.
+    noofpcs = models.IntegerField(blank=True, null=True)
+    unitname = models.CharField(db_column='UnitName', max_length=50, blank=True, null=True)  # Field name made lowercase.
+    lotno = models.CharField(db_column='LotNo', max_length=10)  # Field name made lowercase.
+
+    class Meta:
+        managed = False
+        db_table = 'view_cutting_qty_details_lot_unit'
+
+
+class Rope_cutting_data(models.Model):
+    id = models.AutoField(primary_key=True)
+    jobno = models.CharField(max_length=50)
+    topbottom = models.CharField(max_length=50, blank=True, null=True)
+    unitname = models.CharField(max_length=50, blank=True, null=True)
+    date = models.DateTimeField()
+    color = models.CharField(max_length=100, blank=True, null=True)
+    folding_part = models.CharField(max_length=100, blank=True, null=True)
+    lotno = models.CharField(max_length=10, blank=True, null=True)
+    size = models.CharField(max_length=35)
+    cutting_qty = models.CharField(max_length=20, blank=True, null=True)
+    current_qty = models.CharField(max_length=20, blank=True, null=True)
+    total_roll = models.IntegerField(blank=True, null=True)
+    kgs = models.CharField(max_length=20, blank=True, null=True)
+    mtrs = models.CharField(max_length=20, blank=True, null=True)
+
+
+class Rope_cutting_data_details(models.Model):
+    id = models.AutoField(primary_key=True)
+    rope_cutting_data_id = models.ForeignKey(Rope_cutting_data, on_delete=models.CASCADE, related_name='details')
+    bundle_qty = models.IntegerField()
+    s_no = models.IntegerField()
+
+    
 

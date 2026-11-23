@@ -10,7 +10,7 @@ from django.core.exceptions import ValidationError
 from imp_reports.models import UnitBundlereport
 from bundle_tracking.models import TrsMcutstickerprod,MasUnit,MasTopbottom
 from qcapp.models import Unit,Line,machine_details,emp_allocate,Empwisesal
-from .models import Assembly_data,ViewFabricfoldingRibdetails,ViewUnitFoldDeliveryDetails,ViewElasticCons,ViewCuttingQtyDetailsUnit,ViewOrdersummaryUnit,ViewCuttingQtyDetails,ViewOrdersummary,ViewAccessoryorderqtyElastic,elastic_cons,bundle_transfer,end_line_data, unit_input,ViewOrderdetails,sub_bundle_unit_transfer, Msizes,dependency,dependency_data,PreporatoryEntry,ViewRibdelPreparatory,RibdelEntry,VueCutPlnStat,Elastic_cutting_qty,Elastic_cutting_qty_details,ElasticDelivery,ElasticDeliveryDetails
+from .models import Assembly_data,ViewFabricfoldingRibdetails,ViewCuttingQtyDetailsLotUnit,ViewUnitFoldDeliveryDetails,ViewElasticCons,ViewCuttingQtyDetailsUnit,ViewOrdersummaryUnit,ViewCuttingQtyDetails,ViewOrdersummary,ViewAccessoryorderqtyElastic,elastic_cons,bundle_transfer,end_line_data, unit_input,ViewOrderdetails,sub_bundle_unit_transfer, Msizes,dependency,dependency_data,PreporatoryEntry,ViewRibdelPreparatory,RibdelEntry,VueCutPlnStat,Elastic_cutting_qty,Elastic_cutting_qty_details,ElasticDelivery,ElasticDeliveryDetails
 from django.utils.dateparse import parse_date, parse_datetime
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
@@ -34,7 +34,12 @@ from django.db.models.functions import Cast, Coalesce
 import json
 from django.db import connection, transaction
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
-from .models import folding_data, folding_data_details
+from .models import (
+    folding_data,
+    folding_data_details,
+    Rope_cutting_data,
+    Rope_cutting_data_details,
+)
 
 
 # @require_GET
@@ -741,9 +746,15 @@ def get_eligible_assembly_bundle_ids(job_no, process_des, top_bottom=None, unit=
         return (
             False,
             set(),
-            "Previous process requirements are not complete for any bundle. "
+            "Bundle not available for the current process.\n" 
             + "; ".join(requirement_details),
         )
+        # return (
+        #     False,
+        #     set(),
+        #     "Previous process requirements are not complete for any bundle. "
+        #     + "; ".join(requirement_details),
+        # )
 
     return True, eligible_bundle_ids, None
 
@@ -4113,6 +4124,141 @@ def get_winding_topbottom(request):
 
 
 @require_GET
+def get_winding_colours(request):
+    unit = request.GET.get('unit', '').strip()
+    jobno = request.GET.get('job_no', '').strip()
+    topbottom = request.GET.get('top_bottom', '').strip()
+    if not (unit and jobno and topbottom):
+        return JsonResponse({'colours': []})
+
+    qs = (
+        ViewFabricfoldingRibdetails.objects.using('demo')
+        .filter(
+            unitname__iexact=unit,
+            jobno__iexact=jobno,
+            topbottom_des__iexact=topbottom,
+        )
+        .exclude(comboclr__isnull=True)
+        .exclude(comboclr='')
+        .values_list('comboclr', flat=True)
+        .distinct()
+        .order_by('comboclr')
+    )
+    colours = [value.strip() for value in qs if value and value.strip()]
+    return JsonResponse({'colours': list(dict.fromkeys(colours))})
+
+
+@require_GET
+def get_winding_lots(request):
+    unit = request.GET.get('unit', '').strip()
+    jobno = request.GET.get('job_no', '').strip()
+    topbottom = request.GET.get('top_bottom', '').strip()
+    colour = request.GET.get('colour_combo', '').strip()
+    if not (unit and jobno and topbottom and colour):
+        return JsonResponse({'lots': []})
+
+    qs = (
+        ViewFabricfoldingRibdetails.objects.using('demo')
+        .filter(
+            unitname__iexact=unit,
+            jobno__iexact=jobno,
+            topbottom_des__iexact=topbottom,
+            comboclr__iexact=colour,
+        )
+        .exclude(lotno__isnull=True)
+        .exclude(lotno='')
+        .values_list('lotno', flat=True)
+        .distinct()
+        .order_by('lotno')
+    )
+    lots = [value.strip() for value in qs if value and value.strip()]
+    return JsonResponse({'lots': list(dict.fromkeys(lots))})
+
+
+@require_GET
+def get_winding_folding_parts(request):
+    unit = request.GET.get('unit', '').strip()
+    jobno = request.GET.get('job_no', '').strip()
+    topbottom = request.GET.get('top_bottom', '').strip()
+    colour = request.GET.get('colour_combo', '').strip()
+    lotno = request.GET.get('lot_no', '').strip()
+    if not (unit and jobno and topbottom and colour and lotno):
+        return JsonResponse({'folding_parts': []})
+
+    qs = (
+        ViewFabricfoldingRibdetails.objects.using('demo')
+        .filter(
+            unitname__iexact=unit,
+            jobno__iexact=jobno,
+            topbottom_des__iexact=topbottom,
+            comboclr__iexact=colour,
+            lotno__iexact=lotno,
+        )
+        .exclude(portion_des__isnull=True)
+        .exclude(portion_des='')
+        .values_list('portion_des', flat=True)
+        .distinct()
+        .order_by('portion_des')
+    )
+    folding_parts = [value.strip() for value in qs if value and value.strip()]
+    return JsonResponse({'folding_parts': list(dict.fromkeys(folding_parts))})
+
+
+@require_GET
+def get_winding_cutting_sizes(request):
+    unit = request.GET.get('unit', '').strip()
+    jobno = request.GET.get('job_no', '').strip()
+    topbottom = request.GET.get('top_bottom', '').strip()
+    colour = request.GET.get('colour_combo', '').strip()
+    folding_part = request.GET.get('folding_parts', '').strip()
+    lotno = request.GET.get('lot_no', '').strip()
+    if not (unit and jobno and topbottom and colour and folding_part and lotno):
+        return JsonResponse({'sizes': []})
+
+    items = (
+        ViewCuttingQtyDetailsLotUnit.objects.using('demo')
+        .filter(
+            unitname__iexact=unit,
+            jobno__iexact=jobno,
+            topbottom_des__iexact=topbottom,
+            comboclr__iexact=colour,
+            lotno__iexact=lotno,
+        )
+        .values('name', 'noofpcs')
+        .order_by('name')
+    )
+
+    previous_cuts = (
+        Rope_cutting_data.objects.filter(
+            unitname__iexact=unit,
+            jobno__iexact=jobno,
+            topbottom__iexact=topbottom,
+            color__iexact=colour,
+            folding_part__iexact=folding_part,
+            lotno__iexact=lotno,
+        )
+        .exclude(current_qty__isnull=True)
+        .exclude(current_qty='')
+        .values('size')
+        .annotate(prev_cut=Sum(Cast('current_qty', IntegerField())))
+    )
+    previous_by_size = {
+        (item.get('size') or '').strip().casefold(): item.get('prev_cut') or 0
+        for item in previous_cuts
+    }
+
+    sizes = [
+        {
+            'size': item['name'],
+            'cut_qty': item['noofpcs'] or 0,
+            'prev_cut': previous_by_size.get(item['name'].strip().casefold(), 0),
+        }
+        for item in items
+    ]
+    return JsonResponse({'sizes': sizes})
+
+
+@require_GET
 def get_winding_summary_details(request):
     unit = request.GET.get('unit', '').strip()
     jobno = request.GET.get('jobno', '').strip()
@@ -4245,6 +4391,207 @@ def get_available_rolls(request):
     ]
 
     return JsonResponse({'rolls': rolls})
+
+
+@require_GET
+def get_rope_cutting_available_rolls(request):
+    unit = request.GET.get('unit', '').strip()
+    jobno = request.GET.get('job_no', '').strip()
+    topbottom = request.GET.get('top_bottom', '').strip()
+    colour = request.GET.get('colour_combo', '').strip()
+    folding_part = request.GET.get('folding_parts', '').strip()
+    lotno = request.GET.get('lot_no', '').strip()
+    size = request.GET.get('size', '').strip()
+
+    if not all((unit, jobno, topbottom, colour, folding_part, lotno, size)):
+        return JsonResponse({'rolls': []})
+
+    folding_ids = list(
+        folding_data.objects.filter(
+            topbottom_des__iexact=topbottom,
+            jobno__iexact=jobno,
+            unitname__iexact=unit,
+            color__iexact=colour,
+            folding_part__iexact=folding_part,
+            lotno__iexact=lotno,
+            size__iexact=size,
+        ).values_list('id', flat=True)
+    )
+    if not folding_ids:
+        return JsonResponse({'rolls': []})
+
+    details = (
+        folding_data_details.objects
+        .filter(folding_data_id__in=folding_ids, rope_cutting__isnull=True)
+        .values('id', 'roll_no', 'color', 'lotno', 'fabric', 'kgs', 'mtr')
+        .order_by('roll_no')
+    )
+    rolls = [
+        {
+            'detailId': item['id'],
+            'rollNo': (item.get('roll_no') or '').strip(),
+            'colour': (item.get('color') or '').strip(),
+            'lotNo': (item.get('lotno') or '').strip(),
+            'fabric': (item.get('fabric') or '').strip(),
+            'siz': size,
+            'kgs': float(item.get('kgs') or 0),
+            'mtrs': float(item.get('mtr') or 0),
+        }
+        for item in details
+    ]
+    return JsonResponse({'rolls': rolls})
+
+
+@csrf_exempt
+def save_rope_cutting_entry(request):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST method required.'}, status=405)
+
+    try:
+        payload = json.loads(request.body)
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return JsonResponse({'error': 'Invalid JSON payload.'}, status=400)
+
+    if not isinstance(payload, dict):
+        return JsonResponse({'error': 'Invalid request payload.'}, status=400)
+
+    def text_value(value, field_name, max_length):
+        text = str(value or '').strip()
+        if not text:
+            raise ValueError(f'{field_name} is required.')
+        if len(text) > max_length:
+            raise ValueError(f'{field_name} cannot exceed {max_length} characters.')
+        return text
+
+    def whole_number(value, field_name, minimum=0):
+        if isinstance(value, bool):
+            raise ValueError(f'{field_name} must be a whole number.')
+        try:
+            number = int(str(value).strip())
+        except (TypeError, ValueError):
+            raise ValueError(f'{field_name} must be a whole number.')
+        if number < minimum:
+            raise ValueError(f'{field_name} must be at least {minimum}.')
+        return number
+
+    try:
+        jobno = text_value(payload.get('jobNo'), 'Job No', 50)
+        topbottom = text_value(payload.get('topBott'), 'Top/Bottom', 50)
+        unitname = text_value(payload.get('unit'), 'Unit', 50)
+        colour = text_value(payload.get('colourCombo'), 'Colour/Combo', 100)
+        folding_part = text_value(payload.get('foldingParts'), 'Folding Parts', 100)
+        lotno = text_value(payload.get('lotNo'), 'Lot No', 10)
+        size = text_value(payload.get('size'), 'Size', 35)
+
+        entry_date = parse_date(str(payload.get('date') or ''))
+        if not entry_date:
+            raise ValueError('A valid entry date is required.')
+        entry_datetime = timezone.make_aware(
+            datetime.combine(entry_date, datetime.min.time()),
+            timezone.get_current_timezone(),
+        )
+
+        cutting_qty = whole_number(payload.get('cuttingQty'), 'Cutting Qty', minimum=1)
+        current_qty = whole_number(payload.get('currentQty'), 'Current Qty', minimum=1)
+        if current_qty > cutting_qty:
+            raise ValueError('Current Qty cannot exceed Cutting Qty.')
+
+        detail_ids = payload.get('detailIds')
+        if not isinstance(detail_ids, list) or not detail_ids:
+            raise ValueError('Scan at least one available roll before saving.')
+        detail_ids = [
+            whole_number(value, 'Folding detail ID', minimum=1)
+            for value in detail_ids
+        ]
+        if len(set(detail_ids)) != len(detail_ids):
+            raise ValueError('A folding detail ID cannot be selected more than once.')
+
+        requested_bundles = payload.get('bundles')
+        if not isinstance(requested_bundles, list) or not requested_bundles:
+            raise ValueError('At least one bundle quantity is required.')
+        bundles = [
+            whole_number(
+                row.get('qty') if isinstance(row, dict) else None,
+                f'Bundle {index} Qty',
+                minimum=1,
+            )
+            for index, row in enumerate(requested_bundles, start=1)
+        ]
+        if sum(bundles) != current_qty:
+            raise ValueError(f'Bundle quantities must total {current_qty} pcs.')
+
+        with transaction.atomic():
+            selected_details = list(
+                folding_data_details.objects.filter(
+                    id__in=detail_ids,
+                    rope_cutting__isnull=True,
+                    folding_data_id__jobno__iexact=jobno,
+                    folding_data_id__topbottom_des__iexact=topbottom,
+                    folding_data_id__unitname__iexact=unitname,
+                    folding_data_id__color__iexact=colour,
+                    folding_data_id__folding_part__iexact=folding_part,
+                    folding_data_id__lotno__iexact=lotno,
+                    folding_data_id__size__iexact=size,
+                ).values('id', 'kgs', 'mtr')
+            )
+            if {row['id'] for row in selected_details} != set(detail_ids):
+                raise ValueError(
+                    'One or more selected rolls are unavailable or do not match this entry.'
+                )
+
+            total_kgs = sum(
+                (row['kgs'] or Decimal('0') for row in selected_details),
+                Decimal('0'),
+            )
+            total_mtrs = sum(
+                (row['mtr'] or Decimal('0') for row in selected_details),
+                Decimal('0'),
+            )
+            entry = Rope_cutting_data.objects.create(
+                jobno=jobno,
+                topbottom=topbottom,
+                unitname=unitname,
+                date=entry_datetime,
+                color=colour,
+                folding_part=folding_part,
+                lotno=lotno,
+                size=size,
+                cutting_qty=str(cutting_qty),
+                current_qty=str(current_qty),
+                total_roll=len(detail_ids),
+                kgs=format(total_kgs, 'f'),
+                mtrs=format(total_mtrs, 'f'),
+            )
+            Rope_cutting_data_details.objects.bulk_create(
+                [
+                    Rope_cutting_data_details(
+                        rope_cutting_data_id=entry,
+                        bundle_qty=bundle_qty,
+                        s_no=index,
+                    )
+                    for index, bundle_qty in enumerate(bundles, start=1)
+                ]
+            )
+            linked_count = folding_data_details.objects.filter(
+                id__in=detail_ids,
+                rope_cutting__isnull=True,
+            ).update(rope_cutting=entry.id)
+            if linked_count != len(detail_ids):
+                raise ValueError(
+                    'One or more selected rolls were already used by another entry.'
+                )
+    except ValueError as error:
+        return JsonResponse({'error': str(error)}, status=400)
+
+    return JsonResponse(
+        {
+            'success': True,
+            'id': entry.id,
+            'detailCount': len(bundles),
+            'rollCount': len(detail_ids),
+        },
+        status=201,
+    )
 
 
 @csrf_exempt
