@@ -110,3 +110,24 @@ class Lotsticker(models.Model):
     class Meta:
         managed = False
         db_table = 'LotSticker'
+
+
+class Acc_Inward_Batch(models.Model):
+    sl = models.AutoField(db_column='Sl', primary_key=True)  # Field name made lowercase.
+    inwardno = models.IntegerField(db_column='InwardNo')  # Field name made lowercase.
+    inwarddate = models.DateTimeField(db_column='InwardDate')  # Field name made lowercase.
+    suppliername = models.CharField(db_column='SupplierName', max_length=200)  # Field name made lowercase.
+    pono = models.IntegerField(db_column='PONo')  # Field name made lowercase. 
+    accgorup = models.CharField(db_column='AccGroup', max_length=100)  # Field name made lowercase.
+    itemdescr = models.CharField(db_column='ItemDescr', max_length=500)  # Field name made lowercase.
+    jonno = models.CharField(db_column='JonNo', max_length=50, blank=True, null=True)  # Field name made lowercase.
+    color = models.CharField(db_column='Color', max_length=80)  # Field name made lowercase.
+    size = models.CharField(db_column='Size', max_length=80)  # Field name made lowercase.
+    poqty = models.DecimalField(db_column='POQty', max_digits=18, decimal_places=4)  # Field name made lowercase.
+    UOM = models.CharField(db_column='UOM', max_length=10)  # Field name made lowercase.
+    inwardqty = models.DecimalField(db_column='InwardQty', max_digits=18, decimal_places=4)  # Field name made lowercase.
+
+
+    class Meta:
+        managed = False
+        db_table = 'Acc_Inward_Batch'

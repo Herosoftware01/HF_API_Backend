@@ -8,8 +8,10 @@ from unittest.mock import MagicMock, patch
 from django.test import RequestFactory, SimpleTestCase, TestCase
 from rest_framework.test import APIRequestFactory, force_authenticate
 
+from .models import folding_data as FoldingDataModel
 from .models import Elastic_cutting_qty as ElasticCuttingQtyModel
 from .models import elastic_cons as ElasticConsModel
+from .models import Rope_cutting_data as RopeCuttingDataModel
 from .views import (
     UserUnitPermissionView,
     assembly_process_stock_available,
@@ -21,14 +23,21 @@ from .views import (
     get_assembly_dependency_statuses,
     get_bundle_last_process,
     GetUnitDataAPIView,
+    get_winding_colours,
+    get_winding_cutting_sizes,
+    get_rope_cutting_available_rolls,
+    get_winding_summary_details,
     delete_process_dependency,
     elastic_size_details,
     elastic_previous_cutting,
+    get_elastic_delivery_print,
     save_elastic_delivery,
     SaveAssemblySelectionView,
     save_elastic_cons,
     save_elastic_cutting_entry,
     save_process_dependency,
+    save_rope_cutting_entry,
+    save_winding_entry,
     split_process_descriptions,
     verify_process_dependency,
 )
@@ -56,6 +65,7 @@ class AssemblyProcessSequenceTests(SimpleTestCase):
             dependency,
             set(),
         ))
+
 
     def test_and_dependency_and_one_or_dependency_are_both_required(self):
         and_dependencies = {"top 2nd shoulder attach"}
@@ -222,6 +232,392 @@ class AssemblyProcessSequenceTests(SimpleTestCase):
                 {"process": "Unverified process", "verified": False},
             ],
         )
+
+
+class SaveWindingEntryTests(SimpleTestCase):
+    def setUp(self):
+        self.payload = {
+            "unit": "Unit A",
+            "jobNo": "JOB-1",
+            "topBott": "Top",
+            "emp_id": "EMP-1",
+            "colourCombo": "Navy",
+            "foldingParts": "Body",
+            "fabricColour": "Navy",
+            "lotNo": "LOT-1",
+            "size": "M",
+            "reqKg": "1.2990",
+            "reqMtr": "10.0000",
+            "prevKg": "0.0000",
+            "scannedRoll": {
+                "rollNo": "ROLL-1",
+                "colour": "Navy",
+                "lot": "LOT-1",
+                "fabricType": "Cotton",
+                "stockKg": "2.0000",
+                "stockMtr": "20.0000",
+            },
+            "windingDetails": [{"w_id": 2, "wgtKg": "1.2990", "mtrs": "5.0000"}],
+        }
+
+    def test_employee_id_is_required_before_saving(self):
+        payload = {**self.payload, "emp_id": ""}
+        request = RequestFactory().post(
+            "/api/winding/save/",
+            data=json.dumps(payload),
+            content_type="application/json",
+        )
+
+        response = save_winding_entry(request)
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("Employee ID is required", json.loads(response.content)["error"])
+
+    def test_rejects_winding_weight_above_required_kg(self):
+        payload = {
+            **self.payload,
+            "windingDetails": [{"wgtKg": "1.2991", "mtrs": "5.0000"}],
+        }
+        request = RequestFactory().post(
+            "/api/winding/save/",
+            data=json.dumps(payload),
+            content_type="application/json",
+        )
+
+        response = save_winding_entry(request)
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("Required Kg", json.loads(response.content)["error"])
+
+    def test_rejects_winding_weight_above_stock_kg(self):
+        payload = {
+            **self.payload,
+            "reqKg": "2.0000",
+            "scannedRoll": {**self.payload["scannedRoll"], "stockKg": "1.2990"},
+            "windingDetails": [{"wgtKg": "1.2991", "mtrs": "5.0000"}],
+        }
+        request = RequestFactory().post(
+            "/api/winding/save/",
+            data=json.dumps(payload),
+            content_type="application/json",
+        )
+
+        response = save_winding_entry(request)
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("Stock Kg", json.loads(response.content)["error"])
+
+    @patch("production_live_scan.views.folding_data_details.objects.bulk_create")
+    @patch("production_live_scan.views.folding_data.objects.create")
+    @patch("production_live_scan.views.transaction.atomic", return_value=nullcontext())
+    def test_saves_parent_and_winding_details(self, _atomic, create_entry, create_details):
+        create_entry.return_value = FoldingDataModel(id=42)
+        request = RequestFactory().post(
+            "/api/winding/save/",
+            data=json.dumps(self.payload),
+            content_type="application/json",
+        )
+
+        response = save_winding_entry(request)
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(
+            json.loads(response.content),
+            {"success": True, "id": 42, "detailCount": 1},
+        )
+        self.assertEqual(create_entry.call_args.kwargs["emp_id"], "EMP-1")
+        self.assertEqual(create_entry.call_args.kwargs["current_kg"], Decimal("1.2990"))
+        detail = create_details.call_args.args[0][0]
+        self.assertEqual(detail.wgt_kg, Decimal("1.2990"))
+        self.assertEqual(detail.roll_no, "ROLL-1")
+        self.assertEqual(detail.w_id, 2)
+
+
+class WindingSummaryTests(SimpleTestCase):
+    @patch("production_live_scan.views.folding_data.objects.filter")
+    @patch("production_live_scan.views.ViewFabricfoldingRibdetails.objects.using")
+    def test_summary_includes_saved_previous_winding_totals(
+        self,
+        source_using,
+        saved_filter,
+    ):
+        source_using.return_value.filter.return_value.values.return_value.order_by.return_value = [
+            {
+                "comboclr": "Navy",
+                "portion_des": "Body",
+                "fabclr": "Navy",
+                "lotno": "LOT-1",
+                "siz": "M",
+                "kg": Decimal("2.0000"),
+                "mtr": Decimal("10.0000"),
+            }
+        ]
+        saved_filter.return_value.values.return_value.annotate.return_value = [
+            {
+                "color": "Navy",
+                "folding_part": "Body",
+                "fabclr": "Navy",
+                "lotno": "LOT-1",
+                "size": "M",
+                "previous_kg": Decimal("1.2990"),
+                "previous_mtr": Decimal("5.0000"),
+            }
+        ]
+        request = RequestFactory().get(
+            "/api/winding/summary/",
+            {"unit": "Unit A", "jobno": "JOB-1", "topbottom": "Top"},
+        )
+
+        response = get_winding_summary_details(request)
+
+        row = json.loads(response.content)["rows"][0]
+        self.assertEqual(row["prevKg"], "1.2990")
+        self.assertEqual(row["prevMtr"], "5.0000")
+
+
+class WindingCuttingSizeTests(SimpleTestCase):
+    @patch("production_live_scan.views.Rope_cutting_data.objects.filter")
+    @patch("production_live_scan.views.ViewCuttingQtyDetailsLotUnit.objects.using")
+    def test_sizes_include_saved_previous_cut_totals(
+        self,
+        source_using,
+        previous_filter,
+    ):
+        source_using.return_value.filter.return_value.values.return_value.order_by.return_value = [
+            {"name": "M", "noofpcs": 12},
+            {"name": "L", "noofpcs": 8},
+        ]
+        (
+            previous_filter.return_value.exclude.return_value.exclude.return_value
+            .values.return_value.annotate.return_value
+        ) = [{"size": "m", "prev_cut": 4}]
+        request = RequestFactory().get(
+            "/api/winding/sizes/",
+            {
+                "unit": "Unit A",
+                "job_no": "JOB-1",
+                "top_bottom": "Top",
+                "colour_combo": "Navy",
+                "folding_parts": "Body",
+                "lot_no": "LOT-1",
+            },
+        )
+
+        response = get_winding_cutting_sizes(request)
+
+        source_using.return_value.filter.assert_called_once_with(
+            unitname__iexact="Unit A",
+            jobno__iexact="JOB-1",
+            topbottom_des__iexact="Top",
+            comboclr__iexact="Navy",
+            lotno__iexact="LOT-1",
+        )
+        previous_filter.assert_called_once_with(
+            unitname__iexact="Unit A",
+            jobno__iexact="JOB-1",
+            topbottom__iexact="Top",
+            color__iexact="Navy",
+            folding_part__iexact="Body",
+            lotno__iexact="LOT-1",
+        )
+        self.assertEqual(
+            json.loads(response.content)["sizes"],
+            [
+                {"size": "M", "cut_qty": 12, "prev_cut": 4},
+                {"size": "L", "cut_qty": 8, "prev_cut": 0},
+            ],
+        )
+
+    @patch("production_live_scan.views.ViewFabricfoldingRibdetails.objects.using")
+    def test_colours_use_selected_unit_job_and_topbottom(self, source_using):
+        (
+            source_using.return_value.filter.return_value
+            .exclude.return_value.exclude.return_value
+            .values_list.return_value.distinct.return_value.order_by.return_value
+        ) = ["Navy"]
+        request = RequestFactory().get(
+            "/api/winding/colours/",
+            {
+                "unit": "Unit A",
+                "job_no": "JOB-1",
+                "top_bottom": "Top",
+            },
+        )
+
+        response = get_winding_colours(request)
+
+        source_using.return_value.filter.assert_called_once_with(
+            unitname__iexact="Unit A",
+            jobno__iexact="JOB-1",
+            topbottom_des__iexact="Top",
+        )
+        self.assertEqual(json.loads(response.content)["colours"], ["Navy"])
+
+
+class RopeCuttingAvailableRollTests(SimpleTestCase):
+    @patch("production_live_scan.views.folding_data_details.objects.filter")
+    @patch("production_live_scan.views.folding_data.objects.filter")
+    def test_rolls_are_loaded_through_matching_folding_entry_ids(
+        self,
+        folding_filter,
+        details_filter,
+    ):
+        folding_filter.return_value.values_list.return_value = [17]
+        details_filter.return_value.values.return_value.order_by.return_value = [
+            {
+                "id": 29,
+                "roll_no": "ROLL-1",
+                "color": "Navy",
+                "lotno": "LOT-1",
+                "fabric": "Rib",
+                "kgs": Decimal("1.2500"),
+                "mtr": Decimal("8.5000"),
+            }
+        ]
+        request = RequestFactory().get(
+            "/api/winding/folding-rolls/",
+            {
+                "unit": "Unit A",
+                "job_no": "JOB-1",
+                "top_bottom": "Top",
+                "colour_combo": "Navy",
+                "folding_parts": "Body",
+                "lot_no": "LOT-1",
+                "size": "M",
+            },
+        )
+
+        response = get_rope_cutting_available_rolls(request)
+
+        folding_filter.assert_called_once_with(
+            topbottom_des__iexact="Top",
+            jobno__iexact="JOB-1",
+            unitname__iexact="Unit A",
+            color__iexact="Navy",
+            folding_part__iexact="Body",
+            lotno__iexact="LOT-1",
+            size__iexact="M",
+        )
+        details_filter.assert_called_once_with(
+            folding_data_id__in=[17],
+            rope_cutting__isnull=True,
+        )
+        self.assertEqual(
+            json.loads(response.content)["rolls"],
+            [
+                {
+                    "detailId": 29,
+                    "rollNo": "ROLL-1",
+                    "colour": "Navy",
+                    "lotNo": "LOT-1",
+                    "fabric": "Rib",
+                    "siz": "M",
+                    "kgs": 1.25,
+                    "mtrs": 8.5,
+                }
+            ],
+        )
+
+
+class SaveRopeCuttingEntryTests(SimpleTestCase):
+    def setUp(self):
+        self.payload = {
+            "date": "2026-11-23",
+            "unit": "Unit A",
+            "jobNo": "JOB-1",
+            "topBott": "Top",
+            "colourCombo": "Navy",
+            "foldingParts": "Body",
+            "lotNo": "LOT-1",
+            "size": "M",
+            "cuttingQty": 12,
+            "currentQty": 6,
+            "detailIds": [9],
+            "bundles": [{"qty": 2}, {"qty": 4}],
+        }
+
+    def test_saves_cutting_header_bundles_and_links_fold_details(self):
+        request = RequestFactory().post(
+            "/api/winding/rope-cutting/save/",
+            data=json.dumps(self.payload),
+            content_type="application/json",
+        )
+        selected_query = MagicMock()
+        selected_query.values.return_value = [
+            {
+                "id": 9,
+                "kgs": Decimal("3.6000"),
+                "mtr": Decimal("0.0000"),
+            }
+        ]
+        link_query = MagicMock()
+        link_query.update.return_value = 1
+
+        with (
+            patch("production_live_scan.views.Rope_cutting_data.objects.create") as header_create,
+            patch(
+                "production_live_scan.views.Rope_cutting_data_details.objects.bulk_create"
+            ) as details_create,
+            patch(
+                "production_live_scan.views.folding_data_details.objects.filter",
+                side_effect=[selected_query, link_query],
+            ) as fold_details_filter,
+            patch("production_live_scan.views.transaction.atomic", return_value=nullcontext()),
+        ):
+            header_create.return_value = RopeCuttingDataModel(id=42)
+            response = save_rope_cutting_entry(request)
+
+        self.assertEqual(response.status_code, 201, json.loads(response.content))
+        self.assertEqual(json.loads(response.content)["id"], 42)
+        header_values = header_create.call_args.kwargs
+        self.assertEqual(
+            {key: value for key, value in header_values.items() if key != "date"},
+            {
+                "jobno": "JOB-1",
+                "topbottom": "Top",
+                "unitname": "Unit A",
+                "color": "Navy",
+                "folding_part": "Body",
+                "lotno": "LOT-1",
+                "size": "M",
+                "cutting_qty": "12",
+                "current_qty": "6",
+                "total_roll": 1,
+                "kgs": "3.6000",
+                "mtrs": "0",
+            },
+        )
+        saved_bundles = details_create.call_args.args[0]
+        self.assertEqual(
+            [(row.bundle_qty, row.s_no) for row in saved_bundles],
+            [(2, 1), (4, 2)],
+        )
+        fold_details_filter.assert_called_with(
+            id__in=[9],
+            rope_cutting__isnull=True,
+        )
+        link_query.update.assert_called_once_with(rope_cutting=42)
+
+    def test_rejects_bundle_quantities_that_do_not_match_current_qty(self):
+        self.payload["bundles"] = [{"qty": 5}]
+        request = RequestFactory().post(
+            "/api/winding/rope-cutting/save/",
+            data=json.dumps(self.payload),
+            content_type="application/json",
+        )
+
+        with (
+            patch("production_live_scan.views.Rope_cutting_data.objects.create") as header_create,
+            patch(
+                "production_live_scan.views.Rope_cutting_data_details.objects.bulk_create"
+            ) as details_create,
+        ):
+            response = save_rope_cutting_entry(request)
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("must total 6 pcs", json.loads(response.content)["error"])
+        header_create.assert_not_called()
+        details_create.assert_not_called()
 
 
 class AssemblyTransferFilteringTests(SimpleTestCase):
@@ -1042,6 +1438,58 @@ class ElasticDeliverySaveTests(SimpleTestCase):
         self.assertEqual(response.status_code, 400)
         delivery_create.assert_not_called()
         detail_create.assert_not_called()
+
+
+class ElasticDeliveryPrintTests(SimpleTestCase):
+    def test_returns_matching_delivery_headers_and_bundle_details(self):
+        request = APIRequestFactory().get(
+            "/api/delivery/print/",
+            {
+                "job_no": "ORD-1",
+                "topbottom": "TOP",
+                "colour": "BLACK",
+                "unit": "UNIT-1",
+            },
+        )
+        delivery = SimpleNamespace(
+            id=12,
+            job_no="ORD-1",
+            topbottom="TOP",
+            colour="BLACK",
+            unit="UNIT-1",
+            delivery_date=datetime(2026, 11, 19, tzinfo=datetime_timezone.utc),
+        )
+        detail = SimpleNamespace(id=34)
+        bundle = SimpleNamespace(
+            bdl_id=101,
+            size="M",
+            elastic_cutting_qty="4",
+            len_cm="63",
+        )
+        with (
+            patch("production_live_scan.views.ElasticDelivery.objects.filter") as delivery_filter,
+            patch("production_live_scan.views.ElasticDeliveryDetails.objects.filter") as detail_filter,
+            patch("production_live_scan.views.Elastic_cutting_qty_details.objects.filter") as bundle_filter,
+        ):
+            delivery_filter.return_value.order_by.return_value = [delivery]
+            detail_filter.return_value.order_by.return_value = [detail]
+            bundle_filter.return_value.order_by.return_value = [bundle]
+
+            response = get_elastic_delivery_print(request)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["deliveries"][0]["delivery_id"], 12)
+        self.assertEqual(
+            response.data["deliveries"][0]["bundles"],
+            [{"bdl_id": 101, "size": "M", "qty": "4", "len_cm": "63"}],
+        )
+        delivery_filter.assert_called_once_with(
+            job_no="ORD-1",
+            topbottom="TOP",
+            colour="BLACK",
+            unit="UNIT-1",
+        )
+        bundle_filter.assert_called_once_with(delivery=True, delivery_id__in=[34])
 
 
 class ElasticPreviousCuttingTests(SimpleTestCase):

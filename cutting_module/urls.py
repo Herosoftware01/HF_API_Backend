@@ -10,6 +10,8 @@ urlpatterns = [
     path('fabric_inward_summary/', views.get_fabric_inward_summary, name='fabric_inward_summary'),
     path('fabric_delivery_summary/', views.get_fabric_delivery_summary, name='fabric_delivery_summary'),
     path('fabric_return_summary/', views.get_Fabric_return_summary, name='fabric_return_summary'),
+    path("ocrmanual_stock/", views.manual_stock_list_create, name="manual_stock_list_create"),
+    path("ocrmanual_stock/<int:sno>/", views.manual_stock_detail, name="manual_stock_detail"),
 
     #Cutting Summary API
     path('get_cutting_summary/', views.get_cutting_summary, name='cutting_ocr'),
