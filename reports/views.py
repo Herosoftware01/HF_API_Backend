@@ -837,6 +837,7 @@ def AutoPayReport(request):
         no = request.GET.get('no')
         from_date = request.GET.get('from_date')
         to_date = request.GET.get('to_date')
+        email = request.GET.get('email')
 
         queryset = ViewPayAutoReport.objects.using('test').all()
 
@@ -847,6 +848,10 @@ def AutoPayReport(request):
         if no:
             no_list = [item.strip() for item in no.split(",") if item.strip()]
             queryset = queryset.filter(no__in=no_list)
+
+        if email:
+            email_list = [item.strip() for item in email.split(",") if item.strip()]
+            queryset = queryset.filter(email__in=email_list)
 
         if from_date or to_date:
 

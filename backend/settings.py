@@ -113,6 +113,7 @@ INSTALLED_APPS = [
     'incentive_debit',
     'weighing',
     'cutting_module',
+    'Grievance',
 
 ]
 

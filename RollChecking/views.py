@@ -30,7 +30,7 @@ def Roll_Employee(request):
 
 
 @csrf_exempt
-@require_http_methods(["GET", "POST"])
+@require_http_methods(["GET", "POST", "DELETE"])
 def Roll_Employee_Details(request):
 
     if request.method == "GET":
@@ -63,6 +63,41 @@ def Roll_Employee_Details(request):
 
         return JsonResponse(data, safe=False)
 
+    if request.method == "DELETE":
+        try:
+            body = json.loads(request.body)
+            sl = body.get("sl")
+
+            if not sl:
+                return JsonResponse({
+                    "error": "sl is required"
+                }, status=400)
+
+            today = date.today()
+
+            obj = RollEmpDetails.objects.using("default").filter(
+                sl=sl,
+                date__date=today
+            ).first()
+
+            if not obj:
+                return JsonResponse({
+                    "message": "Allocation record not found"
+                }, status=404)
+
+            obj.delete(using="default")
+
+            return JsonResponse({
+                "message": "Allocation deleted successfully",
+                "deleted": True,
+                "sl": sl
+            }, status=204)
+
+        except json.JSONDecodeError:
+            return JsonResponse({
+                "error": "Invalid JSON body"
+            }, status=400)
+
     try:
         body = json.loads(request.body)
 
@@ -76,18 +111,27 @@ def Roll_Employee_Details(request):
 
         today = date.today()
 
-        exists = RollEmpDetails.objects.using("default").filter(
+        obj = RollEmpDetails.objects.using("default").filter(
             machine_id=machine_id,
             c_code=c_code,
             date__date=today
-        ).exists()
+        ).order_by("-date", "-sl").first()
 
-        if exists:
+        if obj:
+            # Update helper only
+            obj.h_code = body.get("h_code") or None
+            obj.h_name = body.get("h_name") or None
+
+            obj.save(using="default", update_fields=["h_code", "h_name"])
+
             return JsonResponse({
-                "message": "Machine and checker already exist today",
-                "saved": False
-            }, status=409)
+                "message": "Helper updated successfully",
+                "saved": True,
+                "updated": True,
+                "sl": obj.sl
+            }, status=201)
 
+        # New checker allocation - create new record
         obj = RollEmpDetails.objects.using("default").create(
             machine_id=machine_id,
             c_code=c_code,
@@ -97,9 +141,11 @@ def Roll_Employee_Details(request):
         )
 
         return JsonResponse({
-            "message": "Saved successfully",
+            "message": "New allocation saved successfully",
             "saved": True,
-        }, status=201)
+            "updated": False,
+            "sl": obj.sl
+        }, status=200)
 
     except json.JSONDecodeError:
         return JsonResponse({
